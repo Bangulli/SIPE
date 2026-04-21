@@ -1,0 +1,5 @@
+BPTorch @ git+https://github.com/Bangulli/BPTorch@d00339e055d59d46a75ec8a4d4a2e55ca400297e
+huggingface_hub
+torchvision
+timm
+xformers
