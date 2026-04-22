@@ -20,13 +20,14 @@ class Curriculum(list):
     def __init__(self):
         super().__init__()
         
-    def add_step(self, step_type='recon', epochs=5, adverse_alpha=0.1, lr=3e-4, restarts=5):
+    def add_step(self, step_type='recon', epochs=5, adverse_alpha=0.1, lr=3e-4, restarts=5, norm=True):
         self.append({
             'type': step_type,
             'epochs': epochs,
             'lr': lr,
             'adverse_alpha': adverse_alpha,
             'restarts': restarts,
+            'adverse_norm': norm,
         })
         
     def save(self, path):
@@ -40,6 +41,9 @@ class Curriculum(list):
         curriculum = cls()
         curriculum.extend(data)
         return curriculum
+    
+    def extend(self, cr):
+        self += cr
 
 class CurriculumTrainer:
     def __init__(self, model, loss_recon, loss_adverse, 
@@ -124,23 +128,29 @@ class CurriculumTrainer:
         
     def train(self, train, val, curriculum, ckpt_dir='checkpoints', batch_size=32):
         os.makedirs(self.wdir/ckpt_dir, exist_ok=True)
-        curriculum.save(self.wdir/ckpt_dir/'curriculum.json')
+        
+        if not os.path.exists(self.wdir/ckpt_dir/'curriculum.json'): curriculum.save(self.wdir/ckpt_dir/'curriculum.json')
+        else: 
+            extended_cr = Curriculum.load(self.wdir/ckpt_dir/'curriculum.json')
+            extended_cr.extend(curriculum)
+            extended_cr.save(self.wdir/ckpt_dir/'curriculum.json')
+        
         train_loader = DataLoader(train, batch_size, collate_fn=bptorch_collate, shuffle=True) ## needs pre extracted patches to run efficiently
         val_loader = DataLoader(val, batch_size, collate_fn=bptorch_collate)
         self.model.to(self.device)
         
-        strt = 1
-        for step in curriculum:
-            step_type, epochs, lr, adverse_alpha, restarts = itemgetter('type', 'epochs', 'lr', 'adverse_alpha', 'restarts')(step)
+        strt = len([d for d in os.listdir(self.wdir/ckpt_dir) if (self.wdir/ckpt_dir/d).is_dir()])+1
+        for i, step in enumerate(curriculum):
+            step_type, epochs, lr, adverse_alpha, restarts, adv_norm = itemgetter('type', 'epochs', 'lr', 'adverse_alpha', 'restarts', 'adverse_norm')(step)
             self.optim = self.optim_base(self.model.parameters(), lr=lr)
             self.scheduler = self.scheduler_base(self.optim, restarts)
-            if step_type.lower()=='recon': self._train_recon(strt, epochs, train_loader, val_loader, ckpt_dir)
-            elif step_type.lower()=='adverse': self._train_adverse(strt, epochs, train_loader, val_loader, ckpt_dir, adverse_alpha)
+            if step_type.lower()=='recon': self._train_recon(strt, epochs, train_loader, val_loader, ckpt_dir, i)
+            elif step_type.lower()=='adverse': self._train_adverse(strt, epochs, train_loader, val_loader, ckpt_dir, adverse_alpha, adv_norm, i)
             else: raise ValueError(f'Allowed step types are [recon, adverse], but got {step_type.lower()} instead')
             strt += epochs
         
         
-    def _train_recon(self, strt, epochs, train_loader, val_loader, ckpt_dir):
+    def _train_recon(self, strt, epochs, train_loader, val_loader, ckpt_dir, step):
         ######### recon step ########################################################################
         self.model.freeze_or_unfreeze_disentangler(True)
         for epoch in range(strt, epochs+strt):
@@ -154,7 +164,7 @@ class CurriculumTrainer:
                 's std': [],
                 's norm': [],
             }
-            print(f'---------------------- Step: recon {epoch}/{epochs+strt-1} - Recon ----------------------')
+            print(f'---------------------- Step: {step} {epoch}/{epochs+strt-1} - Recon ----------------------')
             with torch.enable_grad():
                 self.model.train()
                 batch_losses = []
@@ -197,9 +207,10 @@ class CurriculumTrainer:
             self.save()
             self._plt_progress()
             
-    def _train_adverse(self, strt, epochs, train_loader, val_loader, ckpt_dir, alpha):
+    def _train_adverse(self, strt, epochs, train_loader, val_loader, ckpt_dir, alpha, norm, step):
             ######### adversarial step ########################################################################
             self.model.freeze_or_unfreeze_disentangler(False) 
+            if type(alpha)!=float: assert len(alpha)==len(range(strt, epochs+strt)), 'Size of alphas list has to match amount of epochs.'
             for i, epoch in enumerate(range(strt, epochs+strt)):
                 logger = {
                     'Recon Img': [],
@@ -211,11 +222,13 @@ class CurriculumTrainer:
                     's std': [],
                     's norm': [],
                 }
-                print(f'---------------------- Step: adverse {epoch}/{epochs+strt-1} - Adverse - Alpha: {alpha:.2f} ----------------------')
+                if type(alpha)==float: self.loss_a.set_adverse_alpha(alpha)
+                else: self.loss_a.set_adverse_alpha(alpha[i])
+                cur_alpha = alpha if type(alpha)==float else alpha[i]
+                self.loss_a.set_adverse_norm(norm)
+                print(f'---------------------- Step: {step} {epoch}/{epochs+strt-1} - Adverse - Alpha: {cur_alpha:.2f} ----------------------')
                 with torch.enable_grad():
                     self.model.train()
-                    if type(alpha)==float: self.loss_a.set_adverse_alpha(alpha)
-                    else: self.loss_a.set_adverse_alpha(alpha[i])
                     batch_losses = []
                     for i, batch in enumerate(ProgBar(train_loader, desc=f'Training Batches')):
                         self.optim.zero_grad()

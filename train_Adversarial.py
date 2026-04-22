@@ -7,6 +7,7 @@ import torch,os
 import torchvision.transforms as T
 import time
 import warnings, json
+import numpy as np
 warnings.filterwarnings('ignore')
 
 
@@ -25,9 +26,9 @@ if __name__ == '__main__':
     
     ## setup curriculum
     cr = Curriculum()
-    cr.add_step('adverse', 20, 1.0, 3e-4, 10)
-    cr.add_step('recon', 2, 0, 3e-4, 2)
-    cr.add_step('adverse', 20, 1.0, 3e-4, 10)
+    alphas = np.arange(0.1, 1.0, 0.1, dtype=float).tolist()
+    alphas += (20-len(alphas))*[1.0]
+    cr.add_step('adverse', 20, alphas, 1e-4, 10, False)
     
     ## prep train trans
     kwargs = WsiDicomDataset.get_default_kwargs()

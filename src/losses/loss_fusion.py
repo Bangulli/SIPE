@@ -121,6 +121,9 @@ class SIPE_Loss_Adversarial(nn.Module):
     def set_adverse_alpha(self, alpha):
         self.alpha=alpha
         
+    def set_adverse_norm(self, norm):
+        self.stain_classif_loss.set_norm(norm)
+        
     def forward(self, 
                 gt, ## the gt, dict, 'image': [B, C, H, W]
                 proj_stain, ## the embedding containing stain info [B, N]
