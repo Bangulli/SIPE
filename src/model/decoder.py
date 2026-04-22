@@ -75,6 +75,24 @@ def get_decoder(base_model, channels, num_features):
         
     )
 
+def get_proj_decoder(base_model, channels, num_features):
+    return nn.Sequential(
+        nn.Conv2d(num_features, num_features, kernel_size=1),
+        # 16x16 -> 28x28
+        nn.ConvTranspose2d(num_features, 256, kernel_size=4, stride=2, padding=1),
+        nn.BatchNorm2d(256), nn.GELU(),
+        # 28x28 -> 56x56
+        nn.ConvTranspose2d(256, 128, kernel_size=4, stride=2, padding=1),
+        nn.BatchNorm2d(128), nn.GELU(),
+        # 56x56 -> 112x112
+        nn.ConvTranspose2d(128, 64, kernel_size=4, stride=2, padding=1),
+        nn.BatchNorm2d(64), nn.GELU(),
+        # 112x112 -> 256x256
+        nn.ConvTranspose2d(64, channels, kernel_size=4, stride=2, padding=1),
+        # 256x256 -> 224x224
+        nn.Upsample(size=(224, 224), mode='bilinear', align_corners=False),
+        
+    )
 
 if __name__ == '__main__':
     get_decoder("hf-hub:bioptimus/H-optimus-0", 3)

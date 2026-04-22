@@ -18,9 +18,28 @@ class ConvDisentangler(nn.Module):
         self.s_projector = ConvProjector(inputs, s_size)
         self.z_projector = ConvProjector(inputs, z_size)
         
-    def forward(self, x):
-        s = self.s_projector(x)
-        z = self.z_projector(x)
+    def forward(self, tokens):
+        patches = tokens[:,5:,:].permute(0, 2, 1) ## cut out cls and register tokens
+        patches = patches.reshape(patches.shape[0], 768, 16, 16) ## reshape to feature map 
+        s = self.s_projector(patches)
+        z = self.z_projector(patches)
+        return torch.cat([s, z], dim=1)
+    
+# Mixed Projector ####################################################
+
+class MixedDisentangler(nn.Module):
+    def __init__(self, inputs, s_size, z_size): # s is specified, z is unspecified
+        super().__init__()
+        self.s_projector = Projector(inputs, s_size)
+        self.z_projector = ConvProjector(inputs, z_size)
+        
+    def forward(self, tokens):
+        patches = tokens[:,5:,:].permute(0, 2, 1) ## cut out cls and register tokens
+        patches = patches.reshape(patches.shape[0], 768, 16, 16) ## reshape to feature map 
+        z = self.z_projector(patches)
+        cls_toks = tokens[:,0,:]
+        s = self.s_projector(cls_toks)
+        s = s[:, :, None, None].expand(-1, -1, 16, 16)
         return torch.cat([s, z], dim=1)
 
 # Projector ######################################################## 

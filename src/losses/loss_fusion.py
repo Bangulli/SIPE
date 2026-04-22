@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 ######## Internal ########
 from src.losses.image_recon_loss import ImageReconLoss
-from src.losses.morphologic_recon_loss import MorphReconLoss_SSIM
+from src.losses.morphologic_recon_loss import MorphReconLoss_SSIM_Sobel
 from src.losses.staining_cluster_loss import SimCLR_NCE_Loss
 from src.losses.adversarial_classif_loss import AdversarialClassifLoss
 ##########################
@@ -17,7 +17,7 @@ class SIPE_Loss_Recon(nn.Module):
         super().__init__()
         self.testmode=testmode
         self.image_recon_loss = ImageReconLoss(testmode=False)
-        self.morph_recon_loss = MorphReconLoss_SSIM(testmode=False)
+        self.morph_recon_loss = MorphReconLoss_SSIM_Sobel(testmode=False)
         
         
     def forward(self, 
@@ -61,7 +61,7 @@ class SIPE_Loss_InfoNCE(nn.Module):
         super().__init__()
         self.testmode=testmode
         self.image_recon_loss = ImageReconLoss(testmode=False)
-        self.morph_recon_loss = MorphReconLoss_SSIM(testmode=False)
+        self.morph_recon_loss = MorphReconLoss_SSIM_Sobel(testmode=False)
         self.stain_cluster_loss = SimCLR_NCE_Loss(testmode=testmode) ## relies on a shuffled dataset. if not shuffled it is impossible to construct pos/neg pairs.
         
     def forward(self, 
@@ -114,7 +114,7 @@ class SIPE_Loss_Adversarial(nn.Module):
         super().__init__()
         self.testmode=testmode
         self.image_recon_loss = ImageReconLoss(testmode=False)
-        self.morph_recon_loss = MorphReconLoss_SSIM(testmode=False)
+        self.morph_recon_loss = MorphReconLoss_SSIM_Sobel(testmode=False)
         self.stain_classif_loss = AdversarialClassifLoss(testmode=testmode) ## relies on a shuffled dataset. if not shuffled it is impossible to construct pos/neg pairs.
         self.alpha = 0.05
     

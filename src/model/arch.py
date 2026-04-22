@@ -7,9 +7,9 @@ import torch
 import torch.nn as nn
 ######## Internal ########
 from src.model.encoder import get_encoder_and_transforms
-from src.model.decoder import get_decoder
+from src.model.decoder import get_decoder, get_proj_decoder
 from torchvision.transforms import ToPILImage
-from src.model.projector import Projector, FullProjector, FullNormalizer, Disentangler, ConvDisentangler
+from src.model.projector import Projector, FullProjector, FullNormalizer, Disentangler, ConvDisentangler, MixedDisentangler
 from src.model.classifier import FullClassif, FullConvClassif
 from src.utils.misc import make_name_from_list
 ##########################
@@ -27,10 +27,10 @@ class H0_mini_for_Adversarial(nn.Module):
         self._freeze_model(self.backbone) ## freeze backbone
         print('Backbone built!')
         
-        self.base_projector = ConvDisentangler(768, emb_stain_size, 768-emb_stain_size)
+        self.base_projector = MixedDisentangler(768, emb_stain_size, 768-emb_stain_size)
         print('Disentangler built!')
         
-        self.image_decoder = get_decoder(base_model, 3, num_features) ## decoder for image recon
+        self.image_decoder = get_proj_decoder(base_model, 3, num_features) ## decoder for image recon, adds a projection layer to mix stain
         print('Image Decoder built!')
         
         self.morph_decoder = get_decoder(base_model, 1, num_features-emb_stain_size) ## decoder for morpholgy recon -> canny mask
@@ -47,16 +47,20 @@ class H0_mini_for_Adversarial(nn.Module):
         
     def forward(self, batch):
         tokens = self.backbone(batch['image'].to(self.device)) # [B, 261, 768]
-        x = tokens[:,5:,:].permute(0, 2, 1) ## cut out cls and register tokens
-        x = x.reshape(x.shape[0], 768, 16, 16) ## reshape to feature map 
-        return self.base_projector(x)
+        return self.base_projector(tokens)
+    
+    def transform_labels(self, batch):
+        return self.classif.transform_labels(self.parse_labels(batch))
+    
+    def parse_labels(self, batch):
+        return [make_name_from_list(l['staining']) for l in batch['metadata']]
     
     def loss(self, batch, loss, logger=None, val=False):  
         emb = self.forward(batch)
         
         ## project and split
         subsec_stain_proba, subsec_morph_proba = self.classif(emb)
-        batch['labels'] = self.classif.transform_labels([make_name_from_list(l['staining']) for l in batch['metadata']])
+        batch['labels'] = self.transform_labels(batch)
         
         ## recon
         rec_img = self.image_decoder(emb)

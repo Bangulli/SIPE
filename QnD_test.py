@@ -36,7 +36,10 @@ def make_side_by_side(images, path):
     fig.savefig(path)
     
 if __name__ == '__main__':
-    sourcedir = pl.Path('/home/lorenz/BigPicture/SIPE/SIPE-1M-Curriculum')
+    
+    sourcedir = pl.Path('/home/lorenz/BigPicture/SIPE/SIPE-50k-ProjRecon')
+    
+    print(f'Running a quick and dirty test for trainer at {sourcedir}')
     
     with open('/home/lorenz/BigPicture/SIPE/classes.json', 'r') as f:
         classes = json.load(f)

@@ -44,24 +44,6 @@ def make_name_from_list(data):
     return "+".join(data)
     
 if __name__ == '__main__':
-    # #########################################################################################################################################
-    # ## setup instances of model and trainer
-    # model = H0_mini_for_InfoNCE(device='cuda:1')
-    # trainer = Trainer(model, SIPE_Loss_InfoNCE(), wdir='SIPE-50k-InfoNCE', device=model.device)
-    # kwargs = WsiDicomDataset.get_default_kwargs()
-    # kwargs['transforms'] = model.transform
-
-    # ## load trainset and point to patch source
-    # trainset = BigPictureRepository('/mnt/nas6/data/BigPicture_CBIR/datasets/BPTorch/fold_1/BPR.json', load=True, wsidicomdataset_kwargs=kwargs, verbose=False) ## loading valset becuase the content gets overwritten by pointing to preextracted patches. this is just faster than loading the full training fold every time
-    # trainset.source_precomputed_patches_from('rnd-subsubset-50k')
-    
-    # ## load valset and point to patch source
-    # valset = BigPictureRepository('/mnt/nas6/data/BigPicture_CBIR/datasets/BPTorch/fold_1/BPR.json', load=True, wsidicomdataset_kwargs=kwargs, verbose=False)
-    # valset.source_precomputed_patches_from('rnd-subset-val')
-    
-    # ## yeet
-    # trainer.train(trainset, valset, epochs=3, batch_size=256, lr=3e-4, restarts=25)
-    
     #########################################################################################################################################
     ## setup instances of model and trainer
     with open('/home/lorenz/BigPicture/SIPE/classes.json', 'r') as f:
@@ -83,32 +65,17 @@ if __name__ == '__main__':
     valset = BigPictureRepository('/mnt/nas6/data/BigPicture_CBIR/datasets/BPTorch/fold_1/BPR.json', load=True, wsidicomdataset_kwargs=kwargs, verbose=False)
     valset.source_precomputed_patches_from('rnd-subset-val')
     
-    cr = Curriculum()
-    cr.add_step('adverse', 5, 1.0, 3e-4, 5)
-    # cr.add_step('recon', 1, 0, 3e-4, 1)
-    # cr.add_step('adverse', 1, 0.1, 3e-4, 1)
-    # cr.add_step('adverse', 1, 0.25, 3e-4, 1)
-    # cr.add_step('recon', 1, 0, 3e-4, 1)
-    # cr.add_step('adverse', 1, 0.5, 3e-4, 1)
-    # cr.add_step('recon', 1, 0, 3e-4, 1)
-    
-    pretrainer = Trainer(model, SIPE_Loss_Recon(), wdir='SIPE-50k-Curriculum', device=model.device)
-    cr_trainer = CurriculumTrainer(pretrainer.load_best_model(), SIPE_Loss_Recon(), SIPE_Loss_Adversarial(), wdir='SIPE-50k-Curriculum2', device=model.device)
-    cr_trainer.train(trainset, valset, cr, batch_size=768)
+    ## setup and run reconstruction pretrainer
+    pretrainer = Trainer(model, SIPE_Loss_Recon(), wdir='SIPE-50k-ProjRecon', device=model.device)
+    pretrainer.train(trainset, valset, 5, 3e-4, 5, batch_size=768)
 
-    # trainer = CurriculumTrainer(model, SIPE_Loss_Recon(), SIPE_Loss_Adversarial(), wdir='SIPE-50k-Curriculum', device=model.device)
-    # trainer.train(trainset, valset, total_steps=4,epochs_per_step=5, lr=3e-4, restarts=5, batch_size=512, delta_adverse_alpha=0.1)
+    raise
+    ## setup curriculum
+    cr = Curriculum()
+    cr.add_step('adverse', 10, 0.1, 3e-4, 10, True)
+    cr.add_step('adverse', 10, 0.25, 3e-4, 10, True)
+    cr.add_step('recon', 5, 0, 3e-4, 5, True)
     
-    # ## pretrain reconstruction
-    # trainer = Trainer(model, SIPE_Loss_Recon(), wdir='SIPE-1M-Adverse', device=model.device)
-    # # trainer.train(trainset, valset, epochs=20, batch_size=256, lr=3e-4)
-    
-    # ## full send
-    # pretrainer = Trainer(model, SIPE_Loss_Recon(), wdir='SIPE-50k-Curriculum', device=model.device)
-# This portion of the code is setting up a training process using a `Trainer` object with a custom
-# loss function `SIPE_Loss_Adversarial()` for training a model. Here's a breakdown of what each line
-# is doing:
-    # loss=SIPE_Loss_Adversarial()
-    # trainer = Trainer(model, loss, wdir='SIPE-50k-Curriculum', device=model.device)
-    # trainer.loss.set_adverse_alpha(1.0)
-    # trainer.train(trainset, valset, epochs=10, batch_size=768, lr=3e-4, restarts=5)
+    ## setup and run curriculum trainer
+    cr_trainer = CurriculumTrainer(pretrainer.load_best_model(), SIPE_Loss_Recon(), SIPE_Loss_Adversarial(), 'SIPE-50k-ProjCurriculum')
+    cr_trainer.train(trainset, valset, cr, batch_size=768)

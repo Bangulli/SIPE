@@ -18,7 +18,7 @@ if __name__ == '__main__':
         
     ## setup model
     model = H0_mini_for_Adversarial(classes, device='cuda:0')
-    trainer = Trainer(model, SIPE_Loss_Adversarial(), wdir='SIPE-50k-Curriculum', device=model.device)
+    trainer = Trainer(model, SIPE_Loss_Adversarial(), wdir='SIPE-50k-ProjRecon', device=model.device)
     model = trainer.load_best_model()
     
     ## setup trainer
@@ -27,8 +27,10 @@ if __name__ == '__main__':
     ## setup curriculum
     cr = Curriculum()
     alphas = np.arange(0.1, 1.0, 0.1, dtype=float).tolist()
-    alphas += (20-len(alphas))*[1.0]
-    cr.add_step('adverse', 20, alphas, 1e-4, 10, False)
+    alphas += (10-len(alphas))*[1.0]
+    cr.add_step('adverse', 10, alphas, 3e-4, 10, False)
+    cr.add_step('recon', 1, 0, 1e-4, 1, False)
+    cr.add_step('adverse', 5, 1.0, 1e-4, 5, False)
     
     ## prep train trans
     kwargs = WsiDicomDataset.get_default_kwargs()

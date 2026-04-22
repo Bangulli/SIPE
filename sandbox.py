@@ -11,6 +11,8 @@ import os, torch
 import torch.nn.functional as F
 import copy, tqdm, json
 import matplotlib.pyplot as plt
+from src.model.projector import MixedDisentangler
+import numpy as np
 # pip install "BPTorch @ git+https://github.com/Bangulli/BPTorch"
 
 def make_side_by_side(images, path):
@@ -33,16 +35,48 @@ def make_side_by_side(images, path):
 
     fig.tight_layout()
     fig.savefig(path)
+
+def make_sobel_for_batch(batch):
+    sobel_x = torch.tensor([
+            [-1., 0., 1.],
+            [-2., 0., 2.],
+            [-1., 0., 1.]
+        ]).view(1, 1, 3, 3)
+    sobel_y = torch.tensor([
+            [-1., -2., -1.],
+            [ 0.,  0.,  0.],
+            [ 1.,  2.,  1.]
+        ]).view(1, 1, 3, 3)
+    batch = batch.mean(dim=1).unsqueeze(1)
+    gx = F.conv2d(F.pad(batch, (1, 1, 1, 1), mode='reflect'), sobel_x)
+    gy = F.conv2d(F.pad(batch, (1, 1, 1, 1), mode='reflect'), sobel_y)
+    magnitude = torch.sqrt(gx ** 2 + gy ** 2)
+    return magnitude
+
+def extend_label_map(label_map, labels, sobel):
+    means = sobel.mean(dim=(1, 2, 3)).to('cpu')
+    for k, v in zip(labels, means.tolist()):
+        label_map[k].append(v)
+    return label_map
+
+    
     
 if __name__ == '__main__':
-    ds = BigPictureRepository('/mnt/nas6/data/BigPicture_CBIR/datasets/BPTorch/fold_0/BPR.json', load=True, wsidicomdataset_kwargs=WsiDicomDataset.get_default_kwargs(), verbose=False)
-    classes = {}
-    for path in ['rnd-subset', 'rnd-subset-test', 'rnd-subset-val', 'rnd-subsubset-50k']:
-        ds.source_precomputed_patches_from(path)
-        for s in tqdm.tqdm(range(len(ds)), desc=path):
-            name = make_name_from_list(ds[s]['metadata']['staining'])
-            if name not in classes.keys(): classes[name]=1
-            else: classes[name]+=1
-    with open('/home/lorenz/BigPicture/SIPE/classes.json', 'w') as f:
-        json.dump(classes, f, indent=2)
-
+    with open('/home/lorenz/BigPicture/SIPE/classes.json', 'r') as f:
+        classes = json.load(f)
+    model = H0_mini_for_Adversarial(classes, device='cuda:0')
+    kwargs = WsiDicomDataset.get_default_kwargs()
+    kwargs['transforms'] = model.transform
+    trainset = BigPictureRepository('/mnt/nas6/data/BigPicture_CBIR/datasets/BPTorch/fold_1/BPR.json', load=True, wsidicomdataset_kwargs=kwargs, verbose=False) ## loading valset becuase the content gets overwritten by pointing to preextracted patches. this is just faster than loading the full training fold every time
+    trainset.source_precomputed_patches_from('rnd-subset')
+    dl = DataLoader(trainset, batch_size=256, collate_fn=bptorch_collate)
+    
+    values = {k:[] for k in classes.keys()}
+    for batch in tqdm.tqdm(dl, desc='computing mean and stds'):
+        sobel = make_sobel_for_batch(batch['image'])
+        labels = model.parse_labels(batch)
+        values = extend_label_map(values, labels, sobel)
+        
+    means_stds = {k:{'mean':np.mean(v), 'std':np.std(v)} for k, v in values.items()}
+    with open('sobel_cfg.json', 'w') as file:
+        json.dump(means_stds, file, indent=4)
