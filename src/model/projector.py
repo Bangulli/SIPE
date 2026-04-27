@@ -1,5 +1,6 @@
 import torch.nn as nn
 import torch
+from src.utils.misc import make_name_from_list
 
 # Convolutional Projector ########################################################
     

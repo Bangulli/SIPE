@@ -154,3 +154,46 @@ class SIPE_Loss_Adversarial(nn.Module):
         if self.testmode: print('Staining cluster loss:',stain_loss.item())
         if self.testmode: print('Final loss:', final_loss.item())
         return final_loss, logger
+    
+class V2_SIPE_Loss_Adversarial(nn.Module):
+    """https://proceedings.neurips.cc/paper/2016/file/ef0917ea498b1665ad6c701057155abe-Paper.pdf
+    """
+    def __init__(self, recon_only=False):
+        super().__init__()
+        self.recon_only = recon_only
+        self.image_recon_loss = ImageReconLoss(testmode=False)
+        self.morph_recon_loss = MorphReconLoss_SSIM_Sobel(testmode=False)
+        self.stain_classif_loss = AdversarialClassifLoss(testmode=False) ## relies on a shuffled dataset. if not shuffled it is impossible to construct pos/neg pairs.
+        self.alpha = 0.05
+    
+    def set_adverse_alpha(self, alpha):
+        self.alpha=alpha
+        
+    def set_adverse_norm(self, norm):
+        self.stain_classif_loss.set_norm(norm)
+        
+    def forward(self, 
+                gt_image,
+                gt_labels,
+                proj_stain, ## the embedding containing stain info [B, N]
+                proj_morph, ## the embedding containing morph infor [B, N]
+                rec_img, ## the full image reconstruction [B, C, H, W]
+                rec_morph, ## the morophologic image reconstruction [B, C, H, W]
+                device, 
+                logger=None,
+                val=False,
+                ):
+        ## Compute and fuse reconstruction losses
+        image_recon_loss = self.image_recon_loss(rec_img.to(device), gt_image.to(device))
+        morph_recon_loss = self.morph_recon_loss(rec_morph.to(device), gt_image, device).to(device)
+        recon_loss = image_recon_loss + morph_recon_loss
+        ## Compute staining cluster loss
+        if not self.recon_only: stain_loss, logger = self.stain_classif_loss(proj_stain.to(device), proj_morph.to(device), gt_labels, device, logger, val, self.alpha)
+        ## Fuse losses recon is more important
+        final_loss = (recon_loss + stain_loss) if not self.recon_only else recon_loss
+        
+        if logger is not None:
+            logger['Recon Img'].append(image_recon_loss.item())
+            logger['Recon Morph'].append(morph_recon_loss.item())
+            
+        return final_loss, logger

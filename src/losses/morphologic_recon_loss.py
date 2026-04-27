@@ -37,7 +37,8 @@ class MorphReconLoss_SSIM(StructuralSimilarityIndexMeasure):
         
     def forward(self, rec, gt, device):
         self.to(device)
-        binary = self._binarize(gt['image'].to(device), gt['metadata'])
+        gt = gt['image'].to(device) if type(gt)==dict else gt
+        binary = self._binarize(gt)
         if self.testmode: 
             print('Morph recon: rec.shape, binary.shape')
             print(rec.shape, binary.shape)
@@ -45,7 +46,7 @@ class MorphReconLoss_SSIM(StructuralSimilarityIndexMeasure):
             #T.ToPILImage()(binary[3]).save('morph_gt.png')
         return 1-super().forward(rec, binary) ## ssim is between 0(worst) and 1(best)
         
-    def _binarize(self, img, meta): ## to be changed to a canny filter tuned based on compound used
+    def _binarize(self, img): ## to be changed to a canny filter tuned based on compound used
         return img.mean(dim=1).unsqueeze(1)
     
 class MorphReconLoss_SSIM_Sobel(StructuralSimilarityIndexMeasure):
@@ -72,19 +73,19 @@ class MorphReconLoss_SSIM_Sobel(StructuralSimilarityIndexMeasure):
             [ 0.,  0.,  0.],
             [ 1.,  2.,  1.]
         ]).view(1, 1, 3, 3)
-        with open('sobel_cfg.json', 'r') as f:
-            self.cfg = json.load(f)
         
     def forward(self, rec, gt, device):
         self.to(device)
-        binary = self._binarize(gt['image'].to(device), gt['metadata'])
-        sobel = self._sobel(binary)
+        gt = gt['image'].to(device) if type(gt)==dict else gt.to(device)
+        binary = self._binarize(gt)
+        sobel = self._sobel(binary).to(rec.device)
+        if rec.shape[1]>1: sobel=sobel.expand(-1, 3, -1, -1)
         if self.testmode: 
             print('Morph recon: rec.shape, binary.shape')
             print(rec.shape, sobel.shape)
         return 1-super().forward(rec, sobel) ## ssim is between 0(worst) and 1(best)
         
-    def _binarize(self, img, _): ## to be changed to a canny filter tuned based on compound used
+    def _binarize(self, img): ## to be changed to a canny filter tuned based on compound used
         return self.denormer(img).mean(dim=1).unsqueeze(1)
     
     def _sobel(self, img):
@@ -93,10 +94,3 @@ class MorphReconLoss_SSIM_Sobel(StructuralSimilarityIndexMeasure):
         magnitude = torch.sqrt(gx ** 2 + gy ** 2)
         magnitude = magnitude / magnitude.max().clamp(min=1e-8)
         return magnitude
-    
-    def _normalize(self, sobel, label):
-        raise NotImplementedError()
-        for i in range(len(label)):
-            mean, std = itemgetter('mean', 'std')(self.cfg[label[i]])
-            sobel[i] = (sobel[i]-float(mean))/float(std)
-        return sobel

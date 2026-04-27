@@ -65,8 +65,6 @@ class SobelTransform:
             [ 0.,  0.,  0.],
             [ 1.,  2.,  1.]
         ]).view(1, 1, 3, 3)
-        with open('sobel_cfg.json', 'r') as f:
-            self.cfg = json.load(f)
             
     def _binarize(self, img): ## to be changed to a canny filter tuned based on compound used
         denormed = self.denormer(img)

@@ -2,12 +2,12 @@ from BPTorch.datasets import BigPictureRepository, WsiDicomDataset
 from torch.utils.data import DataLoader
 from BPTorch.utils import bptorch_collate
 from pprint import pprint
-from src.model.arch import H0_mini_for_Adversarial
+from src.model.archV2 import V2_H0_mini_for_Adversarial
 from torchvision.transforms import ToPILImage
 from src.utils.transfroms import UnNormalize
 from src.trainer.trainer import Trainer
 from src.trainer.curriculum_trainer import CurriculumTrainer, Curriculum
-from src.losses.loss_fusion import SIPE_Loss_Adversarial, SIPE_Loss_Recon
+from src.losses.loss_fusion import V2_SIPE_Loss_Adversarial
 import os, torch, shutil
 import torch.nn.functional as F
 import copy, tqdm, random, math, json
@@ -48,10 +48,11 @@ if __name__ == '__main__':
     ## setup instances of model and trainer
     with open('/home/lorenz/BigPicture/SIPE/classes.json', 'r') as f:
         classes = json.load(f)
-    print(f'Training with the following {len(classes)} class distribution')
-    pprint(classes)
+
     print('############################ Begin ############################')
-    model = H0_mini_for_Adversarial(classes, device='cuda:0')
+    model = V2_H0_mini_for_Adversarial(classes, device='cuda:0')
+    print(f'Training with the following {model.n_classes} class distribution')
+    pprint(model.enc.classes_)
     
     kwargs = WsiDicomDataset.get_default_kwargs()
     kwargs['transforms'] = model.transform
@@ -66,16 +67,17 @@ if __name__ == '__main__':
     valset.source_precomputed_patches_from('rnd-subset-val')
     
     ## setup and run reconstruction pretrainer
-    pretrainer = Trainer(model, SIPE_Loss_Recon(), wdir='SIPE-50k-ProjRecon', device=model.device)
-    pretrainer.train(trainset, valset, 5, 3e-4, 5, batch_size=768)
+    model.freeze_backbone(True)
+    pretrainer = Trainer(model, V2_SIPE_Loss_Adversarial(True), wdir='SIPE-50k-Recon', device=model.device)
+    pretrainer.train(trainset, valset, 20, 3e-4, 20, batch_size=768)
 
-    raise
-    ## setup curriculum
-    cr = Curriculum()
-    cr.add_step('adverse', 10, 0.1, 3e-4, 10, True)
-    cr.add_step('adverse', 10, 0.25, 3e-4, 10, True)
-    cr.add_step('recon', 5, 0, 3e-4, 5, True)
+
+    # ## setup curriculum
+    # cr = Curriculum()
+    # cr.add_step('adverse', 10, 0.1, 3e-4, 10, True)
+    # cr.add_step('adverse', 10, 0.25, 3e-4, 10, True)
+    # cr.add_step('recon', 5, 0, 3e-4, 5, True)
     
-    ## setup and run curriculum trainer
-    cr_trainer = CurriculumTrainer(pretrainer.load_best_model(), SIPE_Loss_Recon(), SIPE_Loss_Adversarial(), 'SIPE-50k-ProjCurriculum')
-    cr_trainer.train(trainset, valset, cr, batch_size=768)
+    # ## setup and run curriculum trainer
+    # cr_trainer = CurriculumTrainer(pretrainer.load_best_model(), SIPE_Loss_Recon(), SIPE_Loss_Adversarial(), 'SIPE-50k-ProjCurriculum')
+    # cr_trainer.train(trainset, valset, cr, batch_size=768)
