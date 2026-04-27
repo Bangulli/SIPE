@@ -1,18 +1,11 @@
-from BPTorch.datasets import BigPictureRepository, WsiDicomDataset
-from torch.utils.data import DataLoader
-from BPTorch.utils import bptorch_collate
-from pprint import pprint
-from src.model.arch import H0_mini_for_Adversarial
-from torchvision.transforms import ToPILImage
+import matplotlib.pyplot as plt, torch, torch.functional as F
+from src.utils.stain_comp import compare
+from torchvision.transforms import ToPILImage, ToTensor
 from src.utils.transfroms import UnNormalize
-from src.trainer.trainer import Trainer
-from src.utils.misc import make_name_from_list
-import os, torch
-import torch.nn.functional as F
-import copy, tqdm, json
-import matplotlib.pyplot as plt
-from src.model.projector import MixedDisentangler
-import numpy as np
+from PIL import Image
+import os
+from BPTorch.datasets import BigPictureRepository, WsiDicomDataset
+
 # pip install "BPTorch @ git+https://github.com/Bangulli/BPTorch"
 
 def make_side_by_side(images, path):
@@ -61,22 +54,5 @@ def extend_label_map(label_map, labels, sobel):
 
     
     
-if __name__ == '__main__':
-    with open('/home/lorenz/BigPicture/SIPE/classes.json', 'r') as f:
-        classes = json.load(f)
-    model = H0_mini_for_Adversarial(classes, device='cuda:0')
-    kwargs = WsiDicomDataset.get_default_kwargs()
-    kwargs['transforms'] = model.transform
-    trainset = BigPictureRepository('/mnt/nas6/data/BigPicture_CBIR/datasets/BPTorch/fold_1/BPR.json', load=True, wsidicomdataset_kwargs=kwargs, verbose=False) ## loading valset becuase the content gets overwritten by pointing to preextracted patches. this is just faster than loading the full training fold every time
-    trainset.source_precomputed_patches_from('rnd-subset')
-    dl = DataLoader(trainset, batch_size=256, collate_fn=bptorch_collate)
-    
-    values = {k:[] for k in classes.keys()}
-    for batch in tqdm.tqdm(dl, desc='computing mean and stds'):
-        sobel = make_sobel_for_batch(batch['image'])
-        labels = model.parse_labels(batch)
-        values = extend_label_map(values, labels, sobel)
-        
-    means_stds = {k:{'mean':np.mean(v), 'std':np.std(v)} for k, v in values.items()}
-    with open('sobel_cfg.json', 'w') as file:
-        json.dump(means_stds, file, indent=4)
+if __name__ == '__main__': 
+    compare('/home/lorenz/BigPicture/SIPE/SIPE-1M-Curriculum', 'images')

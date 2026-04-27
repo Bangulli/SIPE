@@ -26,11 +26,7 @@ if __name__ == '__main__':
     
     ## setup curriculum
     cr = Curriculum()
-    alphas = np.arange(0.1, 1.0, 0.1, dtype=float).tolist()
-    alphas += (10-len(alphas))*[1.0]
-    cr.add_step('adverse', 10, alphas, 3e-4, 10, False)
-    cr.add_step('recon', 1, 0, 1e-4, 1, False)
-    cr.add_step('adverse', 5, 1.0, 1e-4, 5, False)
+    cr.add_step(step_type='recon', epochs=5, adverse_alpha=1.0, lr=1e-5, restarts=5, norm=False, freeze_bb=True)
     
     ## prep train trans
     kwargs = WsiDicomDataset.get_default_kwargs()

@@ -32,7 +32,7 @@ class FullClassif(nn.Module):
     def __init__(self, stain_size, morph_size, possible_classes):
         super().__init__()
         self.stain_size = stain_size
-        self.possible_classes = sorted(self._defrag(list(possible_classes.keys()))) ## for reproducibility
+        self.possible_classes = sorted(self.defrag(list(possible_classes.keys()))) ## for reproducibility
         self.enc = LabelEncoder()
         #print(len(self.possible_classes), self.possible_classes)
         self.enc.fit(self.possible_classes)
@@ -46,13 +46,13 @@ class FullClassif(nn.Module):
         return stain, morph
     
     def transform_labels(self, labels):
-        labels = self._defrag(labels)
+        labels = self.defrag(labels)
         return self.enc.transform(labels)
     
     def reverse_grad(self, x, alpha=1.0):
         return GradientReversal.apply(x, alpha)
     
-    def _defrag(self, raw_labels):
+    def defrag(self, raw_labels):
         new_labels = []
         for label in raw_labels:
             label = make_name_from_list(label)
@@ -90,7 +90,7 @@ class FullConvClassif(nn.Module):
     def __init__(self, stain_size, morph_size, possible_classes):
         super().__init__()
         self.stain_size = stain_size
-        self.possible_classes = sorted(self._defrag(list(possible_classes.keys()))) ## for reproducibility
+        self.possible_classes = sorted(self.defrag(list(possible_classes.keys()))) ## for reproducibility
         self.enc = LabelEncoder()
         #print(len(self.possible_classes), self.possible_classes)
         self.enc.fit(self.possible_classes)
@@ -104,13 +104,13 @@ class FullConvClassif(nn.Module):
         return stain, morph
     
     def transform_labels(self, labels):
-        labels = self._defrag(labels)
+        labels = self.defrag(labels)
         return self.enc.transform(labels)
     
     def reverse_grad(self, x, alpha=1.0):
         return GradientReversal.apply(x, alpha)
     
-    def _defrag(self, raw_labels):
+    def defrag(self, raw_labels):
         new_labels = []
         for label in raw_labels:
             label = make_name_from_list(label)

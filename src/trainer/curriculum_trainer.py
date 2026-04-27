@@ -4,6 +4,7 @@ from operator import itemgetter
 sys.path.append(os.path.join(os.path.dirname(__file__), "."))
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from collections.abc import Iterable
+from pprint import pprint
 ######## External ########
 from tqdm import tqdm as ProgBar
 import torch
@@ -20,7 +21,7 @@ class Curriculum(list):
     def __init__(self):
         super().__init__()
         
-    def add_step(self, step_type='recon', epochs=5, adverse_alpha=0.1, lr=3e-4, restarts=5, norm=True):
+    def add_step(self, step_type='recon', epochs=5, adverse_alpha=0.1, lr=3e-4, restarts=5, norm=True, freeze_bb=True):
         self.append({
             'type': step_type,
             'epochs': epochs,
@@ -28,6 +29,7 @@ class Curriculum(list):
             'adverse_alpha': adverse_alpha,
             'restarts': restarts,
             'adverse_norm': norm,
+            'freeze_backbone': freeze_bb,
         })
         
     def save(self, path):
@@ -113,11 +115,11 @@ class CurriculumTrainer:
         with open(self.wdir/ckpt_dir/f"ckpt_from_epoch_{epoch}/batched_individual_losses.json", "w") as f:
             json.dump(logger, f, indent=4)
         
-    def save(self):
+    def _save_history(self):
         with open(self.wdir/'history.json', 'w') as f:
             json.dump(self.loss_history, f, indent=4)
-        torch.save(self.optim, self.wdir/'optim.bin')
-        torch.save(self.scheduler, self.wdir/'scheduler.bin')
+        # torch.save(self.optim, self.wdir/'optim.bin')
+        # torch.save(self.scheduler, self.wdir/'scheduler.bin')
         #torch.save(self.loss, self.wdir/'loss.bin')
         
     def load(self, ckpt_dir, ckpt):
@@ -134,6 +136,11 @@ class CurriculumTrainer:
             extended_cr = Curriculum.load(self.wdir/ckpt_dir/'curriculum.json')
             extended_cr.extend(curriculum)
             extended_cr.save(self.wdir/ckpt_dir/'curriculum.json')
+            
+        if os.path.exists(self.wdir/'history.json'):
+            with open(self.wdir/'history.json', 'r') as f:
+                self.loss_history = json.load(f)
+            self.model = self.load_model_at_epoch(-1)
         
         train_loader = DataLoader(train, batch_size, collate_fn=bptorch_collate, shuffle=True) ## needs pre extracted patches to run efficiently
         val_loader = DataLoader(val, batch_size, collate_fn=bptorch_collate)
@@ -141,9 +148,10 @@ class CurriculumTrainer:
         
         strt = len([d for d in os.listdir(self.wdir/ckpt_dir) if (self.wdir/ckpt_dir/d).is_dir()])+1
         for i, step in enumerate(curriculum):
-            step_type, epochs, lr, adverse_alpha, restarts, adv_norm = itemgetter('type', 'epochs', 'lr', 'adverse_alpha', 'restarts', 'adverse_norm')(step)
+            step_type, epochs, lr, adverse_alpha, restarts, adv_norm, freeze_bb = itemgetter('type', 'epochs', 'lr', 'adverse_alpha', 'restarts', 'adverse_norm', 'freeze_backbone')(step)
             self.optim = self.optim_base(self.model.parameters(), lr=lr)
             self.scheduler = self.scheduler_base(self.optim, restarts)
+            self.model.freeze_backbone(freeze_bb)
             if step_type.lower()=='recon': self._train_recon(strt, epochs, train_loader, val_loader, ckpt_dir, i)
             elif step_type.lower()=='adverse': self._train_adverse(strt, epochs, train_loader, val_loader, ckpt_dir, adverse_alpha, adv_norm, i)
             else: raise ValueError(f'Allowed step types are [recon, adverse], but got {step_type.lower()} instead')
@@ -204,7 +212,7 @@ class CurriculumTrainer:
                 
             ## save checkpoint
             self._save_ckpt(ckpt_dir, epoch)
-            self.save()
+            self._save_history()
             self._plt_progress()
             
     def _train_adverse(self, strt, epochs, train_loader, val_loader, ckpt_dir, alpha, norm, step):
@@ -266,7 +274,7 @@ class CurriculumTrainer:
                     
                 ## save checkpoint
                 self._save_ckpt(ckpt_dir, epoch)
-                self.save()
+                self._save_history()
                 self._plt_progress()
             
     def load_best_model(self, ckpt_dir='checkpoints'):
@@ -289,7 +297,9 @@ class CurriculumTrainer:
             self.load(ckpt_dir, epoch)
             return self.model
         else:
-            epoch = len(os.listdir(self.wdir/ckpt_dir))
+            with open(self.wdir/'history.json', 'r') as f:
+                self.loss_history = json.load(f)
+            epoch = len(self.loss_history['validation'])
             print('Loading latest model from epoch', epoch)
             self.load(ckpt_dir, epoch)
             return self.model

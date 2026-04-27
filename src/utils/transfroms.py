@@ -17,11 +17,13 @@ class UnNormalize(object):
         Returns:
             Tensor: Normalized image.
         """
-        
+        #print(img.min(), img.max(), img.dtype, img.shape)
+        if len(img.shape)==4: img = img.squeeze(0)
         denorm = (img * self.std.to(img.device)) + self.mean.to(img.device)
         denorm = (denorm.clamp(0, 1)*255).to(torch.uint8)
         #print(denorm.min(), denorm.max(), denorm.dtype, denorm.shape)
         return denorm
+    
     
 class UnNormalizeFloats(object):
     def __init__(self, mean, std):
