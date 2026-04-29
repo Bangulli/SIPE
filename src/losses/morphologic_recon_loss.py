@@ -72,8 +72,6 @@ class MorphReconLoss_SSIM_Sobel(StructuralSimilarityIndexMeasure):
             [ 0.,  0.,  0.],
             [ 1.,  2.,  1.]
         ]).view(1, 1, 3, 3)
-        with open('sobel_cfg.json', 'r') as f:
-            self.cfg = json.load(f)
         
     def forward(self, rec, gt, device):
         self.to(device)

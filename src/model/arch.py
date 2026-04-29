@@ -109,10 +109,3 @@ class H0_mini_for_Adversarial(nn.Module):
         for param in self.backbone.parameters():
             param.requires_grad = not freeze
 
-#########################################################################################################################################        
-class PixCell_uni2h(nn.Module): # pixcell diffusion with uni2h
-    pass
-
-#########################################################################################################################################
-class LIC(nn.Module): # learned image compression approach
-    pass
