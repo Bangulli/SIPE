@@ -23,8 +23,8 @@ def make_side_by_side(images, path):
     for i in range(2):
         key = f"image{i+1}"                          # fix: was hardcoded "image1"
         for j, v in enumerate(row_labels):
-            if not (("morph" in v) or ("sobel" in v)): ax[j, i].imshow(images[f"{key}_{v}"])    # fix: use .imshow() on the axes
-            else: ax[j, i].imshow(images[f"{key}_{v}"], cmap='Grays')
+            if not ("sobel" in v): ax[j, i].imshow(images[f"{key}_{v}"])    # fix: use .imshow() on the axes
+            else: ax[j, i].imshow(images[f"{key}_{v}"], cmap='gray')
             ax[j, i].set_xticks([])
             ax[j, i].set_yticks([])
 
@@ -198,6 +198,7 @@ def testV2(model, sourcedir, imdir_name):
     img.save(f'{sourcedir/imdir_name}/sobel1.png')
     image_dict['image1_sobel'] = img
     s1, z1 = model(patch)
+    s1 = s1.unsqueeze(0)
     
     print('Image 1')
     print(patch['metadata'])
@@ -205,8 +206,7 @@ def testV2(model, sourcedir, imdir_name):
     img.save(f'{sourcedir/imdir_name}/recon_img1.png')
     image_dict['image1_recon'] = copy.deepcopy(img)
     
-    img = model.recon_image_PIL(torch.zeros_like(s1), z1, denormer).convert('L')
-    #img = PIL.ImageOps.invert(img) 
+    img = model.recon_image_PIL(torch.zeros_like(s1), z1, denormer)
     img.save(f'{sourcedir/imdir_name}/recon_morph1.png')
     image_dict['image1_reconmorph'] = copy.deepcopy(img)
     
@@ -221,6 +221,7 @@ def testV2(model, sourcedir, imdir_name):
     img.save(f'{sourcedir/imdir_name}/sobel2.png')
     image_dict['image2_sobel'] = img
     s2, z2 = model(patch)
+    s2 = s2.unsqueeze(0)
     
     print('Image 2')
     print(patch['metadata'])
@@ -228,8 +229,7 @@ def testV2(model, sourcedir, imdir_name):
     img.save(f'{sourcedir/imdir_name}/recon_img2.png')
     
     image_dict['image2_recon'] = copy.deepcopy(img)
-    img = model.recon_image_PIL(torch.zeros_like(s2), z2, denormer).convert('L')
-    #img = PIL.ImageOps.invert(img) 
+    img = model.recon_image_PIL(torch.zeros_like(s2), z2, denormer)
     img.save(f'{sourcedir/imdir_name}/recon_morph2.png')
     image_dict['image2_reconmorph'] = copy.deepcopy(img)
     

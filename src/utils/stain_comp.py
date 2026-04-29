@@ -166,4 +166,71 @@ def compare(sourcedir, imdir_name):
         recons[lbl1] = current_recons
         
     make_diagonal(recons, source_images, sourcedir/imdir_name)
+
+def compareV2(sourcedir, imdir_name):
+    ## some io
+    sourcedir = pl.Path(sourcedir)
+    if not (sourcedir/imdir_name).exists(): os.mkdir(sourcedir/imdir_name)
+    with open('/home/lorenz/BigPicture/SIPE/classes.json', 'r') as f:
+        classes = json.load(f)
+    trainer = Trainer(H0_mini_for_Adversarial(classes, device='cuda:0'), None, wdir=sourcedir)
+    if (sourcedir/'history.json').exists(): model = trainer.load_best_model()
+    else: model = trainer.load_model_at_epoch(1)
+    model.to(model.device)
+    model.eval()
+    kwargs = WsiDicomDataset.get_default_kwargs()
+    kwargs['transforms'] = model.transform
     
+    ## defrag classes
+    classes = model.classif.defrag(list(classes.keys()))
+    
+    ## dataset and loader
+    ds = BigPictureRepository('/mnt/nas6/data/BigPicture_CBIR/datasets/BPTorch/fold_0/BPR.json', load=True, wsidicomdataset_kwargs=kwargs, verbose=False)
+    ds.source_precomputed_patches_from('rnd-subset-test')
+    print(f"Dataset contains {len(ds)} foreground patches")
+    dl = DataLoader(ds, 1, True, collate_fn=bptorch_collate)
+    
+    ## transforms for visu
+    converter = ToPILImage()
+    denormer = UnNormalize([
+        0.707223,
+        0.578729,
+        0.703617
+    ], [
+        0.211883,
+        0.230117,
+        0.177517
+    ])
+    
+    present_classes = []
+    virtual_staining_heads = {}
+    morphologic_bases = {}
+    source_images = {}
+    for batch in tqdm.tqdm(dl, desc='Finding stain examples'):
+        if not patch_is_foreground(converter(batch['image'].squeeze(0))):continue
+        label = model.defrag_labels(batch)[0]
+        if label in present_classes: continue
+        
+        ## encode new image
+        s, z = model(batch)
+        raise NotImplementedError()
+        ## save stuff
+        img = converter(denormer(batch['image'].squeeze(0)))
+        source_images[label] = img
+        s = emb[:, :model.emb_stain_size]
+        virtual_staining_heads[label] = s
+        z = emb[:, model.emb_stain_size:]
+        morphologic_bases[label] = z
+        present_classes.append(label)
+    
+    recons = {}
+    for lbl1 in tqdm.tqdm(present_classes, desc='generating'):
+        current_recons = {}
+        for lbl2 in present_classes:
+            s = virtual_staining_heads[lbl2]
+            z = morphologic_bases[lbl1]
+            cur_emb = torch.cat([s, z], dim=1)
+            current_recons[lbl2] = model.recon_image_PIL(cur_emb, denormer)
+        recons[lbl1] = current_recons
+        
+    make_diagonal(recons, source_images, sourcedir/imdir_name)

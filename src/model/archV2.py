@@ -5,11 +5,11 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 ######## External ########
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from sklearn.preprocessing import LabelEncoder, MultiLabelBinarizer
 ######## Internal ########
 from src.model.encoder import get_encoder_and_transforms
-from src.model.decoder import get_decoder_simple, get_proj_decoder_simple_v2
-from src.model.classifier import ConvClassif, GradientReversal
+from src.model.classifier import GradientReversal
 from torchvision.transforms import ToPILImage
 from src.utils.misc import make_name_from_list
 ##########################
@@ -28,40 +28,40 @@ class V2_H0_mini_for_Adversarial(nn.Module):
         self.n_classes = len(self.enc.classes_)
         num_features = 768 ## embedding size, depends on base_model
         
-        self.backbone, self.transform = get_encoder_and_transforms(base_model) ## backbone model
+        self.backbone, self.transform = get_encoder_and_transforms(base_model) ## patch -> features
         print('Backbone built!')
         
-        self.disentangler = DisentanglerV2(self.n_classes, num_features)
+        self.disentangler = Disentangler(num_features, self.n_classes) ## features -> stain probabs, stain-less features
         print('Disentangler built!')
         
-        self.image_decoder = get_proj_decoder_simple_v2(3, num_features, self.n_classes) ## decoder for image recon, adds a projection layer to mix stain
-        print('Image Decoder built!')
+        self.reentangler = Reentangler(num_features, self.n_classes) ## stain probabs, stain-less features -> features
+        print('Reentangler built!')
         
-        self.adv_classif = ConvClassif(num_features, self.n_classes)
-        print(f'Classifier built! Predicts {self.n_classes} Classes')
+        self.image_decoder = Decoder(num_features, 3) ## features -> patche
+        print('Image Decoder built!')
         
         self.to(self.device)
         
     def forward(self, batch):
         tokens = self.backbone(batch['image'].to(self.device)) # [B, 261, 768]
-        return self.disentangler(tokens)
+        s, z = self.disentangler(tokens) # [B, 768, 16, 16] - specified & [B, 768, 16, 16] # unspecified
+        return s, z
     
     def loss(self, batch, loss, logger=None, val=False):  
-        s, z = self.forward(batch)
-        
-        ## predict
-        subsec_morph_proba = self.adv_classif(self.reverse_grad(z))
-        gt_labels = self.transform_labels([s['staining'] for s in batch['metadata']])
+        s_proba, z = self.forward(batch)
+    
+        z_proba = self.disentangler.classify(self.reverse_grad(z))
+        gt_labels = torch.from_numpy(self.transform_labels([s['staining'] for s in batch['metadata']]))
         
         ## recon
-        rec_img = self.image_decoder(self.disentangler.fuse(s, z))
-        rec_morph = self.image_decoder(self.disentangler.fuse(torch.zeros_like(s, device=s.device), z))
-        
-        return loss(batch['image'].to(self.device), torch.from_numpy(gt_labels).to(self.device), s, subsec_morph_proba, rec_img, rec_morph, self.device, logger, val)
+        rec_img = self.recon_image(s_proba, z)
+        rec_morph = self.recon_image(torch.zeros_like(s_proba, device=self.device), z)
+        return loss(batch['image'].to(self.device), gt_labels.to(self.device), s_proba, z_proba, rec_img, rec_morph, self.device, logger, val)
 
     #----------------------- Recon utils
     def recon_image(self, s, z, transform=None):
-        rec = self.image_decoder(self.disentangler.fuse(s, z)).detach().squeeze()
+        feature_map = self.reentangler(s, z)
+        rec = self.image_decoder(feature_map)
         if transform is not None: rec = transform(rec)
         return rec
     
@@ -79,12 +79,14 @@ class V2_H0_mini_for_Adversarial(nn.Module):
         torch.save(self.backbone.state_dict(), pth/'backbone.pth')
         torch.save(self.image_decoder.state_dict(), pth/'image_decoder.pth')
         torch.save(self.disentangler.state_dict(), pth/'disentangler.pth')
+        torch.save(self.reentangler.state_dict(), pth/'reentangler.pth')
         
     def load(self, pth):
         pth=pl.Path(pth)
         self.backbone.load_state_dict(torch.load(pth/'backbone.pth'))
         self.image_decoder.load_state_dict(torch.load(pth/'image_decoder.pth'))
         self.disentangler.load_state_dict(torch.load(pth/'disentangler.pth'))
+        self.reentangler.load_state_dict(torch.load(pth/'reentangler.pth'))
     
     #----------------------- Freezing utils
     def freeze_or_unfreeze_disentangler(self, freeze=True):
@@ -145,38 +147,65 @@ class V2_H0_mini_for_Adversarial(nn.Module):
         return new_labels
 
 ############################################## Disentangler ##############################################
-
-class DisentanglerV2(nn.Module):
-    def __init__(self, n_classes, n_features):
+class Disentangler(nn.Module): ## separates the feature map into stain and morph maps
+    def __init__(self, n_features, n_classes):
         super().__init__()
-        self.n_c = n_classes
-        self.n_f = n_features
-        self.s_projector = nn.Sequential( ## present the staining in compound likelihoods, so later it can just be modeled as 50% hematox and 50% eosin for H&E
-            nn.Linear(self.n_f, self.n_c),
-            nn.Softmax()
-        )
-        self.z_projector = nn.Sequential(
-            nn.Conv2d(self.n_f, self.n_f, kernel_size=1), ## mix the staining attachment into the data - patch wise
-            nn.BatchNorm2d(self.n_f),
-            nn.GELU(),
-            nn.Conv2d(self.n_f, self.n_f, kernel_size=3, padding_mode='reflect', padding=1), ## neighbor aware mixing
-            nn.BatchNorm2d(self.n_f),
-            nn.GELU(),
-            nn.Conv2d(self.n_f, self.n_f, kernel_size=1), ## patch wise cleaning
-        )
+        self.s_projector = Classif(n_features, n_classes)
+        self.z_projector = nn.Conv2d(n_features, n_features, 1)
         
     def forward(self, tokens):
-        patches = tokens[:,5:,:].permute(0, 2, 1) ## cut out cls and register tokens
-        patches = patches.reshape(patches.shape[0], 768, 16, 16) ## reshape to feature map 
-        z = self.z_projector(patches)
-        cls_toks = tokens[:,0,:]
-        s = self.s_projector(cls_toks)
+        feature_map = tokens[:,5:,:].permute(0, 2, 1) ## cut out cls and register tokens
+        feature_map = feature_map.reshape(feature_map.shape[0], 768, 16, 16) ## reshape to feature map 
+        s = self.s_projector(feature_map)
+        z = self.z_projector(feature_map)
         return s, z
     
-    def fuse(self, s, z):
-        sq = False
-        if z.dim() == 3: z=z.unsqueeze(0); sq=True
-        s = s[:, :, None, None].expand(-1, -1, 16, 16)
-        emb=torch.cat([s, z], dim=1)
-        if sq: return emb.squeeze(0)
-        else: return emb
+    def classify(self, z):
+        return self.s_projector(z)
+class Reentangler(nn.Module):
+    def __init__(self, n_features, n_classes):
+        super().__init__()
+        self.stain_handler = StainEncoder(n_features, n_classes)
+        self.projector = nn.Conv2d(n_features*2, n_features, 1)
+        
+    def forward(self, s, z):
+        s = self.stain_handler(s)
+        x = torch.cat([s, z], dim=1)
+        return self.projector(x)   
+class Classif(nn.Module):
+    def __init__(self, n_features, n_classes):
+        super().__init__()
+        self.head = nn.Conv2d(n_features, n_classes, 16)
+        self.act = nn.Softmax()
+        
+    def forward(self, x):
+        x = self.head(x).squeeze()
+        x = self.act(x)
+        return x
+class StainEncoder(nn.Module):
+    def __init__(self, n_features, n_classes):
+        super().__init__()
+        self.deprob = nn.Linear(n_classes, n_classes)
+        self.projector = nn.ConvTranspose2d(n_classes, n_features, 16)
+        
+    def forward(self, x):
+        x = self.deprob(x) # -> probabs to logits
+        x = x.unsqueeze(-1).unsqueeze(-1) # logits to logit map
+        x = self.projector(x) # -> logit map to feature map
+        return x
+class Decoder(nn.Module):
+    def __init__(self, num_features, channels):
+        super().__init__()
+        self.model = nn.Sequential(
+            nn.ConvTranspose2d(num_features, 256, kernel_size=4, stride=2, padding=1),
+            nn.BatchNorm2d(256), nn.GELU(),
+            nn.ConvTranspose2d(256, 128, kernel_size=4, stride=2, padding=1),
+            nn.BatchNorm2d(128), nn.GELU(),
+            nn.ConvTranspose2d(128, 64, kernel_size=4, stride=2, padding=1),
+            nn.BatchNorm2d(64), nn.GELU(),
+            nn.ConvTranspose2d(64, channels, kernel_size=4, stride=2, padding=1),
+            nn.Upsample(size=(224, 224), mode='bilinear', align_corners=False),
+        )
+    
+    def forward(self, x):
+        return self.model(x)

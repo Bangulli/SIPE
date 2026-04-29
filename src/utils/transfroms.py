@@ -44,8 +44,8 @@ class UnNormalizeFloats(object):
         return denorm
 
 class SobelTransform: 
-    def __init__(self, normalize=False):
-        self.normalize = normalize
+    def __init__(self, standardize=False):
+        self.standardize = standardize
         self.denormer = UnNormalizeFloats([
             0.707223,
             0.578729,
@@ -67,23 +67,27 @@ class SobelTransform:
         ]).view(1, 1, 3, 3)
             
     def _binarize(self, img): ## to be changed to a canny filter tuned based on compound used
-        denormed = self.denormer(img)
-        return denormed.mean(dim=1).unsqueeze(1)
+        return self.denormer(img).mean(dim=1).unsqueeze(1)
     
     def _sobel(self, img):
-        gx = F.conv2d(F.pad(img, (1, 1, 1, 1), mode='reflect'), self.sobel_x)
-        gy = F.conv2d(F.pad(img, (1, 1, 1, 1), mode='reflect'), self.sobel_y)
+        gx = F.conv2d(F.pad(img, (1, 1, 1, 1), mode='reflect'), self.sobel_x.to(img.device))
+        gy = F.conv2d(F.pad(img, (1, 1, 1, 1), mode='reflect'), self.sobel_y.to(img.device))
         magnitude = torch.sqrt(gx ** 2 + gy ** 2)
         magnitude = magnitude / magnitude.max().clamp(min=1e-8)
+        magnitude = torch.abs(magnitude-1)
         return magnitude
     
-    def _normalize(self, sobel, label):
-        for i in range(len(label)):
-            mean, std = itemgetter('mean', 'std')(self.cfg[label[i]])
-            sobel[i] = (sobel[i]-float(mean))/float(std)
-        return sobel
+    def _apply_std(self, msk):
+        mean = 0.9214555621147156
+        std = 0.1259652078151703
+        return (msk-mean)/std
+    
+    def sobel_unnorm(self, msk):
+        mean = 0.9214555621147156
+        std = 0.1259652078151703
+        return (msk*std)+mean
     
     def __call__(self, batch):
         sobel = self._sobel(self._binarize(batch['image']))
-        #if self.normalize: sobel = self._normalize(sobel, [make_name_from_list(s['staining']) for s in batch['metadata']])
+        if self.standardize: sobel = self._apply_std(sobel)
         return sobel.squeeze(0)

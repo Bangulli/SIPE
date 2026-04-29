@@ -18,15 +18,6 @@ if __name__ == '__main__':
         
     ## setup model
     model = V2_H0_mini_for_Adversarial(classes, device='cuda:0')
-    trainer = Trainer(model, V2_SIPE_Loss_Adversarial(), wdir='SIPE-50k-ProjRecon', device=model.device)
-    model = trainer.load_best_model()
-    
-    ## setup trainer
-    cr_trainer = CurriculumTrainer(model, V2_SIPE_Loss_Adversarial(True), V2_SIPE_Loss_Adversarial(), wdir='SIPE-1M-Curriculum', device=model.device)
-    
-    ## setup curriculum
-    cr = Curriculum()
-    cr.add_step(step_type='recon', epochs=5, adverse_alpha=1.0, lr=1e-5, restarts=5, norm=False, freeze_bb=True)
     
     ## prep train trans
     kwargs = WsiDicomDataset.get_default_kwargs()
@@ -44,6 +35,18 @@ if __name__ == '__main__':
     valset = BigPictureRepository('/mnt/nas6/data/BigPicture_CBIR/datasets/BPTorch/fold_1/BPR.json', load=True, wsidicomdataset_kwargs=kwargs, verbose=False)
     valset.source_precomputed_patches_from('rnd-subset-val')
     
+    ## setup pretrainer
+    pretrainer = Trainer(model, V2_SIPE_Loss_Adversarial(True), wdir='SIPE-50k-Recon', device=model.device)
+    #pretrainer.train(trainset, valset, 10, lr=1e-4, restarts=10, batch_size=768)
+    
+    ## setup trainer
+    cr_trainer = CurriculumTrainer(pretrainer.load_best_model(), V2_SIPE_Loss_Adversarial(True), V2_SIPE_Loss_Adversarial(), wdir='SIPE-1M-Curriculum', device=model.device)
+    ## setup curriculum
+    cr = Curriculum()
+    alpha_ramp = np.arange(0.1, 1.0, 0.1).tolist()
+    alpha_ramp += (15-len(alpha_ramp))*[1.0]
+    cr.add_step(step_type='adverse', epochs=15, adverse_alpha=alpha_ramp, lr=3e-4, restarts=5, norm=False, freeze_bb=True)
+    cr.add_step(step_type='recon', epochs=5, adverse_alpha=0, lr=3e-4, restarts=5, norm=False, freeze_bb=True)
     ## yeet
     cr_trainer.train(trainset, valset, cr, batch_size=768)
     

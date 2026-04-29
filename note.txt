@@ -3,3 +3,34 @@ change staining part to instead take percentages so its possible to directly tak
 maybe projector does 768 to 768 with adversarial loss to disentangle staining
 train it to reconstruct edges when passed with all 0
 train disentangler seperately maybe
+
+classes:
+Training with the following 97 class distribution
+array(['Congo red stain method (procedure)', 'Giemsa stain method',
+       'Gomori stain method (procedure)', 'Herovicis stain method',
+       'Masson trichrome stain method (procedure)',
+       'Methenamine silver nitrate stain', 'Periodic acid Schiff stain',
+       'Prussian blue stain method (Perls)', 'Van Gieson stain',
+       'Ziehl-Neelsen stain method (procedure)', 'alcian blue', 'alk',
+       'amacr', 'androgen receptor', 'beta-catenin', 'c1q', 'c3', 'c3c',
+       'c4d', 'calcitonin', 'calponin', 'calretinin',
+       'cb, tp, cytokeratin ae1/ae3', 'cd10', 'cd20', 'cd21', 'cd3',
+       'cd31', 'cd45', 'cd5', 'cd68', 'cdx2', 'chromogranin a', 'cmv-p52',
+       'cyclin d1', 'cytokeratin 20', 'cytokeratin 5', 'cytokeratin 5-6',
+       'cytokeratin 7', 'cytokeratin cam 5.2', 'e-cadherin', 'eber-cish',
+       'egfr', 'eosin', 'epithelial antigen ep4', 'erg',
+       'estrogen receptor alpha', 'estrogen receptor rtu',
+       'fuchsin acid stain', 'gata-3', 'gcdfp15', 'hematoxylin',
+       'her-2 neu', 'iga', 'igg', 'igg4', 'igm', 'insm1', 'kappa',
+       'kappa plasma cell', 'ki-67', 'lambda', 'lambda plasma cell',
+       'mammaglobin', 'mib-1', 'mib-1 (ki-67)', 'napsin',
+       'nuclear fast red stain (substance)', 'nut', 'orange g stain',
+       'p40', 'p53', 'p63', 'pan cytokeratin', 'pax-8', 'pd-l1',
+       'pd-l1 (sp142)', 'pd-l1 (sp263)', 'pd1',
+       'periodic acid schiff stain', 'progesterone receptor rtu',
+       'progesterone reseptor', 'prostate specific  antigen',
+       'prostate specific membrane antigen',
+       'proximal nephrogen renal antigen', 'ros1', 's100', 'satb2',
+       'sox10', 'sstr2', 'sv40', 'synaptophysin', 'thyroglobulin',
+       'thyroid transcripton factor', 'ttf1(8g7g3)', 'vimentin',
+       'wilms tumor'], dtype=object)

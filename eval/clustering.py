@@ -1,6 +1,9 @@
+## evaluate method for metadata-embedding similarity
+
 from BPTorch.datasets import BigPictureRepository, WsiDicomDataset
 from torch.utils.data import DataLoader
 from BPTorch.utils import bptorch_collate
+from torch.nn.functional import avg_pool2d
 from pprint import pprint
 from src.model.arch import H0_mini_for_AutoEncoding
 from src.losses.loss_fusion import SIPE_Loss
@@ -44,11 +47,11 @@ if __name__ == '__main__':
         all_labels_site = []
         for batch in tqdm(dl, desc='Infering Batches'):
             torch.cuda.empty_cache()
-            emb = model(batch)
+            _, emb = model(batch)
             lbls = [make_name_from_list(samp['staining']) for samp in batch['metadata']]
             lbls_site = [make_name_from_list(samp['organ']) for samp in batch['metadata']]
             
-            all_embeddings.append(emb.detach().cpu())
+            all_embeddings.append(avg_pool2d(emb.detach().cpu(), kernel_size=16))
             all_labels_stain += lbls
             all_labels_site += lbls_site
             

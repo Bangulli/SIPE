@@ -6,8 +6,8 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 import torch
 import torch.nn as nn
 ######## Internal ########
-from src.losses.image_recon_loss import ImageReconLoss
-from src.losses.morphologic_recon_loss import MorphReconLoss_SSIM_Sobel
+from src.losses.image_recon_loss import ImageReconLoss_SSIM, ImageReconLoss
+from src.losses.morphologic_recon_loss import MorphReconLoss_SSIM_Sobel_V2, MorphReconLoss_Sobel_V2
 from src.losses.staining_cluster_loss import SimCLR_NCE_Loss
 from src.losses.adversarial_classif_loss import AdversarialClassifLoss
 ##########################
@@ -158,12 +158,13 @@ class SIPE_Loss_Adversarial(nn.Module):
 class V2_SIPE_Loss_Adversarial(nn.Module):
     """https://proceedings.neurips.cc/paper/2016/file/ef0917ea498b1665ad6c701057155abe-Paper.pdf
     """
-    def __init__(self, recon_only=False):
+    def __init__(self, recon_only=False, testmode=False):
         super().__init__()
         self.recon_only = recon_only
-        self.image_recon_loss = ImageReconLoss(testmode=False)
-        self.morph_recon_loss = MorphReconLoss_SSIM_Sobel(testmode=False)
-        self.stain_classif_loss = AdversarialClassifLoss(testmode=False) ## relies on a shuffled dataset. if not shuffled it is impossible to construct pos/neg pairs.
+        self.testmode = testmode
+        self.image_recon_loss = ImageReconLoss(testmode=testmode)
+        self.morph_recon_loss = MorphReconLoss_SSIM_Sobel_V2(testmode=testmode, standardize=True)
+        self.stain_classif_loss = AdversarialClassifLoss(testmode=testmode) ## relies on a shuffled dataset. if not shuffled it is impossible to construct pos/neg pairs.
         self.alpha = 0.05
     
     def set_adverse_alpha(self, alpha):
@@ -195,5 +196,9 @@ class V2_SIPE_Loss_Adversarial(nn.Module):
         if logger is not None:
             logger['Recon Img'].append(image_recon_loss.item())
             logger['Recon Morph'].append(morph_recon_loss.item())
+            
+        if self.testmode:
+            print(f"Recon: img={image_recon_loss.item()}, morph={morph_recon_loss.item()}, comb={recon_loss.item()}")
+            print(f"Classif: stain{stain_loss.item()}")
             
         return final_loss, logger

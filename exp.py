@@ -69,15 +69,17 @@ if __name__ == '__main__':
     ## setup and run reconstruction pretrainer
     model.freeze_backbone(True)
     pretrainer = Trainer(model, V2_SIPE_Loss_Adversarial(True), wdir='SIPE-50k-Recon', device=model.device)
-    pretrainer.train(trainset, valset, 20, 3e-4, 20, batch_size=768)
+    pretrainer.train(trainset, valset, 20, 3e-4, 25, batch_size=768)
 
 
-    # ## setup curriculum
-    # cr = Curriculum()
-    # cr.add_step('adverse', 10, 0.1, 3e-4, 10, True)
-    # cr.add_step('adverse', 10, 0.25, 3e-4, 10, True)
-    # cr.add_step('recon', 5, 0, 3e-4, 5, True)
+    ## setup curriculum
+    cr = Curriculum()
+    cr.add_step('adverse', 10, 0.1, 3e-4, 10, True, True)
+    cr.add_step('adverse', 10, 0.25, 3e-4, 10, True, True)
+    cr.add_step('recon', 5, 0, 3e-4, 5, True, True)
+    cr.add_step('adverse', 10, 0.5, 3e-4, 10, True, True)
+    cr.add_step('adverse', 10, 1, 3e-4, 10, True, True)
     
-    # ## setup and run curriculum trainer
-    # cr_trainer = CurriculumTrainer(pretrainer.load_best_model(), SIPE_Loss_Recon(), SIPE_Loss_Adversarial(), 'SIPE-50k-ProjCurriculum')
-    # cr_trainer.train(trainset, valset, cr, batch_size=768)
+    ## setup and run curriculum trainer
+    cr_trainer = CurriculumTrainer(model, V2_SIPE_Loss_Adversarial(True), V2_SIPE_Loss_Adversarial(), 'SIPE-50k-Curriculum', device=model.device)
+    cr_trainer.train(trainset, valset, cr, batch_size=768)

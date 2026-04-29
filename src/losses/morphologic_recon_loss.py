@@ -94,3 +94,137 @@ class MorphReconLoss_SSIM_Sobel(StructuralSimilarityIndexMeasure):
         magnitude = torch.sqrt(gx ** 2 + gy ** 2)
         magnitude = magnitude / magnitude.max().clamp(min=1e-8)
         return magnitude
+class MorphReconLoss_SSIM_Sobel_V2(StructuralSimilarityIndexMeasure):
+    def __init__(self, data_range=1.0, testmode=False, standardize=False):
+        super().__init__(data_range=data_range)
+        self.testmode = testmode
+        self.standardize = standardize
+        self.denormer = UnNormalizeFloats([
+            0.707223,
+            0.578729,
+            0.703617
+        ], [
+            0.211883,
+            0.230117,
+            0.177517
+        ])
+        self.normer = T.Normalize([
+            0.707223,
+            0.578729,
+            0.703617
+        ], [
+            0.211883,
+            0.230117,
+            0.177517
+        ])
+        self.sobel_x = torch.tensor([
+            [-1., 0., 1.],
+            [-2., 0., 2.],
+            [-1., 0., 1.]
+        ]).view(1, 1, 3, 3)
+        self.sobel_y = torch.tensor([
+            [-1., -2., -1.],
+            [ 0.,  0.,  0.],
+            [ 1.,  2.,  1.]
+        ]).view(1, 1, 3, 3)
+        
+    def forward(self, rec, gt, device):
+        self.to(device)
+        gt = gt['image'].to(device) if type(gt)==dict else gt.to(device)
+        binary = self._binarize(gt)
+        sobel = self._sobel(binary).to(rec.device)
+        
+        if rec.shape[1]>1: sobel=sobel.expand(-1, 3, -1, -1)
+        if self.standardize: sobel = self.normer(sobel)
+        if self.testmode: 
+            print('Morph recon: rec.shape, binary.shape')
+            print(rec.shape, sobel.shape)
+            cnv = T.ToPILImage()
+            cnv(sobel).save('MRL_SSIM_Sobel_V2.png')
+        return 0.5*(1-super().forward(rec, sobel))+0.5*(F.mse_loss(rec, sobel)) ## ssim is between 0(worst) and 1(best)
+        
+    def _binarize(self, img): ## to be changed to a canny filter tuned based on compound used
+        return self.denormer(img).mean(dim=1).unsqueeze(1)
+    
+    def _sobel(self, img):
+        gx = F.conv2d(F.pad(img, (1, 1, 1, 1), mode='reflect'), self.sobel_x.to(img.device))
+        gy = F.conv2d(F.pad(img, (1, 1, 1, 1), mode='reflect'), self.sobel_y.to(img.device))
+        magnitude = torch.sqrt(gx ** 2 + gy ** 2)
+        magnitude = magnitude / magnitude.max().clamp(min=1e-8)
+        magnitude = torch.abs(magnitude-1)
+        return magnitude
+
+    def _apply_std(self, msk):
+        mean = 0.9214555621147156
+        std = 0.1259652078151703
+        return (msk-mean)/std
+    
+    def sobel_unnorm(self, msk):
+        mean = 0.9214555621147156
+        std = 0.1259652078151703
+        return (msk*std)+mean
+    
+class MorphReconLoss_Sobel_V2(StructuralSimilarityIndexMeasure):
+    def __init__(self, data_range=1.0, testmode=False, standardize=True):
+        raise NotImplementedError()
+        super().__init__(data_range=data_range)
+        self.testmode = testmode
+        self.standardize = standardize
+        self.denormer = UnNormalizeFloats([
+            0.707223,
+            0.578729,
+            0.703617
+        ], [
+            0.211883,
+            0.230117,
+            0.177517
+        ])
+        self.sobel_x = torch.tensor([
+            [-1., 0., 1.],
+            [-2., 0., 2.],
+            [-1., 0., 1.]
+        ]).view(1, 1, 3, 3)
+        self.sobel_y = torch.tensor([
+            [-1., -2., -1.],
+            [ 0.,  0.,  0.],
+            [ 1.,  2.,  1.]
+        ]).view(1, 1, 3, 3)
+        
+    def forward(self, rec, gt, device):
+        self.to(device)
+        gt = gt['image'].to(device) if type(gt)==dict else gt.to(device)
+        binary = self._binarize(gt)
+        sobel = self._sobel(binary).to(rec.device)
+        if self.standardize: sobel = self._apply_std(sobel)
+        if rec.shape[1]>1: sobel=sobel.expand(-1, 3, -1, -1)
+        if self.testmode: 
+            print('Morph recon: rec.shape, binary.shape')
+            print(rec.shape, sobel.shape)
+        return F.mse_loss(rec, sobel) ## ssim is between 0(worst) and 1(best)
+        
+    def _binarize(self, img): ## to be changed to a canny filter tuned based on compound used
+        return self.denormer(img).mean(dim=1).unsqueeze(1)
+    
+    def _sobel(self, img):
+        gx = F.conv2d(F.pad(img, (1, 1, 1, 1), mode='reflect'), self.sobel_x.to(img.device))
+        gy = F.conv2d(F.pad(img, (1, 1, 1, 1), mode='reflect'), self.sobel_y.to(img.device))
+        magnitude = torch.sqrt(gx ** 2 + gy ** 2)
+        magnitude = magnitude / magnitude.max().clamp(min=1e-8)
+        magnitude = torch.abs(magnitude-1)
+        return magnitude
+    
+    def _apply_std(self, msk):
+        mean = 0.9214555621147156
+        std = 0.1259652078151703
+        return (msk-mean)/std
+    
+    def sobel_unnorm(self, msk):
+        mean = 0.9214555621147156
+        std = 0.1259652078151703
+        return (msk*std)+mean
+    
+    # def _apply_std(self, msk):
+    #     raise NotImplementedError()
+    #     mean = 0.9214562099771146
+    #     std = 0.08906079096714133
+    #     return (msk-mean)/std
