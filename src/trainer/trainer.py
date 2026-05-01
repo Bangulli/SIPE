@@ -120,7 +120,7 @@ class Trainer:
         for epoch in range(strt, strt+epochs):
             logger = {
                 'Recon Img': [],
-                'Recon Morph': [],
+                'Stain probs2vec': [],
                 'InfoNCE Stain': [],
                 'InfoNCE Morph': [],
                 'Adversarial CE': [],
@@ -152,7 +152,7 @@ class Trainer:
             with torch.no_grad():
                 logger = {
                     'Recon Img': [],
-                    'Recon Morph': [],
+                    'Stain probs2vec': [],
                     'InfoNCE Stain': [],
                     'InfoNCE Morph': [],
                     'Adversarial CE': [],
@@ -192,7 +192,9 @@ class Trainer:
             self.load(ckpt_dir, epoch)
             return self.model
         else:
-            epoch = len(os.listdir(self.wdir/ckpt_dir))
+            with open(self.wdir/'history.json', 'r') as f:
+                self.loss_history = json.load(f)
+            epoch = len(self.loss_history['validation'])
             print('Loading latest model from epoch', epoch)
             self.load(ckpt_dir, epoch)
             return self.model

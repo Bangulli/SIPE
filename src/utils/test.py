@@ -1,14 +1,7 @@
 from BPTorch.datasets import BigPictureRepository, WsiDicomDataset
-from torch.utils.data import DataLoader
-from BPTorch.utils import bptorch_collate
-from pprint import pprint
-from src.model.arch import H0_mini_for_Adversarial
-from src.losses.loss_fusion import SIPE_Loss_Adversarial, SIPE_Loss_InfoNCE
 from torchvision.transforms import ToPILImage
 from src.utils.transfroms import UnNormalize, SobelTransform
-from src.trainer.trainer import Trainer
 import os, torch
-import torch.nn.functional as F
 import copy, tqdm, json, pathlib as pl
 import matplotlib.pyplot as plt
 import PIL
@@ -18,13 +11,13 @@ def make_side_by_side(images, path):
     fig, ax = plt.subplots(7, 2, figsize=(6, 18))
 
     col_labels = ['image1', 'image2']
-    row_labels = ['source', 'recon', 'sobel', 'reconmorph', 'reconO', 'reconrand', 'recon0']
+    row_labels = ['source', 'recon', 'sobel', 'reconmorph', 'reconO', 'reconrand']
 
     for i in range(2):
         key = f"image{i+1}"                          # fix: was hardcoded "image1"
         for j, v in enumerate(row_labels):
-            if not (("morph" in v) or ("sobel" in v)): ax[j, i].imshow(images[f"{key}_{v}"])    # fix: use .imshow() on the axes
-            else: ax[j, i].imshow(images[f"{key}_{v}"], cmap='Grays')
+            if not ("sobel" in v): ax[j, i].imshow(images[f"{key}_{v}"])    # fix: use .imshow() on the axes
+            else: ax[j, i].imshow(images[f"{key}_{v}"], cmap='gray')
             ax[j, i].set_xticks([])
             ax[j, i].set_yticks([])
 
@@ -71,21 +64,22 @@ def test(model, sourcedir, imdir_name):
     img = converter(denormer(patch['image']))
     img.save(f'{sourcedir/imdir_name}/source1.png')
     image_dict['image1_source'] = copy.deepcopy(img)
+    
     patch['image'] = patch['image'].unsqueeze(0)
     patch['metadata'] = [patch['metadata']]
     img = converter(sobeler(patch))
     img.save(f'{sourcedir/imdir_name}/sobel1.png')
     image_dict['image1_sobel'] = img
-    emb1 = model(patch)
+    
+    s1, z1 = model(patch)
     
     print('Image 1')
     print(patch['metadata'])
-    img = converter(denormer(model.recon_image(emb1)))
+    img = converter(denormer(model.recon_image(s1, z1)))
     img.save(f'{sourcedir/imdir_name}/recon_img1.png')
     image_dict['image1_recon'] = copy.deepcopy(img)
     
-    img = model.recon_morph_PIL(emb1, denormer).convert('L')
-    #img = PIL.ImageOps.invert(img) 
+    img = model.recon_image_PIL(torch.zeros_like(s1), z1, denormer)
     img.save(f'{sourcedir/imdir_name}/recon_morph1.png')
     image_dict['image1_reconmorph'] = copy.deepcopy(img)
     
@@ -94,66 +88,43 @@ def test(model, sourcedir, imdir_name):
     img = converter(denormer(patch['image']))
     img.save(f'{sourcedir/imdir_name}/source2.png')
     image_dict['image2_source'] = copy.deepcopy(img)
+    
     patch['image'] = patch['image'].unsqueeze(0)
     patch['metadata'] = [patch['metadata']]
     img = converter(sobeler(patch))
     img.save(f'{sourcedir/imdir_name}/sobel2.png')
     image_dict['image2_sobel'] = img
-    emb2 = model(patch)
+    
+    s2, z2 = model(patch)
     
     print('Image 2')
     print(patch['metadata'])
-    img = model.recon_image_PIL(emb2, denormer)
+    img = model.recon_image_PIL(s2, z2, denormer)
     img.save(f'{sourcedir/imdir_name}/recon_img2.png')
     
     image_dict['image2_recon'] = copy.deepcopy(img)
-    img = model.recon_morph_PIL(emb2, denormer).convert('L')
-    #img = PIL.ImageOps.invert(img) 
+    img = model.recon_image_PIL(torch.zeros_like(s2), z2, denormer)
     img.save(f'{sourcedir/imdir_name}/recon_morph2.png')
     image_dict['image2_reconmorph'] = copy.deepcopy(img)
     
     ### image two with image 1 stain
-    emb2_64 = emb2[:, :64]
-    emb2[:, :64] = emb1[:, :64]
-    
-    img = model.recon_image_PIL(emb2, denormer)
+    img = model.recon_image_PIL(s1, z2, denormer)
     img.save(f'{sourcedir/imdir_name}/recon_img_2_with_1_stain.png')
     image_dict['image2_reconO'] = copy.deepcopy(img)
     
     ### image two with random stain
-    emb2[:, :64] = torch.rand(emb1[:, :64].shape)
-    
-    img = model.recon_image_PIL(emb2, denormer)
+    img = model.recon_image_PIL(torch.rand_like(s1), z2, denormer)
     img.save(f'{sourcedir/imdir_name}/recon_img_2_with_rand_stain.png')
     image_dict['image2_reconrand'] = copy.deepcopy(img)
     
-    ### image two with random stain
-    emb2[:, :64] = torch.zeros_like(emb1[:, :64])
-    
-    img = model.recon_image_PIL(emb2, denormer)
-    img.save(f'{sourcedir/imdir_name}/recon_img_2_with_zero_stain.png')
-    image_dict['image2_recon0'] = copy.deepcopy(img)
-    
     #####################################################################
-    
-    emb1[:, :64] = emb2_64
-    
-    img = model.recon_image_PIL(emb1, denormer)
+    img = model.recon_image_PIL(s2, z1, denormer)
     img.save(f'{sourcedir/imdir_name}/recon_img_1_with_2_stain.png')
     image_dict['image1_reconO'] = copy.deepcopy(img)
     
     ### image two with random stain
-    emb1[:, :64] = torch.rand(emb1[:, :64].shape)
-    
-    img = model.recon_image_PIL(emb1, denormer)
+    img = model.recon_image_PIL(torch.rand_like(s2), z1, denormer)
     img.save(f'{sourcedir/imdir_name}/recon_img_1_with_rand_stain.png')
     image_dict['image1_reconrand'] = copy.deepcopy(img)
-    
-    ### image two with random stain
-    emb1[:, :64] = torch.zeros_like(emb1[:, :64])
-    
-    img = model.recon_image_PIL(emb1, denormer)
-    img.save(f'{sourcedir/imdir_name}/recon_img_1_with_zero_stain.png')
-    image_dict['image1_recon0'] = copy.deepcopy(img)
     
     make_side_by_side(image_dict, f'{sourcedir/imdir_name}/side-by-side.png')

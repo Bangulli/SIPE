@@ -4,6 +4,7 @@ from torchvision.transforms import ToPILImage, ToTensor
 from src.utils.transfroms import UnNormalize
 from PIL import Image
 import os
+import copy
 from BPTorch.datasets import BigPictureRepository, WsiDicomDataset
 
 # pip install "BPTorch @ git+https://github.com/Bangulli/BPTorch"
@@ -52,7 +53,30 @@ def extend_label_map(label_map, labels, sobel):
         label_map[k].append(v)
     return label_map
 
-    
+def _roll_list(lst, shifts):
+        if shifts > 0:
+            for idx in range(shifts):
+                lst.insert(0, lst.pop(-1))
+        else:
+            for idx in range(abs(shifts)):
+                lst.append(lst.pop(0))
+        return lst
     
 if __name__ == '__main__': 
-    compare('/home/lorenz/BigPicture/SIPE/SIPE-1M-Curriculum', 'images')
+    print('+++++++++++++++++++++ LIST ROLL +++++++++++++++++++++')
+    foo = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    print(f"Orig -> {foo}")
+    for shft in range(1, 6, 1):
+        f1 = _roll_list(copy.deepcopy(foo), shft)
+        print(f"Shifts={shft} -> {f1}")
+        f0 = _roll_list(copy.deepcopy(f1), -shft)
+        print(f"Shifts={-shft} -> {f0}")
+    
+    print('++++++++++++++++++++ TENSOR ROLL ++++++++++++++++++++') 
+    foo = torch.tensor([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+    print(f"Orig -> {foo}")
+    for shft in range(1, 6, 1):
+        f1 = torch.roll(copy.deepcopy(foo), shft, 0)
+        print(f"Shifts={shft} -> {f1}")
+        f0 = torch.roll(copy.deepcopy(f1), -shft, 0)
+        print(f"Shifts={-shft} -> {f0}")

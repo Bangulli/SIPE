@@ -3,7 +3,6 @@ from torch.utils.data import DataLoader
 from BPTorch.utils import bptorch_collate
 from pprint import pprint
 from src.model.arch import H0_mini_for_Adversarial
-from src.losses.loss_fusion import SIPE_Loss_Adversarial, SIPE_Loss_InfoNCE
 from torchvision.transforms import ToPILImage
 from src.utils.transfroms import UnNormalize, SobelTransform
 from src.trainer.trainer import Trainer
@@ -21,6 +20,8 @@ import matplotlib.gridspec as gridspec
 # pip install "BPTorch @ git+https://github.com/Bangulli/BPTorch"
 
 def make_side_by_side(images, path):
+   
+        
     fig, ax = plt.subplots(7, 2, figsize=(6, 18))
 
     col_labels = ['image1', 'image2']
@@ -100,22 +101,19 @@ def make_diagonal(images, originals, outdir):
     )
     plt.close(fig)
     
-def compare(sourcedir, imdir_name):
+def compare(model, sourcedir, imdir_name):
+    with open('classes.json', 'r') as f:
+        classes = json.load(f)
+        
     ## some io
     sourcedir = pl.Path(sourcedir)
-    if not (sourcedir/imdir_name).exists(): os.mkdir(sourcedir/imdir_name)
-    with open('/home/lorenz/BigPicture/SIPE/classes.json', 'r') as f:
-        classes = json.load(f)
-    trainer = Trainer(H0_mini_for_Adversarial(classes, device='cuda:0'), None, wdir=sourcedir)
-    if (sourcedir/'history.json').exists(): model = trainer.load_best_model()
-    else: model = trainer.load_model_at_epoch(1)
     model.to(model.device)
     model.eval()
     kwargs = WsiDicomDataset.get_default_kwargs()
     kwargs['transforms'] = model.transform
     
     ## defrag classes
-    classes = model.classif.defrag(list(classes.keys()))
+    classes = model.defrag(list(classes.keys()))
     
     ## dataset and loader
     ds = BigPictureRepository('/mnt/nas6/data/BigPicture_CBIR/datasets/BPTorch/fold_0/BPR.json', load=True, wsidicomdataset_kwargs=kwargs, verbose=False)
@@ -141,17 +139,15 @@ def compare(sourcedir, imdir_name):
     source_images = {}
     for batch in tqdm.tqdm(dl, desc='Finding stain examples'):
         if not patch_is_foreground(converter(batch['image'].squeeze(0))):continue
-        label = model.defrag_labels(batch)[0]
+        label = model.defrag(batch['metadata'][0]['staining'])[0][0]
         if label in present_classes: continue
         
         ## encode new image
-        emb = model(batch)
+        s_proba, z = model(batch)
         ## save stuff
         img = converter(denormer(batch['image'].squeeze(0)))
         source_images[label] = img
-        s = emb[:, :model.emb_stain_size]
-        virtual_staining_heads[label] = s
-        z = emb[:, model.emb_stain_size:]
+        virtual_staining_heads[label] = s_proba
         morphologic_bases[label] = z
         present_classes.append(label)
     
@@ -161,8 +157,7 @@ def compare(sourcedir, imdir_name):
         for lbl2 in present_classes:
             s = virtual_staining_heads[lbl2]
             z = morphologic_bases[lbl1]
-            cur_emb = torch.cat([s, z], dim=1)
-            current_recons[lbl2] = model.recon_image_PIL(cur_emb, denormer)
+            current_recons[lbl2] = model.recon_image_PIL(s, z, denormer)
         recons[lbl1] = current_recons
         
     make_diagonal(recons, source_images, sourcedir/imdir_name)

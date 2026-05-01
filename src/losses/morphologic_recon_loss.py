@@ -30,6 +30,60 @@ class MorphReconLoss_MSE(nn.MSELoss):
     def _binarize(self, img, meta): ## to be changed to a canny filter tuned based on compound used
         return img.mean(dim=1).unsqueeze(1)
     
+class MorphReconLoss_MSE_Sobel(nn.MSELoss):
+    def __init__(self, size_average=None, reduce=None, reduction='mean', testmode=False):
+        super().__init__(size_average, reduce, reduction)
+        self.testmode = testmode
+        self.denormer = UnNormalizeFloats([
+            0.707223,
+            0.578729,
+            0.703617
+        ], [
+            0.211883,
+            0.230117,
+            0.177517
+        ])
+        self.normer = T.Normalize([
+            0.707223,
+            0.578729,
+            0.703617
+        ], [
+            0.211883,
+            0.230117,
+            0.177517
+        ])
+        self.sobel_x = torch.tensor([
+            [-1., 0., 1.],
+            [-2., 0., 2.],
+            [-1., 0., 1.]
+        ]).view(1, 1, 3, 3)
+        self.sobel_y = torch.tensor([
+            [-1., -2., -1.],
+            [ 0.,  0.,  0.],
+            [ 1.,  2.,  1.]
+        ]).view(1, 1, 3, 3)
+        
+    def forward(self, rec, gt, device):
+        binary = self._binarize(gt['image'].to(device))
+        sobel = self._sobel(binary)
+        sobel_3c = sobel.expand(-1, 3, -1, -1)
+        sobel_3c = self.normer(sobel_3c)
+        if self.testmode: 
+            print('Morph recon: rec.shape, binary.shape')
+            print(rec.shape, binary.shape)
+        return super().forward(rec, binary)
+        
+    def _binarize(self, img): ## to be changed to a canny filter tuned based on compound used
+        return self.denormer(img).mean(dim=1).unsqueeze(1)
+    
+    def _sobel(self, img):
+        gx = F.conv2d(F.pad(img, (1, 1, 1, 1), mode='reflect'), self.sobel_x.to(img.device))
+        gy = F.conv2d(F.pad(img, (1, 1, 1, 1), mode='reflect'), self.sobel_y.to(img.device))
+        magnitude = torch.sqrt(gx ** 2 + gy ** 2)
+        magnitude = magnitude / magnitude.max().clamp(min=1e-8)
+        magnitude = torch.abs(magnitude-1)
+        return magnitude
+    
 class MorphReconLoss_SSIM(StructuralSimilarityIndexMeasure):
     def __init__(self, data_range=1.0, testmode=False):
         super().__init__(data_range=data_range)
@@ -49,10 +103,9 @@ class MorphReconLoss_SSIM(StructuralSimilarityIndexMeasure):
         return img.mean(dim=1).unsqueeze(1)
     
 class MorphReconLoss_SSIM_Sobel(StructuralSimilarityIndexMeasure):
-    def __init__(self, data_range=1.0, testmode=False, normalize=False):
+    def __init__(self, data_range=1.0, testmode=False):
         super().__init__(data_range=data_range)
         self.testmode = testmode
-        self.normalize = normalize
         self.denormer = UnNormalizeFloats([
             0.707223,
             0.578729,
@@ -75,14 +128,15 @@ class MorphReconLoss_SSIM_Sobel(StructuralSimilarityIndexMeasure):
         
     def forward(self, rec, gt, device):
         self.to(device)
-        binary = self._binarize(gt['image'].to(device), gt['metadata'])
+        rec = self._binarize(rec.to(device))
+        binary = self._binarize(gt['image'].to(device))
         sobel = self._sobel(binary)
         if self.testmode: 
             print('Morph recon: rec.shape, binary.shape')
             print(rec.shape, sobel.shape)
         return 1-super().forward(rec, sobel) ## ssim is between 0(worst) and 1(best)
         
-    def _binarize(self, img, _): ## to be changed to a canny filter tuned based on compound used
+    def _binarize(self, img): ## to be changed to a canny filter tuned based on compound used
         return self.denormer(img).mean(dim=1).unsqueeze(1)
     
     def _sobel(self, img):
@@ -90,11 +144,5 @@ class MorphReconLoss_SSIM_Sobel(StructuralSimilarityIndexMeasure):
         gy = F.conv2d(F.pad(img, (1, 1, 1, 1), mode='reflect'), self.sobel_y.to(img.device))
         magnitude = torch.sqrt(gx ** 2 + gy ** 2)
         magnitude = magnitude / magnitude.max().clamp(min=1e-8)
+        magnitude = torch.abs(magnitude-1)
         return magnitude
-    
-    def _normalize(self, sobel, label):
-        raise NotImplementedError()
-        for i in range(len(label)):
-            mean, std = itemgetter('mean', 'std')(self.cfg[label[i]])
-            sobel[i] = (sobel[i]-float(mean))/float(std)
-        return sobel

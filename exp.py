@@ -2,18 +2,19 @@ from BPTorch.datasets import BigPictureRepository, WsiDicomDataset
 from torch.utils.data import DataLoader
 from BPTorch.utils import bptorch_collate
 from pprint import pprint
-from src.model_exps.arch import H0_mini_for_Adversarial
+from src.model.arch import H0_mini_for_Adversarial
 from torchvision.transforms import ToPILImage
 from src.utils.transfroms import UnNormalize
 from src.trainer.trainer import Trainer
 from src.trainer.curriculum_trainer import CurriculumTrainer, Curriculum
-from src.losses_exps.loss_fusion import SIPE_Loss_Adversarial, SIPE_Loss_Recon
+from src.losses.loss_fusion import SIPE_Loss_Adversarial, SIPE_Loss_Adversarial_Cycle
 import os, torch, shutil
 import torch.nn.functional as F
 import copy, tqdm, random, math, json
 import matplotlib.pyplot as plt
 import warnings
 import torchvision.transforms as T
+import numpy as np
 warnings.filterwarnings('ignore')
 # pip install "BPTorch @ git+https://github.com/Bangulli/BPTorch"
 
@@ -66,6 +67,10 @@ if __name__ == '__main__':
     valset.source_precomputed_patches_from('rnd-subset-val')
     
     ## setup and run reconstruction pretrainer
-    model.freeze_backbone(True)
-    pretrainer = Trainer(model, SIPE_Loss_Recon(), wdir='EXP-SIPE-50k-Recon', device=model.device)
-    pretrainer.train(trainset, valset, 20, 3e-4, 10, batch_size=768)
+
+    pretrainer = CurriculumTrainer(model, SIPE_Loss_Adversarial(recon_mode=True), SIPE_Loss_Adversarial(), wdir='EXP-SIPE-50k-Curriculum', device='cuda:0')
+    
+    cr_trainer = CurriculumTrainer(model, SIPE_Loss_Adversarial(recon_mode=True), SIPE_Loss_Adversarial(), SIPE_Loss_Adversarial_Cycle(), wdir='EXP-SIPE-50k-Cycle', device='cuda:0')
+    cr = Curriculum()
+    cr.add_step(step_type='cycle', epochs=20, adverse_alpha=1.0, lr=3e-4, restarts=10, norm=True, freeze_bb=True)
+    cr_trainer.train(trainset, valset, cr, batch_size=256)

@@ -10,16 +10,22 @@ class AdversarialClassifLoss(nn.Module):
         self.compute = nn.CrossEntropyLoss()
         
     def forward(self, proj_stain_proba, proj_morph_proba, gt, device, logger, val, alpha):
-        gt = torch.tensor(gt, device=device)
+        gt = gt.to(device)
+        n_classes = gt.shape[1]
 
-        s_loss = self.compute(proj_stain_proba, gt) ### gets regular logits
+        if self.norm: s_loss = self.compute(proj_stain_proba, gt)/math.log(n_classes) ### gets regular logits
+        else: s_loss = self.compute(proj_stain_proba, gt)
         
-        if self.norm: z_loss = alpha*self.compute(proj_morph_proba, gt)/math.log(105) ### gets grad reverse logits
-        else: z_loss = alpha*self.compute(proj_morph_proba, gt)
+        H=16;W=16
+        if self.norm: z_loss = alpha*self.compute(proj_morph_proba, gt.repeat_interleave(H * W, dim=0))/math.log(n_classes) ### gets grad reverse logits
+        else: z_loss = alpha*self.compute(proj_morph_proba, gt.repeat_interleave(H * W, dim=0))
+        
         if self.testmode: print('losses:', f's={s_loss.item()}', f"z={z_loss.item()}")
+        
         if logger is not None:
             logger['CE'].append(s_loss.item())
             logger['Adversarial CE'].append(z_loss.item())
+            
         if not val: return (s_loss)+(z_loss), logger
         else: return s_loss, logger 
         

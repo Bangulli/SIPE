@@ -14,6 +14,7 @@ from torch.optim import AdamW
 from torch.utils.data import DataLoader
 import torch.nn as nn
 from BPTorch.utils import bptorch_collate
+import copy
 ######## Internal ########
 ##########################
 
@@ -48,7 +49,7 @@ class Curriculum(list):
         self += cr
 
 class CurriculumTrainer:
-    def __init__(self, model, loss_recon, loss_adverse, 
+    def __init__(self, model, loss_recon, loss_adverse, loss_cycle=None,
                  wdir='trainer',
                  scheduler=CosineAnnealingWarmRestarts,
                  optim=AdamW,
@@ -59,6 +60,7 @@ class CurriculumTrainer:
         self.model = model
         self.loss_r = loss_recon
         self.loss_a = loss_adverse
+        self.loss_c = loss_cycle
         self.scheduler_base = scheduler
         self.optim_base = optim
         self.loss_history = {
@@ -154,6 +156,9 @@ class CurriculumTrainer:
             self.model.freeze_backbone(freeze_bb)
             if step_type.lower()=='recon': self._train_recon(strt, epochs, train_loader, val_loader, ckpt_dir, i)
             elif step_type.lower()=='adverse': self._train_adverse(strt, epochs, train_loader, val_loader, ckpt_dir, adverse_alpha, adv_norm, i)
+            elif step_type.lower()=='cycle': 
+                assert self.loss_c is not None, "Can't train a cycle paradigm when no cycle loss function has been passed to the trainer."
+                self._train_cycle(strt, epochs, train_loader, val_loader, ckpt_dir, adverse_alpha, adv_norm, i)
             else: raise ValueError(f'Allowed step types are [recon, adverse], but got {step_type.lower()} instead')
             strt += epochs
         
@@ -164,7 +169,7 @@ class CurriculumTrainer:
         for epoch in range(strt, epochs+strt):
             logger = {
                 'Recon Img': [],
-                'Recon Morph': [],
+                'Stain probs2vec': [],
                 'InfoNCE Stain': [],
                 'InfoNCE Morph': [],
                 'Adversarial CE': [],
@@ -172,7 +177,7 @@ class CurriculumTrainer:
                 's std': [],
                 's norm': [],
             }
-            print(f'---------------------- Step: {step} {epoch}/{epochs+strt-1} - Recon ----------------------')
+            print(f'---------------------- Step: {step} - {epoch}/{epochs+strt-1} - Recon ----------------------')
             with torch.enable_grad():
                 self.model.train()
                 batch_losses = []
@@ -195,7 +200,7 @@ class CurriculumTrainer:
             with torch.no_grad():
                 logger = {
                     'Recon Img': [],
-                    'Recon Morph': [],
+                    'Stain probs2vec': [],
                     'InfoNCE Stain': [],
                     'InfoNCE Morph': [],
                     'Adversarial CE': [],
@@ -222,7 +227,7 @@ class CurriculumTrainer:
             for i, epoch in enumerate(range(strt, epochs+strt)):
                 logger = {
                     'Recon Img': [],
-                    'Recon Morph': [],
+                    'Stain probs2vec': [],
                     'InfoNCE Stain': [],
                     'InfoNCE Morph': [],
                     'Adversarial CE': [],
@@ -234,7 +239,7 @@ class CurriculumTrainer:
                 else: self.loss_a.set_adverse_alpha(alpha[i])
                 cur_alpha = alpha if type(alpha)==float else alpha[i]
                 self.loss_a.set_adverse_norm(norm)
-                print(f'---------------------- Step: {step} {epoch}/{epochs+strt-1} - Adverse - Alpha: {cur_alpha:.2f} ----------------------')
+                print(f'---------------------- Step: {step} - {epoch}/{epochs+strt-1} - Adverse - Alpha: {cur_alpha:.2f} ----------------------')
                 with torch.enable_grad():
                     self.model.train()
                     batch_losses = []
@@ -257,7 +262,7 @@ class CurriculumTrainer:
                 with torch.no_grad():
                     logger = {
                         'Recon Img': [],
-                        'Recon Morph': [],
+                        'Stain probs2vec': [],
                         'InfoNCE Stain': [],
                         'InfoNCE Morph': [],
                         'Adversarial CE': [],
@@ -276,7 +281,98 @@ class CurriculumTrainer:
                 self._save_ckpt(ckpt_dir, epoch)
                 self._save_history()
                 self._plt_progress()
+                
+    def _train_cycle(self, strt, epochs, train_loader, val_loader, ckpt_dir, alpha, norm, step):
+        self.loss_c.to(self.device)
+        self.model.freeze_or_unfreeze_disentangler(False) 
+        ######### recon step ########################################################################
+        for epoch in range(strt, epochs+strt):
+            logger = {
+                    'Recon Img': [],
+                    'S cycle': [],
+                    'Z cycle': [],
+                    'Adversarial CE': [],
+                    'CE':[],
+                }
+            if type(alpha)==float: self.loss_c.set_adverse_alpha(alpha)
+            else: self.loss_c.set_adverse_alpha(alpha[i])
+            cur_alpha = alpha if type(alpha)==float else alpha[i]
+            self.loss_c.set_adverse_norm(norm)
+            print(f'---------------------- Step: {step} - {epoch}/{epochs+strt-1} - alpha: {cur_alpha:.2f} - Cycle ----------------------')
+            with torch.enable_grad():
+                self.model.train()
+                batch_losses = []
+                for i, batch in enumerate(ProgBar(train_loader, desc=f'Training Batches')):
+                    self.optim.zero_grad()
+                    
+                    loss, logger = self._compute_cycle_loss_for_batch(batch, logger)
+                    
+                    batch_losses.append(loss.item())
+                    loss.backward()
+                    self.optim.step()
+                    if i%20==0:
+                        self._save_ckpt(ckpt_dir, epoch)
+                        self._plt_batch_progress(batch_losses, ckpt_dir, epoch)
+                        self._plt_individual_loss_progress(logger, ckpt_dir, epoch)
+                    
+                self.scheduler.step()
+                self.loss_history['training'].append(sum(batch_losses)/len(batch_losses))
             
+                            ## validation step
+            with torch.no_grad():
+                logger = {
+                    'Recon Img': [],
+                    'S cycle': [],
+                    'Z cycle': [],
+                    'Adversarial CE': [],
+                    'CE':[],
+                }
+                self.model.eval()
+                val_losses = []
+                for batch in ProgBar(val_loader, desc=f'Validating Batches'):
+                    loss, logger = self._compute_cycle_loss_for_batch(batch, logger, True)
+                    val_losses.append(loss.item())
+                self.loss_history['validation'].append(sum(val_losses)/len(val_losses))
+                
+            ## save checkpoint
+            self._save_ckpt(ckpt_dir, epoch)
+            self._save_history()
+            self._plt_progress()
+            
+    def _compute_cycle_loss_for_batch(self, batch, logger=None, val=False):
+        ## encode initial batch
+        batch1 = batch
+        s1, z1 = self.model(batch1)
+        recon1 = self.model.recon_image(s1, z1)
+        s1_class, z1_class = self.model.entangler.classify(s1, z1)
+        
+        ## shift along the batch dimension to mix and specified/unspecified pairs and create second batch
+        s1_prime = torch.roll(s1, 1, 0) 
+        meta_prime = self._roll_list(copy.deepcopy(batch1['metadata']), 1)
+        batch2= {'image':self.model.recon_image(s1_prime, z1), 'metadata':meta_prime}
+        
+        ## encode second batch
+        s2, z2 = self.model(batch2)
+        
+        ## unshift to re-establish correspondence
+        s2_prime = torch.roll(s2, -1, 0)
+        
+        ## organize gts
+        gt_labels = torch.tensor(self.model.transform_labels([s['staining'] for s in batch1['metadata']]), dtype=torch.float32)
+        gt_images = batch1['image']
+        
+        ## compute loss
+        return self.loss_c(gt_labels, gt_images, recon1, s1, s2_prime, z1, z2, s1_class, z1_class, logger, val)
+        
+    def _roll_list(self, lst, shifts): ## Equivalent to torch.roll(tensor, shifts, dim=0)
+        if shifts > 0:
+            for idx in range(shifts):
+                lst.insert(0, lst.pop(-1))
+        else:
+            for idx in range(abs(shifts)):
+                lst.append(lst.pop(0))
+        return lst
+    
     def load_best_model(self, ckpt_dir='checkpoints'):
         if os.path.exists(self.wdir/'history.json'):
             with open(self.wdir/'history.json', 'r') as f:

@@ -65,8 +65,6 @@ class SobelTransform:
             [ 0.,  0.,  0.],
             [ 1.,  2.,  1.]
         ]).view(1, 1, 3, 3)
-        with open('sobel_cfg.json', 'r') as f:
-            self.cfg = json.load(f)
             
     def _binarize(self, img): ## to be changed to a canny filter tuned based on compound used
         denormed = self.denormer(img)
@@ -77,6 +75,7 @@ class SobelTransform:
         gy = F.conv2d(F.pad(img, (1, 1, 1, 1), mode='reflect'), self.sobel_y)
         magnitude = torch.sqrt(gx ** 2 + gy ** 2)
         magnitude = magnitude / magnitude.max().clamp(min=1e-8)
+        magnitude = torch.abs(magnitude-1)
         return magnitude
     
     def _normalize(self, sobel, label):
