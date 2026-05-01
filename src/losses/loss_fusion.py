@@ -6,7 +6,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 import torch
 import torch.nn as nn
 ######## Internal ########
-from src.losses.image_recon_loss import ImageReconLoss
+from src.losses.image_recon_loss import ImageReconLoss, GAN_Loss
 from src.losses.morphologic_recon_loss import MorphReconLoss_MSE_Sobel
 from src.losses.staining_cluster_loss import SimCLR_NCE_Loss
 from src.losses.adversarial_classif_loss import AdversarialClassifLoss
@@ -18,7 +18,7 @@ class SIPE_Loss_Adversarial(nn.Module):
         super().__init__()
         self.testmode=testmode
         self.recon_mode = recon_mode
-        self.image_recon_loss = ImageReconLoss(testmode=False)
+        self.image_recon_loss = GAN_Loss()
         self.probas_to_stainvec_loss = nn.MSELoss()
         #self.morph_recon_loss = MorphReconLoss_MSE_Sobel(testmode=False)
         self.stain_classif_loss = AdversarialClassifLoss(testmode=testmode) ## relies on a shuffled dataset. if not shuffled it is impossible to construct pos/neg pairs.
@@ -40,11 +40,19 @@ class SIPE_Loss_Adversarial(nn.Module):
                 device, 
                 logger=None,
                 val=False,
+                disc_gt = None,
+                disc_rec = None,
                 ):
         ## Compute and fuse reconstruction losses
-        image_recon_loss = self.image_recon_loss(rec_img.to(device), gt['image'].to(device))
-        #morph_recon_loss = self.morph_recon_loss(rec_morph.to(device), gt, device).to(device)
-        recon_loss = image_recon_loss# + morph_recon_loss
+        if isinstance(self.image_recon_loss, ImageReconLoss):
+            image_recon_loss = self.image_recon_loss(rec_img.to(device), gt['image'].to(device))
+            recon_loss = image_recon_loss
+        elif disc_gt is not None and disc_rec is not None and isinstance(self.image_recon_loss, GAN_Loss):
+            perception_loss, gan_loss = self.image_recon_loss(gt['image'].to(device), rec_img.to(device), disc_gt, disc_rec)
+            recon_loss = perception_loss + 0.5*gan_loss
+        else: raise RuntimeError('Did not receive a valid loss/value configuration for MSE or GAN loss.')
+            
+        
         ## Compute staining cluster loss
         if not self.recon_mode: 
             stain_loss, logger = self.stain_classif_loss(proj_stain.to(device), proj_morph.to(device), gt['labels'], device, logger, val, self.alpha)
@@ -74,7 +82,7 @@ class SIPE_Loss_Adversarial_Cycle(nn.Module):
         super().__init__()
         self.testmode=testmode
         self.recon_mode = recon_mode
-        self.image_recon_loss = ImageReconLoss(testmode=False)
+        self.image_recon_loss = GAN_Loss()
         self.cycle_consistency_loss = nn.L1Loss()
         self.stain_classif_loss = AdversarialClassifLoss(testmode=testmode) ## relies on a shuffled dataset. if not shuffled it is impossible to construct pos/neg pairs.
         self.alpha = 0.05
@@ -100,10 +108,20 @@ class SIPE_Loss_Adversarial_Cycle(nn.Module):
                 s_class,
                 z_class,
                 logger = None,
-                val = False
+                val = False,
+                disc_gt = None,
+                disc_rec = None
                 ):
         
-        recon_loss = self.image_recon_loss(recon_images.to(self.device), gt_images.to(self.device))
+        if isinstance(self.image_recon_loss, ImageReconLoss):
+            image_recon_loss = self.image_recon_loss(recon_images.to(self.device), gt_images.to(self.device))
+            recon_loss = image_recon_loss
+        elif disc_gt is not None and disc_rec is not None and isinstance(self.image_recon_loss, GAN_Loss):
+            perception_loss, gan_loss = self.image_recon_loss(recon_images.to(self.device), gt_images.to(self.device), disc_gt, disc_rec)
+            recon_loss = perception_loss + 0.5*gan_loss
+        else: raise RuntimeError('Did not receive a valid loss/value configuration for MSE or GAN loss.')
+            
+        
         s_cycle_loss = self.cycle_consistency_loss(s_cycle, s_orig)
         z_cycle_loss = self.cycle_consistency_loss(z_cycle, z_orig)
         stain_loss, logger = self.stain_classif_loss(s_class, z_class, gt_labels, self.device, logger, val, self.alpha)

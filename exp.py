@@ -70,7 +70,7 @@ if __name__ == '__main__':
 
     pretrainer = CurriculumTrainer(model, SIPE_Loss_Adversarial(recon_mode=True), SIPE_Loss_Adversarial(), wdir='EXP-SIPE-50k-Curriculum', device='cuda:0')
     
-    cr_trainer = CurriculumTrainer(model, SIPE_Loss_Adversarial(recon_mode=True), SIPE_Loss_Adversarial(), SIPE_Loss_Adversarial_Cycle(), wdir='EXP-SIPE-50k-Cycle', device='cuda:0')
+    cr_trainer = CurriculumTrainer(model, SIPE_Loss_Adversarial(recon_mode=True), SIPE_Loss_Adversarial(), SIPE_Loss_Adversarial_Cycle(), wdir='EXP-SIPE-50k-CycleGAN', device='cuda:0')
     cr = Curriculum()
-    cr.add_step(step_type='cycle', epochs=20, adverse_alpha=1.0, lr=3e-4, restarts=10, norm=True, freeze_bb=True)
+    cr.add_step(step_type='cycle', epochs=20, adverse_alpha=1.0, lr=1e-3, restarts=10, norm=True, freeze_bb=True)
     cr_trainer.train(trainset, valset, cr, batch_size=256)

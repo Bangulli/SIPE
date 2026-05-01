@@ -47,3 +47,5 @@ class GAN_Loss(nn.Module):
         
         loss_real = self.mse(gt_prob, self._labels(gt_prob, True))
         loss_fake = self.mse(rec_prob, self._labels(rec_prob, False))
+        
+        return perception_loss, loss_fake+loss_real

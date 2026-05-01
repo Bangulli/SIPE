@@ -54,6 +54,9 @@ class H0_mini_for_Adversarial(nn.Module):
         
         self.image_decoder = get_decoder(num_features, 3) ## decoder for image recon, adds a projection layer to mix stain
         print('Image Decoder built!')
+        
+        self.discriminator = get_discriminator()
+        print('Discriminator built!')
 
         self.to(self.device)
     
@@ -87,7 +90,13 @@ class H0_mini_for_Adversarial(nn.Module):
         ## recon
         rec_img = self.recon_image(s, z)
         
-        return loss(batch, s_classif, z_classif, rec_img, s_recon, s, self.device, logger, val)
+        ## discrimination (that ain't right - The Lonely Island)
+        if type(batch)==dict: disc_gt = self.discriminator(batch['image'].to(self.device))
+        else: disc_gt = self.discriminator(batch.to(self.device))
+        
+        disc_rec = self.discriminator(rec_img.detach())
+        
+        return loss(batch, s_classif, z_classif, rec_img, s_recon, s, self.device, logger, val, disc_gt, disc_rec)
 
     def recon_image(self, s, z, transform=None):
         if len(s.shape)==1: s=s.unsqueeze(0)
@@ -109,12 +118,15 @@ class H0_mini_for_Adversarial(nn.Module):
         torch.save(self.backbone.state_dict(), pth/'backbone.pth')
         torch.save(self.image_decoder.state_dict(), pth/'image_decoder.pth')
         torch.save(self.entangler.state_dict(), pth/'entangler.pth')
+        torch.save(self.discriminator.state_dict(), pth/'discriminator.pth')
         
     def load(self, pth):
         pth=pl.Path(pth)
         self.backbone.load_state_dict(torch.load(pth/'backbone.pth'))
         self.image_decoder.load_state_dict(torch.load(pth/'image_decoder.pth'))
         self.entangler.load_state_dict(torch.load(pth/'entangler.pth'))
+        try: self.discriminator.load_state_dict(torch.load(pth/'discriminator.pth'))
+        except: print('Couldnt load discriminator, using initialized weights instead')
         
     def freeze_backbone(self, freeze):
         for param in self.backbone.parameters():

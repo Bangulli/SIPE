@@ -5,9 +5,9 @@ def make_name_from_list(data):
         return data
     return "+".join(data)
 
-def patch_is_foreground(patch, frac=0.5, size=244):
+def patch_is_foreground(patch, frac=0.7, size=244):
     patch = patch.convert('L')
-    gs_threshold = skimage.filters.threshold_otsu(np.array(patch))
+    gs_threshold = 180
     thmbnl = np.array(patch)<gs_threshold
     thmbnl_se = skimage.morphology.disk(16)
     thmbnl = cv2.morphologyEx(thmbnl.astype(np.uint8), cv2.MORPH_CLOSE, thmbnl_se).astype(bool)

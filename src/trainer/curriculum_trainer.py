@@ -16,13 +16,14 @@ import torch.nn as nn
 from BPTorch.utils import bptorch_collate
 import copy
 ######## Internal ########
+from src.losses.image_recon_loss import GAN_Loss
 ##########################
 
 class Curriculum(list):
     def __init__(self):
         super().__init__()
         
-    def add_step(self, step_type='recon', epochs=5, adverse_alpha=0.1, lr=3e-4, restarts=5, norm=True, freeze_bb=True):
+    def add_step(self, step_type='recon', epochs=5, adverse_alpha=0.1, lr=3e-4, restarts=5, norm=True, freeze_bb=True, freeze_tangler=True):
         self.append({
             'type': step_type,
             'epochs': epochs,
@@ -31,6 +32,7 @@ class Curriculum(list):
             'restarts': restarts,
             'adverse_norm': norm,
             'freeze_backbone': freeze_bb,
+            'freeze_tangler': freeze_tangler
         })
         
     def save(self, path):
@@ -133,6 +135,11 @@ class CurriculumTrainer:
     def train(self, train, val, curriculum, ckpt_dir='checkpoints', batch_size=32):
         os.makedirs(self.wdir/ckpt_dir, exist_ok=True)
         
+        ## send perceptive loss to device
+        if isinstance(self.loss_a.image_recon_loss, GAN_Loss): self.loss_a.image_recon_loss.to(self.device)
+        if isinstance(self.loss_c.image_recon_loss, GAN_Loss): self.loss_c.image_recon_loss.to(self.device)
+        if isinstance(self.loss_r.image_recon_loss, GAN_Loss): self.loss_r.image_recon_loss.to(self.device)
+        
         if not os.path.exists(self.wdir/ckpt_dir/'curriculum.json'): curriculum.save(self.wdir/ckpt_dir/'curriculum.json')
         else: 
             extended_cr = Curriculum.load(self.wdir/ckpt_dir/'curriculum.json')
@@ -150,10 +157,11 @@ class CurriculumTrainer:
         
         strt = len([d for d in os.listdir(self.wdir/ckpt_dir) if (self.wdir/ckpt_dir/d).is_dir()])+1
         for i, step in enumerate(curriculum):
-            step_type, epochs, lr, adverse_alpha, restarts, adv_norm, freeze_bb = itemgetter('type', 'epochs', 'lr', 'adverse_alpha', 'restarts', 'adverse_norm', 'freeze_backbone')(step)
+            step_type, epochs, lr, adverse_alpha, restarts, adv_norm, freeze_bb, freeze_tangler = itemgetter('type', 'epochs', 'lr', 'adverse_alpha', 'restarts', 'adverse_norm', 'freeze_backbone', 'freeze_tangler')(step)
             self.optim = self.optim_base(self.model.parameters(), lr=lr)
             self.scheduler = self.scheduler_base(self.optim, restarts)
             self.model.freeze_backbone(freeze_bb)
+            self.model.freeze_or_unfreeze_disentangler(freeze_tangler) 
             if step_type.lower()=='recon': self._train_recon(strt, epochs, train_loader, val_loader, ckpt_dir, i)
             elif step_type.lower()=='adverse': self._train_adverse(strt, epochs, train_loader, val_loader, ckpt_dir, adverse_alpha, adv_norm, i)
             elif step_type.lower()=='cycle': 
@@ -165,7 +173,6 @@ class CurriculumTrainer:
         
     def _train_recon(self, strt, epochs, train_loader, val_loader, ckpt_dir, step):
         ######### recon step ########################################################################
-        self.model.freeze_or_unfreeze_disentangler(True)
         for epoch in range(strt, epochs+strt):
             logger = {
                 'Recon Img': [],
@@ -222,7 +229,6 @@ class CurriculumTrainer:
             
     def _train_adverse(self, strt, epochs, train_loader, val_loader, ckpt_dir, alpha, norm, step):
             ######### adversarial step ########################################################################
-            self.model.freeze_or_unfreeze_disentangler(False) 
             if type(alpha)!=float: assert len(alpha)==len(range(strt, epochs+strt)), 'Size of alphas list has to match amount of epochs.'
             for i, epoch in enumerate(range(strt, epochs+strt)):
                 logger = {
@@ -284,7 +290,6 @@ class CurriculumTrainer:
                 
     def _train_cycle(self, strt, epochs, train_loader, val_loader, ckpt_dir, alpha, norm, step):
         self.loss_c.to(self.device)
-        self.model.freeze_or_unfreeze_disentangler(False) 
         ######### recon step ########################################################################
         for epoch in range(strt, epochs+strt):
             logger = {
@@ -345,11 +350,13 @@ class CurriculumTrainer:
         s1, z1 = self.model(batch1)
         recon1 = self.model.recon_image(s1, z1)
         s1_class, z1_class = self.model.entangler.classify(s1, z1)
+        disc_gt = self.model.discriminator(batch1['image'].to(self.device))
+        disc_rec = self.model.discriminator(recon1.detach())
         
         ## shift along the batch dimension to mix and specified/unspecified pairs and create second batch
         s1_prime = torch.roll(s1, 1, 0) 
         meta_prime = self._roll_list(copy.deepcopy(batch1['metadata']), 1)
-        batch2= {'image':self.model.recon_image(s1_prime, z1), 'metadata':meta_prime}
+        batch2= {'image':self.model.recon_image(s1_prime.detach(), z1.detach()), 'metadata':meta_prime} ## detach to avoid gradient flow through first pass
         
         ## encode second batch
         s2, z2 = self.model(batch2)
@@ -362,7 +369,7 @@ class CurriculumTrainer:
         gt_images = batch1['image']
         
         ## compute loss
-        return self.loss_c(gt_labels, gt_images, recon1, s1, s2_prime, z1, z2, s1_class, z1_class, logger, val)
+        return self.loss_c(gt_labels, gt_images, recon1, s1, s2_prime, z1, z2, s1_class, z1_class, logger, val, disc_gt, disc_rec)
         
     def _roll_list(self, lst, shifts): ## Equivalent to torch.roll(tensor, shifts, dim=0)
         if shifts > 0:

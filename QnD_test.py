@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
     
 if __name__ == '__main__':
     
-    sourcedir = pl.Path('/home/lorenz/BigPicture/SIPE/EXP-SIPE-50k-Cycle')
+    sourcedir = pl.Path('/home/lorenz/BigPicture/SIPE/EXP-SIPE-50k-CycleGAN')
     
     print(f'Running a quick and dirty test for trainer at {sourcedir}')
     
@@ -28,4 +28,4 @@ if __name__ == '__main__':
     else: model = trainer.load_model_at_epoch(1)
 
     test(model, sourcedir, 'images')
-    compare(model, sourcedir, 'images')
+    #compare(model, sourcedir, 'images')
