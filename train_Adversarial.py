@@ -17,7 +17,7 @@ if __name__ == '__main__':
         classes = json.load(f)
         
     ## setup model
-    model = H0_mini_for_Adversarial(classes, device='cuda:0')
+    model = H0_mini_for_Adversarial(classes, device='cuda:1')
         
     ## prep train trans
     kwargs = WsiDicomDataset.get_default_kwargs()

@@ -18,7 +18,7 @@ class SIPE_Loss_Adversarial(nn.Module):
         super().__init__()
         self.testmode=testmode
         self.recon_mode = recon_mode
-        self.image_recon_loss = GAN_Loss()
+        self.image_recon_loss = ImageReconLoss()
         self.probas_to_stainvec_loss = nn.MSELoss()
         #self.morph_recon_loss = MorphReconLoss_MSE_Sobel(testmode=False)
         self.stain_classif_loss = AdversarialClassifLoss(testmode=testmode) ## relies on a shuffled dataset. if not shuffled it is impossible to construct pos/neg pairs.
@@ -82,7 +82,7 @@ class SIPE_Loss_Adversarial_Cycle(nn.Module):
         super().__init__()
         self.testmode=testmode
         self.recon_mode = recon_mode
-        self.image_recon_loss = GAN_Loss()
+        self.image_recon_loss = ImageReconLoss()
         self.cycle_consistency_loss = nn.L1Loss()
         self.stain_classif_loss = AdversarialClassifLoss(testmode=testmode) ## relies on a shuffled dataset. if not shuffled it is impossible to construct pos/neg pairs.
         self.alpha = 0.05
