@@ -138,7 +138,7 @@ def compare(model, sourcedir, imdir_name):
     morphologic_bases = {}
     source_images = {}
     for batch in tqdm.tqdm(dl, desc='Finding stain examples'):
-        if not patch_is_foreground(converter(batch['image'].squeeze(0))):continue
+        if not patch_is_foreground(converter(denormer(batch['image']).squeeze(0))):continue
         label = model.defrag(batch['metadata'][0]['staining'])[0][0]
         if label in present_classes: continue
         

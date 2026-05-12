@@ -66,11 +66,11 @@ if __name__ == '__main__':
     valset = BigPictureRepository('/mnt/nas6/data/BigPicture_CBIR/datasets/BPTorch/fold_1/BPR.json', load=True, wsidicomdataset_kwargs=kwargs, verbose=False)
     valset.source_precomputed_patches_from('rnd-subset-val')
     
-    ## setup and run reconstruction pretrainer
-
-    pretrainer = CurriculumTrainer(model, SIPE_Loss_Adversarial(recon_mode=True), SIPE_Loss_Adversarial(), wdir='EXP-SIPE-50k-Curriculum', device='cuda:0')
-    
-    cr_trainer = CurriculumTrainer(model, SIPE_Loss_Adversarial(recon_mode=True), SIPE_Loss_Adversarial(), SIPE_Loss_Adversarial_Cycle(), wdir='EXP-SIPE-50k-CycleGAN', device='cuda:0')
+    cr_trainer = CurriculumTrainer(model, SIPE_Loss_Adversarial(recon_mode=True), SIPE_Loss_Adversarial(), SIPE_Loss_Adversarial_Cycle(), wdir='SIPE-50k-Curriculum', device='cuda:0')
     cr = Curriculum()
-    cr.add_step(step_type='cycle', epochs=20, adverse_alpha=1.0, lr=1e-3, restarts=10, norm=True, freeze_bb=True)
-    cr_trainer.train(trainset, valset, cr, batch_size=256)
+    # cr.add_step(step_type='recon', epochs=5, adverse_alpha=1.0, lr=1e-3, restarts=5, norm=True, freeze_bb=True, freeze_tangler=False)
+    # alpha = np.arange(0.1, 1.0, 0.1).tolist()
+    # alpha += (20-len(alpha))*[1.0]
+    # cr.add_step(step_type='cycle', epochs=20, adverse_alpha=alpha, lr=1e-3, restarts=10, norm = True, freeze_bb=True, freeze_tangler=False)
+    cr.add_step(step_type='cycle', epochs=50, adverse_alpha=1.0, lr=1e-5, restarts=25, norm = True, freeze_bb=True, freeze_tangler=False)
+    cr_trainer.train(trainset, valset, cr, batch_size=512)

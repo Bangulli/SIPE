@@ -33,13 +33,10 @@ def swap_stain(model, img_a, img_b):
             
             batch = {'image': torch.stack([patch_aa, patch_bb])}
             
-            embs = model(batch)
+            s, z = model(batch)
             
-            s = embs[:, :model.emb_stain_size]
-            z = embs[:, model.emb_stain_size:]
-            
-            out_ab[:, h:h+224, w:w+224] = model.recon_image(torch.cat([s[0], z[1]], dim=0).unsqueeze(0))
-            out_ba[:, h:h+224, w:w+224] = model.recon_image(torch.cat([s[1], z[0]], dim=0).unsqueeze(0))
+            out_ab[:, h:h+224, w:w+224] = model.recon_image(s[0].unsqueeze(0), z[1].unsqueeze(0))
+            out_ba[:, h:h+224, w:w+224] = model.recon_image(s[1].unsqueeze(0), z[0].unsqueeze(0))
     
     return to_regsized_pil(out_ab), to_regsized_pil(out_ba)
 
@@ -166,4 +163,4 @@ def test_virtual_staining(model_dir):
             json.dump(results_other2he, f, indent=4)
     
 if __name__ == '__main__':
-    test_virtual_staining('/home/lorenz/BigPicture/SIPE/v1_models/SIPE-1M-Curriculum')
+    test_virtual_staining('/home/lorenz/BigPicture/SIPE/SIPE-50k-Curriculum')

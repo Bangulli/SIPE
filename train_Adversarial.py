@@ -17,7 +17,7 @@ if __name__ == '__main__':
         classes = json.load(f)
         
     ## setup model
-    model = H0_mini_for_Adversarial(classes, device='cuda:1')
+    model = H0_mini_for_Adversarial(classes, device='cuda:0')
         
     ## prep train trans
     kwargs = WsiDicomDataset.get_default_kwargs()
@@ -36,18 +36,12 @@ if __name__ == '__main__':
     valset.source_precomputed_patches_from('rnd-subset-val')
     
     ## setup trainer
-    cr_trainer = CurriculumTrainer(model, SIPE_Loss_Adversarial(recon_mode=True), SIPE_Loss_Adversarial(), SIPE_Loss_Adversarial_Cycle(), wdir='SIPE-1M-Curriculum', device=model.device)
+    pretrainer = CurriculumTrainer(model, SIPE_Loss_Adversarial(recon_mode=True), SIPE_Loss_Adversarial(), SIPE_Loss_Adversarial_Cycle(), wdir='SIPE-50k-Curriculum', device='cuda:0')
+    cr_trainer = CurriculumTrainer(pretrainer, SIPE_Loss_Adversarial(recon_mode=True), SIPE_Loss_Adversarial(), SIPE_Loss_Adversarial_Cycle(), wdir='SIPE-1M-Curriculum', device=pretrainer.device)
     
     ## setup curriculum
     cr = Curriculum()
-    alpha_ramp = np.arange(0.05, 1.0, 0.05).tolist()
-    alpha_ramp += (20-len(alpha_ramp))*[1.0]
-    cr.add_step(step_type='recon', epochs=5, adverse_alpha=1.0, lr=1e-3, restarts=5, norm=True, freeze_bb=True, freeze_tangler=False)
-    cr.add_step(step_type='adverse', epochs=20, adverse_alpha=alpha_ramp, lr=1e-3, restarts=10, norm=False, freeze_bb=True, freeze_tangler=False)
-    cr.add_step(step_type='cycle', epochs=20, adverse_alpha=1.0, lr=1e-3, restarts=10, norm=True, freeze_bb=True, freeze_tangler=False)
-    cr.add_step(step_type='recon', epochs=5, adverse_alpha=1.0, lr=3e-4, restarts=5, norm=True, freeze_bb=True, freeze_tangler=True)
-    cr.add_step(step_type='cycle', epochs=20, adverse_alpha=1.0, lr=3e-4, restarts=10, norm=True, freeze_bb=True, freeze_tangler=False)
-    cr.add_step(step_type='recon', epochs=5, adverse_alpha=1.0, lr=1e-4, restarts=5, norm=True, freeze_bb=True, freeze_tangler=True)
+    cr.add_step(step_type='cycle', epochs=50, adverse_alpha=1.0, lr=1e-5, restarts=25, norm=True, freeze_bb=True, freeze_tangler=False)
     ## yeet
     cr_trainer.train(trainset, valset, cr, batch_size=256)
     

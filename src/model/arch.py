@@ -201,8 +201,14 @@ class Entangler(nn.Module):
         return s, z # -> [B, n_stain_features], [B, n_other_features, 16, 16]
     
     def reentangle(self, s, z):
-        # s = self.porbas_to_specified(s)
-        # s = self.act2(s)
+        s = s[:, :, None, None].expand(-1, -1, 16, 16)
+        patches = torch.cat([s, z], dim=1)
+        patches = self.reentangler(patches)
+        return patches
+    
+    def reentangle_from_probas(self, s_probas, z):
+        s = self.porbas_to_specified(s_probas)
+        s = self.act2(s)
         s = s[:, :, None, None].expand(-1, -1, 16, 16)
         patches = torch.cat([s, z], dim=1)
         patches = self.reentangler(patches)

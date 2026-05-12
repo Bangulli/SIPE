@@ -17,6 +17,7 @@ from BPTorch.utils import bptorch_collate
 import copy
 ######## Internal ########
 from src.losses.image_recon_loss import GAN_Loss
+from src.model.arch import H0_mini_for_Adversarial
 ##########################
 
 class Curriculum(list):
@@ -55,11 +56,17 @@ class CurriculumTrainer:
                  wdir='trainer',
                  scheduler=CosineAnnealingWarmRestarts,
                  optim=AdamW,
-                 from_scratch = False,
                  device = 'cuda:1'
                  ):
-        self.wdir = self._prep_wdir(wdir) if from_scratch else pl.Path(wdir)
-        self.model = model
+        self.wdir = pl.Path(wdir)
+        os.makedirs(self.wdir, exist_ok=True)
+        if isinstance(model, H0_mini_for_Adversarial): self.model = model
+        elif isinstance(model, CurriculumTrainer): 
+            print(f'Forking model from {model.wdir}')
+            self.model, epoch = model._load_pretrained()
+            with open(self.wdir/'NOTE.txt', 'w') as f:
+                f.write(f'Forked from {model.wdir}, epoch {epoch}')
+        else: raise ValueError(f'Got unsupported model object {type(model)}')
         self.loss_r = loss_recon
         self.loss_a = loss_adverse
         self.loss_c = loss_cycle
@@ -291,7 +298,7 @@ class CurriculumTrainer:
     def _train_cycle(self, strt, epochs, train_loader, val_loader, ckpt_dir, alpha, norm, step):
         self.loss_c.to(self.device)
         ######### recon step ########################################################################
-        for epoch in range(strt, epochs+strt):
+        for i, epoch in enumerate(range(strt, epochs+strt)):
             logger = {
                     'Recon Img': [],
                     'S cycle': [],
@@ -350,13 +357,11 @@ class CurriculumTrainer:
         s1, z1 = self.model(batch1)
         recon1 = self.model.recon_image(s1, z1)
         s1_class, z1_class = self.model.entangler.classify(s1, z1)
-        disc_gt = self.model.discriminator(batch1['image'].to(self.device))
-        disc_rec = self.model.discriminator(recon1.detach())
         
         ## shift along the batch dimension to mix and specified/unspecified pairs and create second batch
         s1_prime = torch.roll(s1, 1, 0) 
         meta_prime = self._roll_list(copy.deepcopy(batch1['metadata']), 1)
-        batch2= {'image':self.model.recon_image(s1_prime.detach(), z1.detach()), 'metadata':meta_prime} ## detach to avoid gradient flow through first pass
+        batch2= {'image':self.model.recon_image(s1_prime, z1).detach(), 'metadata':meta_prime} ## detach to avoid gradient flow through first pass
         
         ## encode second batch
         s2, z2 = self.model(batch2)
@@ -369,7 +374,7 @@ class CurriculumTrainer:
         gt_images = batch1['image']
         
         ## compute loss
-        return self.loss_c(gt_labels, gt_images, recon1, s1, s2_prime, z1, z2, s1_class, z1_class, logger, val, disc_gt, disc_rec)
+        return self.loss_c(gt_labels, gt_images, recon1, s1, s2_prime, z1, z2, s1_class, z1_class, logger, val)#, disc_gt, disc_rec)
         
     def _roll_list(self, lst, shifts): ## Equivalent to torch.roll(tensor, shifts, dim=0)
         if shifts > 0:
@@ -406,3 +411,19 @@ class CurriculumTrainer:
             print('Loading latest model from epoch', epoch)
             self.load(ckpt_dir, epoch)
             return self.model
+
+    def _load_pretrained(self, ckpt_dir='checkpoints'):
+        if os.path.exists(self.wdir/'history.json'):
+            with open(self.wdir/'history.json', 'r') as f:
+                self.loss_history = json.load(f)
+            values = self.loss_history['validation']
+            best_epoch = min(range(len(values)), key=values.__getitem__)+1 ## epochs are 1 based indexed.
+            print(f'Best loss value of {values[best_epoch-1]} was achieved at epoch {best_epoch}')
+            self.load(ckpt_dir, best_epoch)
+            return self.model, best_epoch
+        elif os.path.exists(self.wdir/ckpt_dir/'ckpt_from_epoch_1'):
+            print(f'Cant find loss history but falling back to available checkpoint')
+            self.load(ckpt_dir, 1)
+            return self.model, 1
+        else: raise RuntimeError('No loss history found to infer the best model from')
+        

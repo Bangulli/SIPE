@@ -114,7 +114,7 @@ class SIPE_Loss_Adversarial_Cycle(nn.Module):
                 ):
         
         if isinstance(self.image_recon_loss, ImageReconLoss):
-            image_recon_loss = self.image_recon_loss(recon_images.to(self.device), gt_images.to(self.device))
+            image_recon_loss = self.image_recon_loss(recon_images.to(self.device), gt_images.to(self.device))*20
             recon_loss = image_recon_loss
         elif disc_gt is not None and disc_rec is not None and isinstance(self.image_recon_loss, GAN_Loss):
             perception_loss, gan_loss = self.image_recon_loss(recon_images.to(self.device), gt_images.to(self.device), disc_gt, disc_rec)
@@ -123,7 +123,7 @@ class SIPE_Loss_Adversarial_Cycle(nn.Module):
             
         
         s_cycle_loss = self.cycle_consistency_loss(s_cycle, s_orig)
-        z_cycle_loss = self.cycle_consistency_loss(z_cycle, z_orig)
+        z_cycle_loss = self.cycle_consistency_loss(z_cycle, z_orig)*0.5
         stain_loss, logger = self.stain_classif_loss(s_class, z_class, gt_labels, self.device, logger, val, self.alpha)
         logger['Recon Img'].append(recon_loss.item())
         logger['S cycle'].append(s_cycle_loss.item())
