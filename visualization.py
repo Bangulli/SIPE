@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
     
 if __name__ == '__main__':
     
-    sourcedir = pl.Path('/home/lorenz/BigPicture/SIPE/SIPE-50k-Curriculum')
+    sourcedir = pl.Path('/home/lorenz/BigPicture/SIPE/SIPE-1M-Curriculum')
     
     print(f'Running a quick and dirty test for trainer at {sourcedir}')
     

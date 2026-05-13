@@ -1,5 +1,0 @@
-make better decoder.
-change staining part to instead take percentages so its possible to directly take a one hot encoded vector of staining
-maybe projector does 768 to 768 with adversarial loss to disentangle staining
-train it to reconstruct edges when passed with all 0
-train disentangler seperately maybe
