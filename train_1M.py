@@ -36,12 +36,12 @@ if __name__ == '__main__':
     valset.source_precomputed_patches_from('rnd-subset-val')
     
     ## setup trainer
-    pretrainer = CurriculumTrainer(model, SIPE_Loss_Adversarial(recon_mode=True), SIPE_Loss_Adversarial(), SIPE_Loss_Adversarial_Cycle(), wdir='SIPE-50k-Curriculum', device='cuda:0')
-    cr_trainer = CurriculumTrainer(pretrainer, SIPE_Loss_Adversarial(recon_mode=True), SIPE_Loss_Adversarial(), SIPE_Loss_Adversarial_Cycle(), wdir='SIPE-1M-Curriculum', device=pretrainer.device)
+    pretrainer = CurriculumTrainer(model, SIPE_Loss_Adversarial(recon_mode=True), SIPE_Loss_Adversarial(), SIPE_Loss_Adversarial_Cycle(), wdir='SIPE-1M-Curriculum', device='cuda:0')
+    cr_trainer = CurriculumTrainer(pretrainer, SIPE_Loss_Adversarial(recon_mode=True), SIPE_Loss_Adversarial(), SIPE_Loss_Adversarial_Cycle(), wdir='SIPE-1M-Curriculum-BB_unfrozen', device=pretrainer.device)
     
     ## setup curriculum
     cr = Curriculum()
-    cr.add_step(step_type='cycle', epochs=50, adverse_alpha=1.0, lr=1e-5, restarts=25, norm=True, freeze_bb=True, freeze_tangler=False)
+    cr.add_step(step_type='cycle', epochs=50, adverse_alpha=1.0, lr=1e-5, restarts=25, norm=True, freeze_bb=False, freeze_tangler=False)
     ## yeet
-    cr_trainer.train(trainset, valset, cr, batch_size=256)
+    cr_trainer.train(trainset, valset, cr, batch_size=128)
     

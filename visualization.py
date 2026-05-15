@@ -26,6 +26,5 @@ if __name__ == '__main__':
     trainer = Trainer(H0_mini_for_Adversarial(classes, device='cuda:0'), None, wdir=sourcedir)
     if (sourcedir/'history.json').exists(): model = trainer.load_best_model()
     else: model = trainer.load_model_at_epoch(1)
-    #model = trainer.load_model_at_epoch(-1)
     test(model, sourcedir, 'images')
     compare(model, sourcedir, 'images')

@@ -17,6 +17,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+from src.utils.misc import make_name_from_list
 # pip install "BPTorch @ git+https://github.com/Bangulli/BPTorch"
 
 def make_side_by_side(images, path):
@@ -44,60 +45,169 @@ def make_side_by_side(images, path):
     fig.savefig(path)
     fig.clf()
     
+def defrag(raw_labels):
+    new_labels = []
+    for label in raw_labels:
+        label = make_name_from_list(label)
+        ## hematox & eosin
+        if label == "HE - Hematoxylin and eosin stain method (procedure)" or label == "Hematoxylin and eosin stain method" or label == "hematoxylin stain+water soluble eosin stain":
+            new_labels.append('Hematoxylin+Eosin')
+        ## Van Gieson
+        elif label == "Van Gieson stain" or label == "Verhoeff-Van Gieson stain method":
+            new_labels.append("Van Gieson stain")
+        elif "Periodic acid Schiff stain" in label and "blue" not in label:
+            new_labels.append("Periodic acid Schiff stain")
+        elif "Periodic acid Schiff stain" in label and "blue" in label:
+            new_labels.append("Periodic acid Schiff stain+Alcian blue")
+        elif "Herovici's stain method"==label or "Herovic's stain method"==label: new_labels.append("Herovicis stain method")
+        else: new_labels.append(label)
+    return new_labels
+    
+# def make_diagonal(images, originals, outdir):
+#     keys = list(images.keys())
+#     orig_keys = list(originals.keys())
+#     N = len(keys)
+
+#     dpi = 100
+#     cell_px = 224
+#     cell_in = cell_px / dpi          # 2.24 inches per image cell
+#     title_in = 0.35                   # thin header row for labels
+
+#     fig_w = (1 + N) * cell_in         # source col + N reconstruction cols
+#     fig_h = N * cell_in + title_in
+
+#     fig = plt.figure(figsize=(fig_w, fig_h), dpi=dpi)
+
+#     # One title row (thin) + N image rows; source col + N recon cols
+#     gs = gridspec.GridSpec(
+#         N + 1, 1 + N,
+#         figure=fig,
+#         height_ratios=[title_in] + [cell_in] * N,   # proportional — title is short
+#         left=0, right=1, top=1, bottom=0,
+#         wspace=0, hspace=0,
+#     )
+
+#     # ── header labels ────────────────────────────────────────────────────────
+#     ax_src_hdr = fig.add_subplot(gs[0, 0])
+#     ax_src_hdr.text(0.5, 0.5, "sources",
+#                     ha="center", va="center", fontsize=9, fontweight="bold")
+#     ax_src_hdr.axis("off")
+
+#     ax_rec_hdr = fig.add_subplot(gs[0, 1:])
+#     ax_rec_hdr.text(0.5, 0.5, "reconstructions",
+#                     ha="center", va="center", fontsize=9, fontweight="bold")
+#     ax_rec_hdr.axis("off")
+
+#     # ── image grid ───────────────────────────────────────────────────────────
+#     for i in tqdm.tqdm(range(N), desc='visualizing'):
+#         # left column — source image
+#         ax = fig.add_subplot(gs[i + 1, 0])
+#         ax.imshow(originals[orig_keys[i]])
+#         ax.axis("off")
+
+#         # NxN reconstruction block
+#         for j in range(N):
+#             ax = fig.add_subplot(gs[i + 1, j + 1])
+#             ax.imshow(images[keys[i]][keys[j]])
+#             ax.axis("off")
+
+#     # ── save ─────────────────────────────────────────────────────────────────
+#     os.makedirs(outdir, exist_ok=True)
+#     fig.savefig(
+#         os.path.join(outdir, "dense_side_by_side.png"),
+#         dpi=dpi,
+#         pad_inches=0,       # no bbox_inches='tight' — preserves exact cell sizes
+#     )
+#     plt.close(fig)
+
 def make_diagonal(images, originals, outdir):
-    keys = list(images.keys())
+    keys      = list(images.keys())
     orig_keys = list(originals.keys())
     N = len(keys)
 
-    dpi = 100
-    cell_px = 224
-    cell_in = cell_px / dpi          # 2.24 inches per image cell
-    title_in = 0.35                   # thin header row for labels
+    dpi      = 100
+    cell_px  = 224
+    cell_in  = cell_px / dpi   # 2.24 in per image cell
+    title_in = 0.35            # header row height
+    label_in = 0.50            # row/col key label thickness
+    spacer_in = 0.20           # white gap between sources and reconstructions
 
-    fig_w = (1 + N) * cell_in         # source col + N reconstruction cols
-    fig_h = N * cell_in + title_in
+    # ── figure dimensions ────────────────────────────────────────────────
+    # cols: [row-label | source | spacer | recon×N]
+    # rows: [title | col-labels | image×N]
+    fig_w = label_in + cell_in + spacer_in + N * cell_in
+    fig_h = title_in + label_in + N * cell_in
 
     fig = plt.figure(figsize=(fig_w, fig_h), dpi=dpi)
 
-    # One title row (thin) + N image rows; source col + N recon cols
     gs = gridspec.GridSpec(
-        N + 1, 1 + N,
+        N + 2, N + 3,                                   # rows, cols
         figure=fig,
-        height_ratios=[title_in] + [cell_in] * N,   # proportional — title is short
+        height_ratios=[title_in, label_in] + [cell_in] * N,
+        width_ratios=[label_in, cell_in, spacer_in]    + [cell_in] * N,
         left=0, right=1, top=1, bottom=0,
         wspace=0, hspace=0,
     )
 
-    # ── header labels ────────────────────────────────────────────────────────
-    ax_src_hdr = fig.add_subplot(gs[0, 0])
-    ax_src_hdr.text(0.5, 0.5, "sources",
-                    ha="center", va="center", fontsize=9, fontweight="bold")
-    ax_src_hdr.axis("off")
+    # column index aliases (makes the code below easier to read)
+    C_ROWLABEL = 0
+    C_SOURCE   = 1
+    C_SPACER   = 2
+    C_RECON0   = 3          # first reconstruction column
 
-    ax_rec_hdr = fig.add_subplot(gs[0, 1:])
-    ax_rec_hdr.text(0.5, 0.5, "reconstructions",
-                    ha="center", va="center", fontsize=9, fontweight="bold")
-    ax_rec_hdr.axis("off")
+    # ── row 0: section header labels ─────────────────────────────────────
+    for ax_col, text, span in [
+        (slice(C_ROWLABEL, C_SOURCE + 1), "sources",         {}),
+        (slice(C_SPACER,   None),         "reconstructions", {}),
+    ]:
+        ax = fig.add_subplot(gs[0, ax_col])
+        ax.text(0.5, 0.5, text,
+                ha="center", va="center", fontsize=9, fontweight="bold")
+        ax.axis("off")
 
-    # ── image grid ───────────────────────────────────────────────────────────
-    for i in tqdm.tqdm(range(N), desc='visualizing'):
-        # left column — source image
-        ax = fig.add_subplot(gs[i + 1, 0])
+    # ── row 1: per-column key labels ──────────────────────────────────────
+    # blank corner cells
+    for c in (C_ROWLABEL, C_SOURCE, C_SPACER):
+        fig.add_subplot(gs[1, c]).axis("off")
+
+    for j, key in enumerate(keys):
+        ax = fig.add_subplot(gs[1, C_RECON0 + j])
+        ax.text(0.5, 0.5, str(key),
+                ha="center", va="center", fontsize=7,
+                rotation=0, rotation_mode="anchor")
+        ax.axis("off")
+
+    # ── rows 2…N+1: image grid ────────────────────────────────────────────
+    for i in tqdm.tqdm(range(N), desc="visualizing"):
+        row = i + 2
+
+        # row-label cell (leftmost column)
+        ax = fig.add_subplot(gs[row, C_ROWLABEL])
+        ax.text(0.5, 0.5, str(orig_keys[i]),
+                ha="center", va="center", fontsize=7,
+                rotation=90)
+        ax.axis("off")
+
+        # source image
+        ax = fig.add_subplot(gs[row, C_SOURCE])
         ax.imshow(originals[orig_keys[i]])
         ax.axis("off")
 
-        # NxN reconstruction block
+        # spacer — leave blank / white
+        fig.add_subplot(gs[row, C_SPACER]).axis("off")
+
+        # N reconstruction images
         for j in range(N):
-            ax = fig.add_subplot(gs[i + 1, j + 1])
+            ax = fig.add_subplot(gs[row, C_RECON0 + j])
             ax.imshow(images[keys[i]][keys[j]])
             ax.axis("off")
 
-    # ── save ─────────────────────────────────────────────────────────────────
+    # ── save ──────────────────────────────────────────────────────────────
     os.makedirs(outdir, exist_ok=True)
     fig.savefig(
         os.path.join(outdir, "dense_side_by_side.png"),
         dpi=dpi,
-        pad_inches=0,       # no bbox_inches='tight' — preserves exact cell sizes
+        pad_inches=0,
     )
     plt.close(fig)
     
@@ -139,9 +249,8 @@ def compare(model, sourcedir, imdir_name):
     source_images = {}
     for batch in tqdm.tqdm(dl, desc='Finding stain examples'):
         if not patch_is_foreground(converter(denormer(batch['image']).squeeze(0))):continue
-        label = model.defrag(batch['metadata'][0]['staining'])[0][0]
+        label = defrag([batch['metadata'][0]['staining']])[0]
         if label in present_classes: continue
-        
         ## encode new image
         s_proba, z = model(batch)
         ## save stuff

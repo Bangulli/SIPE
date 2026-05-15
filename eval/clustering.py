@@ -46,9 +46,9 @@ class InferenceWrapper():
             tok = tok.reshape(tok.shape[0], 768, 16, 16)
             return avg_pool2d(tok, kernel_size=16).detach().cpu().squeeze()
         elif self.mode == 'ours':
-            tok = self.model(batch)
-            s = avg_pool2d(tok[:, :self.model.emb_stain_size], kernel_size=16).detach().cpu().squeeze()
-            z = avg_pool2d(tok[:, self.model.emb_stain_size:], kernel_size=16).detach().cpu().squeeze()
+            s, z = self.model(batch)
+            s = s.detach().cpu().squeeze()
+            z = avg_pool2d(z, kernel_size=16).detach().cpu().squeeze()
             sz = torch.cat([s, z], dim=1)
             return s, z, sz
 
@@ -82,6 +82,7 @@ def run_inference(datapath, outputpath, inf_name, methods, trainer_path):
         all_sz = []
         all_labels_stain = []
         all_labels_site = []
+        all_labels_diag = []
         for batch in tqdm(dl, desc='Infering Batches'):
             torch.cuda.empty_cache()
             
@@ -97,9 +98,11 @@ def run_inference(datapath, outputpath, inf_name, methods, trainer_path):
                 
             lbls = [make_name_from_list(samp['staining']) for samp in batch['metadata']]
             lbls_site = [make_name_from_list(samp['organ']) for samp in batch['metadata']]
+            lbls_diag = [make_name_from_list(samp['diagnosis']) for samp in batch['metadata']]
             
             all_labels_stain += lbls
             all_labels_site += lbls_site
+            all_labels_diag += lbls_diag
             
         if all_embeddings:
             all_embeddings = torch.concat(all_embeddings, dim=0)
@@ -140,7 +143,13 @@ def run_inference(datapath, outputpath, inf_name, methods, trainer_path):
         np.save(outputpath/inf_name/'organs.npy', all_labels_site)
         np.save(outputpath/inf_name/'map_site.npy', enc_site)
         
-def eval_clust(emb_path, stain_path, stain_map, site_path, site_map, outpath):
+        enc_diag = LabelEncoder()
+        all_labels_diag = enc_diag.fit_transform(all_labels_diag)
+        enc_diag = enc_diag.classes_
+        np.save(outputpath/inf_name/'diags.npy', all_labels_diag)
+        np.save(outputpath/inf_name/'map_diag.npy', enc_diag)
+        
+def eval_clust(emb_path, stain_path, stain_map, site_path, site_map, diag_path, diag_map, outpath):
     os.makedirs(outpath, exist_ok=True)
     name = emb_path.name.split('.')[0]
     all_embeddings = np.load(emb_path)
@@ -151,42 +160,31 @@ def eval_clust(emb_path, stain_path, stain_map, site_path, site_map, outpath):
     all_labels_site = np.load(site_path)
     enc_site = np.load(site_map)
     
+    all_labels_diag = np.load(diag_path)
+    enc_diag = np.load(diag_map)
+    
     ############################################################################### make plots
     tsne=TSNE(n_components=2, random_state=42, perplexity=30, init="pca", learning_rate="auto", metric="cosine", early_exaggeration=12)
     projections_tsne = tsne.fit_transform(all_embeddings)
-    print(f"Davies-Bouldin for clustering staining in the whole vector: {davies_bouldin_score(all_embeddings, all_labels_stain)}")
-    print(f"Davies-Bouldin for clustering organ in the whole vector: {davies_bouldin_score(all_embeddings, all_labels_site)}")
+    print(f"Davies-Bouldin for clustering staining: {davies_bouldin_score(all_embeddings, all_labels_stain)}")
+    print(f"Davies-Bouldin for clustering organ: {davies_bouldin_score(all_embeddings, all_labels_site)}")
+    print(f"Davies-Bouldin for clustering diag: {davies_bouldin_score(all_embeddings, all_labels_diag)}")
     
     plot_dim_red_clust(projections_tsne, all_labels_stain, make_or_load_cmap(all_labels_stain, outpath/'stain_cmap.json'), outpath/f'{name}-tsne-stain-ALL.png', f'{name} t-SNE for Stain')
     plot_dim_red_clust(projections_tsne, all_labels_site, make_or_load_cmap(all_labels_site, outpath/'site_cmap.json'), outpath/f'{name}-tsne-site-ALL.png', f'{name} t-SNE for Site')
-    
-    # tsne=TSNE(n_components=2, random_state=42, perplexity=30, init="pca", learning_rate="auto", metric="cosine", early_exaggeration=12)
-    # projections_tsne = tsne.fit_transform(all_embeddings[:,:64])
-    # print(f"Davies-Bouldin for clustering staining in the speciefied part: {davies_bouldin_score(all_embeddings[:,:64], all_labels_stain)}")
-    # print(f"Davies-Bouldin for clustering organ in the specified part: {davies_bouldin_score(all_embeddings[:,:64], all_labels_site)}")
-    
-    # plot_dim_red_clust(projections_tsne, all_labels_stain, make_or_load_cmap(all_labels_stain, outputpath/inf_name/'stain_cmap.json'), outputpath/inf_name/f'{name}-tsne-stain-S.png', f'{name} t-SNE for Stain')
-    # plot_dim_red_clust(projections_tsne, all_labels_site, make_or_load_cmap(all_labels_site, outputpath/inf_name/'site_cmap.json'), outputpath/inf_name/f'{name}-tsne-site-S.png', f'{name} t-SNE for Site')
-    
-    # tsne=TSNE(n_components=2, random_state=42, perplexity=30, init="pca", learning_rate="auto", metric="cosine", early_exaggeration=12)
-    # projections_tsne = tsne.fit_transform(all_embeddings[:,64:])
-    # print(f"Davies-Bouldin for clustering staining in the unspecified part: {davies_bouldin_score(all_embeddings[:,64:], all_labels_stain)}")
-    # print(f"Davies-Bouldin for clustering organ in the unspecified part: {davies_bouldin_score(all_embeddings[:,64:], all_labels_site)}")
-    
-    # plot_dim_red_clust(projections_tsne, all_labels_stain, make_or_load_cmap(all_labels_stain, outputpath/inf_name/'stain_cmap.json'), outputpath/inf_name/f'{name}-tsne-stain-Z.png', f'{name} t-SNE for Stain')
-    # plot_dim_red_clust(projections_tsne, all_labels_site, make_or_load_cmap(all_labels_site, outputpath/inf_name/'site_cmap.json'), outputpath/inf_name/f'{name}-tsne-site-Z.png', f'{name} t-SNE for Site')
+    plot_dim_red_clust(projections_tsne, all_labels_diag, make_or_load_cmap(all_labels_diag, outpath/'diag_cmap.json'), outpath/f'{name}-tsne-diag-ALL.png', f'{name} t-SNE for Diag')
 
 if __name__ == '__main__':
     datapath = pl.Path('/mnt/nas6/data/BigPicture_CBIR/datasets/BPTorch/fold_0/BPR.json')
-    outputpath = pl.Path('v1_models/SIPE-1M-Curriculum/.results')
+    outputpath = pl.Path('SIPE-1M-Curriculum/.results/clustering')
     inf_name = 'infered'
 
-    run_inference(datapath, outputpath, inf_name, ['cls', 'patch_token', 'ours'], '/home/lorenz/BigPicture/SIPE/v1_models/SIPE-1M-Curriculum')
+    #run_inference(datapath, outputpath, inf_name, ['cls', 'patch_token', 'ours'], '/home/lorenz/BigPicture/SIPE/SIPE-1M-Curriculum')
         
     for eval_res in ['cls_embeddings.npy', 'patch_token_embeddings.npy']:
         print(f'---------------------------------- Evaluating {eval_res} Baseline ----------------------------------')
-        eval_clust(outputpath/inf_name/eval_res, outputpath/inf_name/'stainings.npy', outputpath/inf_name/'map_stain.npy', outputpath/inf_name/'organs.npy', outputpath/inf_name/'map_site.npy', outpath=outputpath/'baseline')
+        eval_clust(outputpath/inf_name/eval_res, outputpath/inf_name/'stainings.npy', outputpath/inf_name/'map_stain.npy', outputpath/inf_name/'organs.npy', outputpath/inf_name/'map_site.npy',  outputpath/inf_name/'diags.npy', outputpath/inf_name/'map_diag.npy', outpath=outputpath/'baseline')
         
     for eval_res in ['ours_s.npy', 'ours_z.npy', 'ours_sz.npy']:  
         print(f'---------------------------------- Evaluating {eval_res} Ours ----------------------------------')
-        eval_clust(outputpath/inf_name/eval_res, outputpath/inf_name/'stainings.npy', outputpath/inf_name/'map_stain.npy', outputpath/inf_name/'organs.npy', outputpath/inf_name/'map_site.npy', outpath=outputpath/'ours')
+        eval_clust(outputpath/inf_name/eval_res, outputpath/inf_name/'stainings.npy', outputpath/inf_name/'map_stain.npy', outputpath/inf_name/'organs.npy', outputpath/inf_name/'map_site.npy',  outputpath/inf_name/'diags.npy', outputpath/inf_name/'map_diag.npy', outpath=outputpath/'ours')
