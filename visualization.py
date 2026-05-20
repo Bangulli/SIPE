@@ -3,6 +3,8 @@ from torch.utils.data import DataLoader
 from BPTorch.utils import bptorch_collate
 from pprint import pprint
 from src.model.arch import H0_mini_for_Adversarial
+from src.model.vae import H0_mini_for_VAE
+from src.model.arch_cls import H0_mini_for_Adversarial_on_CLS
 from torchvision.transforms import ToPILImage
 from src.utils.transfroms import UnNormalize
 from src.utils.test import test
@@ -16,15 +18,19 @@ import matplotlib.pyplot as plt
     
 if __name__ == '__main__':
     
-    sourcedir = pl.Path('/home/lorenz/BigPicture/SIPE/SIPE-1M-Curriculum')
+    sourcedir = pl.Path('/home/lorenz/BigPicture/SIPE/SIPE-50k-Curriculum')
     
     print(f'Running a quick and dirty test for trainer at {sourcedir}')
     
     with open('/home/lorenz/BigPicture/SIPE/classes.json', 'r') as f:
         classes = json.load(f)
+        
     ## setup variables
     trainer = Trainer(H0_mini_for_Adversarial(classes, device='cuda:0'), None, wdir=sourcedir)
-    if (sourcedir/'history.json').exists(): model = trainer.load_best_model()
-    else: model = trainer.load_model_at_epoch(1)
-    test(model, sourcedir, 'images')
-    compare(model, sourcedir, 'images')
+    
+    # model = trainer.load_model_at_epoch(-1)
+    # test(model, sourcedir, 'images_breast')
+    
+    model = trainer.load_best_model()
+    # test(model, sourcedir, 'images_best')
+    compare(model, sourcedir, 'images_best')

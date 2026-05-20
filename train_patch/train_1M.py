@@ -25,7 +25,7 @@ if __name__ == '__main__':
 
     ## load trainset and point to patch source
     trainset = BigPictureRepository('/mnt/nas6/data/BigPicture_CBIR/datasets/BPTorch/fold_1/BPR.json', load=True, wsidicomdataset_kwargs=kwargs, verbose=False) ## loading valset becuase the content gets overwritten by pointing to preextracted patches. this is just faster than loading the full training fold every time
-    trainset.source_precomputed_patches_from('rnd-subset')
+    trainset.source_precomputed_patches_from('data/rnd-subset')
     
     ## prep val trans
     kwargs = WsiDicomDataset.get_default_kwargs()
@@ -33,7 +33,7 @@ if __name__ == '__main__':
     
     ## load valset and point to patch source
     valset = BigPictureRepository('/mnt/nas6/data/BigPicture_CBIR/datasets/BPTorch/fold_1/BPR.json', load=True, wsidicomdataset_kwargs=kwargs, verbose=False)
-    valset.source_precomputed_patches_from('rnd-subset-val')
+    valset.source_precomputed_patches_from('data/rnd-subset-val')
     
     ## setup trainer
     pretrainer = CurriculumTrainer(model, SIPE_Loss_Adversarial(recon_mode=True), SIPE_Loss_Adversarial(), SIPE_Loss_Adversarial_Cycle(), wdir='SIPE-1M-Curriculum', device='cuda:0')

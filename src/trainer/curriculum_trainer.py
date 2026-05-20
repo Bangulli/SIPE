@@ -13,11 +13,14 @@ from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
 import torch.nn as nn
+import torch.nn.functional as F
 from BPTorch.utils import bptorch_collate
 import copy
 ######## Internal ########
 from src.losses.image_recon_loss import GAN_Loss
 from src.model.arch import H0_mini_for_Adversarial
+from src.model.arch_cls import H0_mini_for_Adversarial_on_CLS
+from src.model.vae import H0_mini_for_VAE
 ##########################
 
 class Curriculum(list):
@@ -60,13 +63,12 @@ class CurriculumTrainer:
                  ):
         self.wdir = pl.Path(wdir)
         os.makedirs(self.wdir, exist_ok=True)
-        if isinstance(model, H0_mini_for_Adversarial): self.model = model
-        elif isinstance(model, CurriculumTrainer): 
+        if isinstance(model, CurriculumTrainer): 
             print(f'Forking model from {model.wdir}')
             self.model, epoch = model._load_pretrained()
             with open(self.wdir/'NOTE.txt', 'w') as f:
                 f.write(f'Forked from {model.wdir}, epoch {epoch}')
-        else: raise ValueError(f'Got unsupported model object {type(model)}')
+        else: self.model = model
         self.loss_r = loss_recon
         self.loss_a = loss_adverse
         self.loss_c = loss_cycle
@@ -174,6 +176,7 @@ class CurriculumTrainer:
             elif step_type.lower()=='cycle': 
                 assert self.loss_c is not None, "Can't train a cycle paradigm when no cycle loss function has been passed to the trainer."
                 self._train_cycle(strt, epochs, train_loader, val_loader, ckpt_dir, adverse_alpha, adv_norm, i)
+            elif step_type.lower()=='vae': self._train_VAE(strt, epochs, train_loader, val_loader, ckpt_dir, adverse_alpha, adv_norm, i)
             else: raise ValueError(f'Allowed step types are [recon, adverse], but got {step_type.lower()} instead')
             strt += epochs
         
@@ -190,6 +193,7 @@ class CurriculumTrainer:
                 'CE':[],
                 's std': [],
                 's norm': [],
+                'KDE':[]
             }
             print(f'---------------------- Step: {step} - {epoch}/{epochs+strt-1} - Recon ----------------------')
             with torch.enable_grad():
@@ -221,6 +225,7 @@ class CurriculumTrainer:
                     'CE':[],
                     's std': [],
                     's norm': [],
+                    'KDE':[]
                 }
                 self.model.eval()
                 val_losses = []
@@ -247,6 +252,7 @@ class CurriculumTrainer:
                     'CE':[],
                     's std': [],
                     's norm': [],
+                    'KDE':[]
                 }
                 if type(alpha)==float: self.loss_a.set_adverse_alpha(alpha)
                 else: self.loss_a.set_adverse_alpha(alpha[i])
@@ -282,6 +288,7 @@ class CurriculumTrainer:
                         'CE':[],
                         's std': [],
                         's norm': [],
+                        'KDE':[]
                     }
                     self.model.eval()
                     val_losses = []
@@ -295,6 +302,93 @@ class CurriculumTrainer:
                 self._save_history()
                 self._plt_progress()
                 
+    def _train_VAE(self, strt, epochs, train_loader, val_loader, ckpt_dir, alpha, norm, step):
+        if not isinstance(self.model, H0_mini_for_VAE): raise ValueError('Cant run VAE training on non VAE model')
+        ######### adversarial step ########################################################################
+        if type(alpha)!=float: assert len(alpha)==len(range(strt, epochs+strt)), 'Size of alphas list has to match amount of epochs.'
+        for i, epoch in enumerate(range(strt, epochs+strt)):
+            logger = {
+                'Recon Img': [],
+                'Stain probs2vec': [],
+                'InfoNCE Stain': [],
+                'InfoNCE Morph': [],
+                'Adversarial CE': [],
+                'CE':[],
+                's std': [],
+                's norm': [],
+                'KDE':[],
+                'MSE':[]
+            }
+            if type(alpha)==float: self.loss_a.set_adverse_alpha(alpha)
+            else: self.loss_a.set_adverse_alpha(alpha[i])
+            cur_alpha = alpha if type(alpha)==float else alpha[i]
+            self.loss_a.set_adverse_norm(norm)
+            print(f'---------------------- Step: {step} - {epoch}/{epochs+strt-1} - VAE - Alpha: {cur_alpha:.2f} ----------------------')
+            with torch.enable_grad():
+                self.model.train()
+                batch_losses = []
+                for i, batch in enumerate(ProgBar(train_loader, desc=f'Training Batches')):
+                    self.optim.zero_grad()
+                    emb = self.model.backbone(batch['image'].to(self.model.device))
+                    s, z, mu, logvar = self.model.entangler.disentangle(emb)
+                    emb_orig = emb[:,5:,:].permute(0, 2, 1) ## cut out cls and register tokens
+                    emb_orig = emb_orig.reshape(emb_orig.shape[0], 768, 16, 16) ## reshape to feature map 
+                    emb_recon = self.model.entangler.reentangle(s, z)
+                    
+                    mse = F.mse_loss(emb_recon, emb_orig, reduction='sum')
+                    logger['MSE'].append(mse.item())
+                    kde = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+                    logger['KDE'].append(kde.item())
+                    loss = mse+kde
+                    
+                    batch_losses.append(loss.item())
+                    loss.backward()
+                    self.optim.step()
+                    if i%20==0:
+                        self._save_ckpt(ckpt_dir, epoch)
+                        self._plt_batch_progress(batch_losses, ckpt_dir, epoch)
+                        self._plt_individual_loss_progress(logger, ckpt_dir, epoch)
+                    
+                self.scheduler.step()
+                self.loss_history['training'].append(sum(batch_losses)/len(batch_losses))
+        
+            ## validation step
+            with torch.no_grad():
+                logger = {
+                    'Recon Img': [],
+                    'Stain probs2vec': [],
+                    'InfoNCE Stain': [],
+                    'InfoNCE Morph': [],
+                    'Adversarial CE': [],
+                    'CE':[],
+                    's std': [],
+                    's norm': [],
+                    'KDE':[],
+                    'MSE':[]
+                }
+                self.model.eval()
+                val_losses = []
+                for batch in ProgBar(val_loader, desc=f'Validating Batches'):
+                    emb = self.model.backbone(batch['image'].to(self.model.device))
+                    s, z, mu, logvar = self.model.entangler.disentangle(emb)
+                    emb_orig = emb[:,5:,:].permute(0, 2, 1) ## cut out cls and register tokens
+                    emb_orig = emb_orig.reshape(emb_orig.shape[0], 768, 16, 16) ## reshape to feature map 
+                    emb_recon = self.model.entangler.reentangle(s, z)
+                    
+                    mse = F.mse_loss(emb_recon, emb_orig, reduction='sum')
+                    logger['MSE'].append(mse.item())
+                    kde = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+                    logger['KDE'].append(kde.item())
+                    loss = mse+kde
+                    
+                    val_losses.append(loss.item())
+                self.loss_history['validation'].append(sum(val_losses)/len(val_losses))
+                
+            ## save checkpoint
+            self._save_ckpt(ckpt_dir, epoch)
+            self._save_history()
+            self._plt_progress()
+                
     def _train_cycle(self, strt, epochs, train_loader, val_loader, ckpt_dir, alpha, norm, step):
         self.loss_c.to(self.device)
         ######### recon step ########################################################################
@@ -305,6 +399,7 @@ class CurriculumTrainer:
                     'Z cycle': [],
                     'Adversarial CE': [],
                     'CE':[],
+                    'KDE':[]
                 }
             if type(alpha)==float: self.loss_c.set_adverse_alpha(alpha)
             else: self.loss_c.set_adverse_alpha(alpha[i])
@@ -338,6 +433,7 @@ class CurriculumTrainer:
                     'Z cycle': [],
                     'Adversarial CE': [],
                     'CE':[],
+                    'KDE':[]
                 }
                 self.model.eval()
                 val_losses = []
@@ -352,11 +448,12 @@ class CurriculumTrainer:
             self._plt_progress()
             
     def _compute_cycle_loss_for_batch(self, batch, logger=None, val=False):
+        ## comp adverse loss
+        adv_loss, logger = self.model.loss(batch, self.loss_a, logger, val=False)
+        
         ## encode initial batch
         batch1 = batch
         s1, z1 = self.model(batch1)
-        recon1 = self.model.recon_image(s1, z1)
-        s1_class, z1_class = self.model.entangler.classify(s1, z1)
         
         ## shift along the batch dimension to mix and specified/unspecified pairs and create second batch
         s1_prime = torch.roll(s1, 1, 0) 
@@ -369,12 +466,11 @@ class CurriculumTrainer:
         ## unshift to re-establish correspondence
         s2_prime = torch.roll(s2, -1, 0)
         
-        ## organize gts
-        gt_labels = torch.tensor(self.model.transform_labels([s['staining'] for s in batch1['metadata']]), dtype=torch.float32)
-        gt_images = batch1['image']
+        ## comp cycle loss
+        cycle_loss, logger = self.loss_c(s1, s2_prime, z1, z2, logger)
         
         ## compute loss
-        return self.loss_c(gt_labels, gt_images, recon1, s1, s2_prime, z1, z2, s1_class, z1_class, logger, val)#, disc_gt, disc_rec)
+        return adv_loss+cycle_loss, logger
         
     def _roll_list(self, lst, shifts): ## Equivalent to torch.roll(tensor, shifts, dim=0)
         if shifts > 0:

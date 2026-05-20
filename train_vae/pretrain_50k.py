@@ -1,19 +1,13 @@
+
+import os, sys, json, warnings
+sys.path.append(os.path.join(os.path.dirname(__file__), "."))
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from BPTorch.datasets import BigPictureRepository, WsiDicomDataset
-from torch.utils.data import DataLoader
-from BPTorch.utils import bptorch_collate
 from pprint import pprint
-from src.model.arch import H0_mini_for_Adversarial
-from torchvision.transforms import ToPILImage
-from src.utils.transfroms import UnNormalize
-from src.trainer.trainer import Trainer
+from src.model.vae import H0_mini_for_VAE
 from src.trainer.curriculum_trainer import CurriculumTrainer, Curriculum
-from src.losses.loss_fusion import SIPE_Loss_Adversarial, SIPE_Loss_Adversarial_Cycle
-import os, torch, shutil
-import torch.nn.functional as F
-import copy, tqdm, random, math, json
+from src.losses.loss_fusion import SIPEVAE_Loss_Adversarial, SIPE_Loss_Cycle
 import matplotlib.pyplot as plt
-import warnings
-import torchvision.transforms as T
 import numpy as np
 warnings.filterwarnings('ignore')
 # pip install "BPTorch @ git+https://github.com/Bangulli/BPTorch"
@@ -52,26 +46,39 @@ if __name__ == '__main__':
     print(f'Training with the following {len(classes)} class distribution')
     pprint(classes)
     print('############################ Begin ############################')
-    model = H0_mini_for_Adversarial(classes, device='cuda:0')
+    model = H0_mini_for_VAE(classes, device='cuda:0')
     
     kwargs = WsiDicomDataset.get_default_kwargs()
     kwargs['transforms'] = model.transform
     ## load trainset and point to patch source
     trainset = BigPictureRepository('/mnt/nas6/data/BigPicture_CBIR/datasets/BPTorch/fold_1/BPR.json', load=True, wsidicomdataset_kwargs=kwargs, verbose=False) ## loading valset becuase the content gets overwritten by pointing to preextracted patches. this is just faster than loading the full training fold every time
-    trainset.source_precomputed_patches_from('rnd-subsubset-50k')
+    trainset.source_precomputed_patches_from('data/rnd-subsubset-50k')
     
     kwargs = WsiDicomDataset.get_default_kwargs()
     kwargs['transforms'] = model.transform
     ## load valset and point to patch source
     valset = BigPictureRepository('/mnt/nas6/data/BigPicture_CBIR/datasets/BPTorch/fold_1/BPR.json', load=True, wsidicomdataset_kwargs=kwargs, verbose=False)
-    valset.source_precomputed_patches_from('rnd-subset-val')
+    valset.source_precomputed_patches_from('data/rnd-subset-val')
     
-    cr_trainer = CurriculumTrainer(model, SIPE_Loss_Adversarial(recon_mode=True), SIPE_Loss_Adversarial(), SIPE_Loss_Adversarial_Cycle(), wdir='SIPE-50k-Curriculum', device='cuda:0')
+    cr_trainer = CurriculumTrainer(model, SIPEVAE_Loss_Adversarial(recon_mode=True), SIPEVAE_Loss_Adversarial(), SIPE_Loss_Cycle(), wdir='SIPEVAE-50k-Curriculum', device='cuda:0')
     cr = Curriculum()
-    cr.add_step(step_type='recon', epochs=5, adverse_alpha=1.0, lr=1e-3, restarts=5, norm=True, freeze_bb=True, freeze_tangler=False)
+    
+    ### PRETRAINING
+    cr.add_step(step_type='vae', epochs=40, adverse_alpha=0.0, lr=1e-3, restarts=10, norm = True, freeze_bb=True, freeze_tangler=False) ## pretrain vae to produce similar features to the backbone itself such that tuning is easier
+    cr.add_step(step_type='recon', epochs=5, adverse_alpha=1.0, lr=1e-3, restarts=5, norm=True, freeze_bb=True, freeze_tangler=False) ## pretrain generator to produce similar images such that runing is easier
+    ###############
+    
+    ### ACTUAL TRAINING
     alpha = np.arange(0.1, 1.0, 0.1).tolist()
     alpha += (20-len(alpha))*[1.0]
-    cr.add_step(step_type='cycle', epochs=20, adverse_alpha=alpha, lr=1e-3, restarts=10, norm = True, freeze_bb=True, freeze_tangler=False)
-    cr.add_step(step_type='cycle', epochs=20, adverse_alpha=1.0, lr=1e-3, restarts=10, norm = True, freeze_bb=True, freeze_tangler=False)
-    cr.add_step(step_type='cycle', epochs=20, adverse_alpha=1.0, lr=1e-3, restarts=10, norm = True, freeze_bb=True, freeze_tangler=False)
+    cr.add_step(step_type='cycle', epochs=20, adverse_alpha=alpha, lr=3e-4, restarts=10, norm = True, freeze_bb=True, freeze_tangler=False)
+    cr.add_step(step_type='cycle', epochs=20, adverse_alpha=1.0, lr=3e-4, restarts=10, norm = True, freeze_bb=True, freeze_tangler=False)
+    cr.add_step(step_type='cycle', epochs=20, adverse_alpha=1.0, lr=3e-4, restarts=10, norm = True, freeze_bb=True, freeze_tangler=False)
+    cr.add_step(step_type='recon', epochs=5, adverse_alpha=1.0, lr=1e-4, restarts=5, norm=True, freeze_bb=True, freeze_tangler=True)
+    ###################
+    
+    ### FINAL TUNING
+    cr.add_step(step_type='cycle', epochs=50, adverse_alpha=1.0, lr=1e-4, restarts=25, norm = True, freeze_bb=True, freeze_tangler=False)
+    ################
+    
     cr_trainer.train(trainset, valset, cr, batch_size=512)
