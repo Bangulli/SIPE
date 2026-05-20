@@ -9,7 +9,7 @@ from src.trainer.trainer import Trainer
 from src.utils.misc import patch_is_foreground
 import os, torch
 import torch.nn.functional as F
-import copy, tqdm, json, pathlib as pl
+import copy, tqdm, json, pathlib as pl, json
 import matplotlib.pyplot as plt
 import PIL
 import os
@@ -62,6 +62,25 @@ def defrag(raw_labels):
         elif "Herovici's stain method"==label or "Herovic's stain method"==label: new_labels.append("Herovicis stain method")
         else: new_labels.append(label)
     return new_labels
+
+def shorten(nme):
+        """Convert a name into a shorthand
+
+        Args:
+            nme (str): The name
+
+        Returns:
+            str: The shorthand
+        """
+        try:
+            shorthand = ''
+            for section in nme.split('+'):
+                for subword in section.strip().split(' '):
+                    shorthand += subword[0]
+                shorthand += '+'
+            if not shorthand.endswith('+'): return shorthand.replace('(', '').replace(')', '')
+            else: return shorthand.removesuffix('+').replace('(', '').replace(')', '')
+        except: return ''  
     
 # def make_diagonal(images, originals, outdir):
 #     keys = list(images.keys())
@@ -126,7 +145,7 @@ def make_diagonal(images, originals, outdir):
     N = len(keys)
 
     dpi      = 100
-    cell_px  = 224
+    cell_px  = 112
     cell_in  = cell_px / dpi   # 2.24 in per image cell
     title_in = 0.35            # header row height
     label_in = 0.50            # row/col key label thickness
@@ -162,7 +181,7 @@ def make_diagonal(images, originals, outdir):
     ]:
         ax = fig.add_subplot(gs[0, ax_col])
         ax.text(0.5, 0.5, text,
-                ha="center", va="center", fontsize=9, fontweight="bold")
+                ha="center", va="center", fontsize=12, fontweight="bold")
         ax.axis("off")
 
     # ── row 1: per-column key labels ──────────────────────────────────────
@@ -173,7 +192,7 @@ def make_diagonal(images, originals, outdir):
     for j, key in enumerate(keys):
         ax = fig.add_subplot(gs[1, C_RECON0 + j])
         ax.text(0.5, 0.5, str(key),
-                ha="center", va="center", fontsize=7,
+                ha="center", va="center", fontsize=9,
                 rotation=0, rotation_mode="anchor")
         ax.axis("off")
 
@@ -184,7 +203,7 @@ def make_diagonal(images, originals, outdir):
         # row-label cell (leftmost column)
         ax = fig.add_subplot(gs[row, C_ROWLABEL])
         ax.text(0.5, 0.5, str(orig_keys[i]),
-                ha="center", va="center", fontsize=7,
+                ha="center", va="center", fontsize=9,
                 rotation=90)
         ax.axis("off")
 
@@ -203,7 +222,7 @@ def make_diagonal(images, originals, outdir):
             ax.axis("off")
 
     # ── save ──────────────────────────────────────────────────────────────
-    os.makedirs(outdir, exist_ok=True)
+    
     fig.savefig(
         os.path.join(outdir, "dense_side_by_side.png"),
         dpi=dpi,
@@ -227,7 +246,7 @@ def compare(model, sourcedir, imdir_name):
     
     ## dataset and loader
     ds = BigPictureRepository('/mnt/nas6/data/BigPicture_CBIR/datasets/BPTorch/fold_0/BPR.json', load=True, wsidicomdataset_kwargs=kwargs, verbose=False)
-    ds.source_precomputed_patches_from('rnd-subset-test')
+    ds.source_precomputed_patches_from('data/rnd-subset-test')
     print(f"Dataset contains {len(ds)} foreground patches")
     dl = DataLoader(ds, 1, True, collate_fn=bptorch_collate)
     
@@ -247,23 +266,32 @@ def compare(model, sourcedir, imdir_name):
     virtual_staining_heads = {}
     morphologic_bases = {}
     source_images = {}
+    source_image_meta = {}
     for batch in tqdm.tqdm(dl, desc='Finding stain examples'):
         if not patch_is_foreground(converter(denormer(batch['image']).squeeze(0))):continue
         label = defrag([batch['metadata'][0]['staining']])[0]
+        organ = [batch['metadata'][0]['organ']]
+        #if organ != ["mamma"]:continue
         if label in present_classes: continue
+        present_classes.append(label)
         ## encode new image
         s_proba, z = model(batch)
         ## save stuff
         img = converter(denormer(batch['image'].squeeze(0)))
-        source_images[label] = img
-        virtual_staining_heads[label] = s_proba
-        morphologic_bases[label] = z
-        present_classes.append(label)
+        label_s = shorten(label)
+        source_images[label_s] = img
+        virtual_staining_heads[label_s] = s_proba
+        morphologic_bases[label_s] = z
+        source_image_meta[label_s] = {'stain': label, 'site': batch['metadata'][0]['organ']}
+    
+    os.makedirs(sourcedir/imdir_name, exist_ok=True)
+    with open(sourcedir/imdir_name/'dense_side_by_side.json', 'w') as f:
+        json.dump(source_image_meta, f, indent=4)
     
     recons = {}
-    for lbl1 in tqdm.tqdm(present_classes, desc='generating'):
+    for lbl1 in tqdm.tqdm(source_images.keys(), desc='generating'):
         current_recons = {}
-        for lbl2 in present_classes:
+        for lbl2 in source_images.keys():
             s = virtual_staining_heads[lbl2]
             z = morphologic_bases[lbl1]
             current_recons[lbl2] = model.recon_image_PIL(s, z, denormer)
