@@ -16,8 +16,8 @@ import torch.nn as nn
 from BPTorch.utils import bptorch_collate
 import copy
 ######## Internal ########
-from src.losses.image_recon_loss import GAN_Loss
-from src.model.arch import H0_mini_for_Adversarial
+from sipe.losses.image_recon_loss import GAN_Loss
+from sipe.model.arch import H0_mini_for_Adversarial
 ##########################
 
 class Curriculum(list):

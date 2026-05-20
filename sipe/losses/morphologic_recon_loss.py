@@ -3,7 +3,7 @@ import os, sys, pathlib as pl, json
 sys.path.append(os.path.join(os.path.dirname(__file__), "."))
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from operator import itemgetter
-from src.utils.transfroms import UnNormalizeFloats
+from sipe.utils.transfroms import UnNormalizeFloats
 ######## External ########
 import torch
 from torchmetrics.image import StructuralSimilarityIndexMeasure

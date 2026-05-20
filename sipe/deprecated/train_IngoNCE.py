@@ -1,6 +1,6 @@
-from src.model.arch import H0_mini_for_AutoEncoding
-from src.losses.loss_fusion import SIPE_Loss_InfoNCE
-from src.trainer.trainer import Trainer
+from sipe.model.arch import H0_mini_for_AutoEncoding
+from sipe.losses.loss_fusion import SIPE_Loss_InfoNCE
+from sipe.trainer.trainer import Trainer
 from BPTorch.datasets import BigPictureRepository, WsiDicomDataset
 import torch,os
 import torchvision.transforms as T

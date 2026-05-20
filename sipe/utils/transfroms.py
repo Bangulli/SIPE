@@ -3,7 +3,7 @@ import torch.nn.functional as F
 from torchvision.transforms import functional as TF
 import json
 from operator import itemgetter
-from src.utils.misc import make_name_from_list
+from sipe.utils.misc import make_name_from_list
 
 class UnNormalize(object):
     def __init__(self, mean, std):

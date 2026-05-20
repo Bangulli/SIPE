@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sipe"
+version = "0.0.1"
+description = "SIPE model code"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "Lorenz Kuhn" }
+]
+dependencies = []
+
+[project.optional-dependencies]
+model = [
+    "torch",
+    "torchvision",
+    "timm",
+    "huggingface-hub",
+    "scikit-learn",
+]
+
+dev = [
+    "pytest",
+    "ruff",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["sipe*"]

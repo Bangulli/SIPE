@@ -7,13 +7,13 @@ import os, torch
 import PIL
 from tqdm import tqdm
 from torchvision.transforms import ToTensor, Resize, Compose, Normalize, ToPILImage, CenterCrop
-from src.utils.transfroms import UnNormalize
+from sipe.utils.transfroms import UnNormalize
 from skimage.metrics import structural_similarity as ssim
 from pytorch_msssim import ms_ssim
 import torch
 from pprint import pprint
-from src.model.arch import H0_mini_for_Adversarial
-from src.trainer.trainer import Trainer
+from sipe.model.arch import H0_mini_for_Adversarial
+from sipe.trainer.trainer import Trainer
 from huggingface_hub import login
 from scipy.stats import pearsonr
 

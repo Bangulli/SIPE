@@ -1,6 +1,6 @@
 from BPTorch.datasets import BigPictureRepository, WsiDicomDataset
 from torchvision.transforms import ToPILImage
-from src.utils.transfroms import UnNormalize, SobelTransform
+from sipe.utils.transfroms import UnNormalize, SobelTransform
 import os, torch
 import copy, tqdm, json, pathlib as pl
 import matplotlib.pyplot as plt

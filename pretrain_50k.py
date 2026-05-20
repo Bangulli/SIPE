@@ -2,12 +2,12 @@ from BPTorch.datasets import BigPictureRepository, WsiDicomDataset
 from torch.utils.data import DataLoader
 from BPTorch.utils import bptorch_collate
 from pprint import pprint
-from src.model.arch import H0_mini_for_Adversarial
+from sipe.model.arch import H0_mini_for_Adversarial
 from torchvision.transforms import ToPILImage
-from src.utils.transfroms import UnNormalize
-from src.trainer.trainer import Trainer
-from src.trainer.curriculum_trainer import CurriculumTrainer, Curriculum
-from src.losses.loss_fusion import SIPE_Loss_Adversarial, SIPE_Loss_Adversarial_Cycle
+from sipe.utils.transfroms import UnNormalize
+from sipe.trainer.trainer import Trainer
+from sipe.trainer.curriculum_trainer import CurriculumTrainer, Curriculum
+from sipe.losses.loss_fusion import SIPE_Loss_Adversarial, SIPE_Loss_Adversarial_Cycle
 import os, torch, shutil
 import torch.nn.functional as F
 import copy, tqdm, random, math, json

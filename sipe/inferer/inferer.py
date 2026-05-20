@@ -12,8 +12,8 @@ from torch.optim import AdamW
 from torch.utils.data import DataLoader
 import torch.nn as nn
 from BPTorch.utils import bptorch_collate
-from src.trainer.trainer import Trainer
-from src.model.arch import H0_mini_for_AutoEncoding
+from sipe.trainer.trainer import Trainer
+from sipe.model.arch import H0_mini_for_AutoEncoding
 ######## Internal ########
 ##########################
 

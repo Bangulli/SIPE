@@ -2,12 +2,12 @@ from BPTorch.datasets import BigPictureRepository, WsiDicomDataset
 from torch.utils.data import DataLoader
 from BPTorch.utils import bptorch_collate
 from pprint import pprint
-from src.model.arch import H0_mini_for_Adversarial
+from sipe.model.arch import H0_mini_for_Adversarial
 from torchvision.transforms import ToPILImage
-from src.utils.transfroms import UnNormalize
-from src.utils.test import test
-from src.utils.stain_comp import compare
-from src.trainer.trainer import Trainer
+from sipe.utils.transfroms import UnNormalize
+from sipe.utils.test import test
+from sipe.utils.stain_comp import compare
+from sipe.trainer.trainer import Trainer
 import os, torch
 import torch.nn.functional as F
 import copy, tqdm, json, pathlib as pl

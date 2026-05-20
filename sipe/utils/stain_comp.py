@@ -2,11 +2,11 @@ from BPTorch.datasets import BigPictureRepository, WsiDicomDataset
 from torch.utils.data import DataLoader
 from BPTorch.utils import bptorch_collate
 from pprint import pprint
-from src.model.arch import H0_mini_for_Adversarial
+from sipe.model.arch import H0_mini_for_Adversarial
 from torchvision.transforms import ToPILImage
-from src.utils.transfroms import UnNormalize, SobelTransform
-from src.trainer.trainer import Trainer
-from src.utils.misc import patch_is_foreground
+from sipe.utils.transfroms import UnNormalize, SobelTransform
+from sipe.trainer.trainer import Trainer
+from sipe.utils.misc import patch_is_foreground
 import os, torch
 import torch.nn.functional as F
 import copy, tqdm, json, pathlib as pl, json
@@ -17,7 +17,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-from src.utils.misc import make_name_from_list
+from sipe.utils.misc import make_name_from_list
 # pip install "BPTorch @ git+https://github.com/Bangulli/BPTorch"
 
 def make_side_by_side(images, path):

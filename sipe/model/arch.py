@@ -14,7 +14,7 @@ from timm.data import resolve_data_config
 from timm.data.transforms_factory import create_transform
 ######## Internal ########
 from torchvision.transforms import ToPILImage
-from src.utils.misc import make_name_from_list
+from sipe.utils.misc import make_name_from_list
 ##########################
 
 

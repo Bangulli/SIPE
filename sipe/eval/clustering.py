@@ -8,18 +8,18 @@ from torch.utils.data import DataLoader
 from BPTorch.utils import bptorch_collate
 from torch.nn.functional import avg_pool2d
 from pprint import pprint
-from src.model.arch import H0_mini_for_Adversarial
+from sipe.model.arch import H0_mini_for_Adversarial
 from torchvision.transforms import ToPILImage
-from src.utils.transfroms import UnNormalize
-from src.trainer.trainer import Trainer
+from sipe.utils.transfroms import UnNormalize
+from sipe.trainer.trainer import Trainer
 from tqdm import tqdm
 from BPTorch.utils import bptorch_collate
 from sklearn.preprocessing import LabelEncoder
 from sklearn.manifold import TSNE
 from umap import UMAP
 from sklearn.metrics import davies_bouldin_score
-from src.utils.misc import make_name_from_list
-from src.utils.visu import plot_dim_red_clust, make_or_load_cmap
+from sipe.utils.misc import make_name_from_list
+from sipe.utils.visu import plot_dim_red_clust, make_or_load_cmap
 from typing import Literal
 # pip install "BPTorch @ git+https://github.com/Bangulli/BPTorch"
 

@@ -6,10 +6,10 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 import torch
 import torch.nn as nn
 ######## Internal ########
-from src.losses.image_recon_loss import ImageReconLoss, GAN_Loss
-from src.losses.morphologic_recon_loss import MorphReconLoss_MSE_Sobel
-from src.losses.staining_cluster_loss import SimCLR_NCE_Loss
-from src.losses.adversarial_classif_loss import AdversarialClassifLoss
+from sipe.losses.image_recon_loss import ImageReconLoss, GAN_Loss
+from sipe.losses.morphologic_recon_loss import MorphReconLoss_MSE_Sobel
+from sipe.losses.staining_cluster_loss import SimCLR_NCE_Loss
+from sipe.losses.adversarial_classif_loss import AdversarialClassifLoss
 ##########################
 class SIPE_Loss_Adversarial(nn.Module):
     """https://proceedings.neurips.cc/paper/2016/file/ef0917ea498b1665ad6c701057155abe-Paper.pdf

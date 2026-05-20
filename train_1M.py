@@ -1,7 +1,7 @@
-from src.model.arch import H0_mini_for_Adversarial
-from src.losses.loss_fusion import SIPE_Loss_Adversarial, SIPE_Loss_Adversarial_Cycle
-from src.trainer.trainer import Trainer
-from src.trainer.curriculum_trainer import CurriculumTrainer, Curriculum
+from sipe.model.arch import H0_mini_for_Adversarial
+from sipe.losses.loss_fusion import SIPE_Loss_Adversarial, SIPE_Loss_Adversarial_Cycle
+from sipe.trainer.trainer import Trainer
+from sipe.trainer.curriculum_trainer import CurriculumTrainer, Curriculum
 from BPTorch.datasets import BigPictureRepository, WsiDicomDataset
 import torch,os
 import torchvision.transforms as T
