@@ -20,6 +20,9 @@ model = [
     "timm",
     "huggingface-hub",
     "scikit-learn",
+    "opencv-python",
+    "numpy",
+    "pillow",
 ]
 
 dev = [
