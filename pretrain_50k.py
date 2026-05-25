@@ -58,15 +58,15 @@ if __name__ == '__main__':
     kwargs['transforms'] = model.transform
     ## load trainset and point to patch source
     trainset = BigPictureRepository('/mnt/nas6/data/BigPicture_CBIR/datasets/BPTorch/fold_1/BPR.json', load=True, wsidicomdataset_kwargs=kwargs, verbose=False) ## loading valset becuase the content gets overwritten by pointing to preextracted patches. this is just faster than loading the full training fold every time
-    trainset.source_precomputed_patches_from('rnd-subsubset-50k')
+    trainset.source_precomputed_patches_from('data/rnd-subsubset-50k')
     
     kwargs = WsiDicomDataset.get_default_kwargs()
     kwargs['transforms'] = model.transform
     ## load valset and point to patch source
     valset = BigPictureRepository('/mnt/nas6/data/BigPicture_CBIR/datasets/BPTorch/fold_1/BPR.json', load=True, wsidicomdataset_kwargs=kwargs, verbose=False)
-    valset.source_precomputed_patches_from('rnd-subset-val')
+    valset.source_precomputed_patches_from('data/rnd-subset-val')
     
-    cr_trainer = CurriculumTrainer(model, SIPE_Loss_Adversarial(recon_mode=True), SIPE_Loss_Adversarial(), SIPE_Loss_Adversarial_Cycle(), wdir='SIPE-50k-Curriculum', device='cuda:0')
+    cr_trainer = CurriculumTrainer(model, SIPE_Loss_Adversarial(recon_mode=True), SIPE_Loss_Adversarial(), SIPE_Loss_Adversarial_Cycle(), wdir='SIPE-50k-Curriculum-768', device='cuda:0')
     cr = Curriculum()
     cr.add_step(step_type='recon', epochs=5, adverse_alpha=1.0, lr=1e-3, restarts=5, norm=True, freeze_bb=True, freeze_tangler=False)
     alpha = np.arange(0.1, 1.0, 0.1).tolist()

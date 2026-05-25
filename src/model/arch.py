@@ -49,7 +49,7 @@ class H0_mini_for_Adversarial(nn.Module):
         self.backbone, self.transform = get_encoder_and_transforms(base_model) ## backbone model
         print('Backbone built!')
         
-        self.entangler = Entangler(768, emb_stain_size, 768-emb_stain_size, self.n_classes)
+        self.entangler = Entangler(768, emb_stain_size, 768, self.n_classes)
         print('Disentangler built!')
         
         self.image_decoder = get_decoder(num_features, 3) ## decoder for image recon, adds a projection layer to mix stain
@@ -172,33 +172,33 @@ class H0_mini_for_Adversarial(nn.Module):
 # DISENTANGLER ########################################################
 
 class Entangler(nn.Module):
-    def __init__(self, n_features, n_stain_features, n_other_features, n_classes):
+    def __init__(self, n_features, n_spec_features, n_unspec_features, n_classes):
         super().__init__()
         self.n_features = n_features
         self.n_classes = n_classes
-        self.n_stain_features = n_stain_features
-        self.n_other_features = n_other_features
+        self.n_spec_features = n_spec_features
+        self.n_unspec_features = n_unspec_features
         
         ### disentanglement
-        self.to_specified = PooledProjector(n_features, n_stain_features)
-        self.to_unspecified = ConvProjector(n_features, n_other_features)
+        self.to_specified = PooledProjector(n_features, n_spec_features)
+        self.to_unspecified = ConvProjector(n_features, n_unspec_features)
         
         ### classification
         self.act = nn.Softmax()
-        self.pred_specified = nn.Linear(n_stain_features, n_classes)
-        self.pred_unspecified = nn.Linear(n_other_features, n_classes)
+        self.pred_specified = nn.Linear(n_spec_features, n_classes)
+        self.pred_unspecified = nn.Linear(n_unspec_features, n_classes)
         
         ### reentanglement
-        self.porbas_to_specified = nn.Linear(n_classes, n_stain_features)
+        self.porbas_to_specified = nn.Linear(n_classes, n_spec_features)
         self.act2 = nn.ReLU()
-        self.reentangler = nn.Conv2d(n_features, n_features, 1)
+        self.reentangler = nn.Conv2d(n_spec_features+n_unspec_features, n_features, 1)
     
     def disentangle(self, tokens):
         patches = tokens[:,5:,:].permute(0, 2, 1) ## cut out cls and register tokens
         patches = patches.reshape(patches.shape[0], 768, 16, 16) ## reshape to feature map 
         z = self.to_unspecified(patches)
         s = self.to_specified(patches)
-        return s, z # -> [B, n_stain_features], [B, n_other_features, 16, 16]
+        return s, z # -> [B, n_spec_features], [B, n_unspec_features, 16, 16]
     
     def reentangle(self, s, z):
         s = s[:, :, None, None].expand(-1, -1, 16, 16)
@@ -219,7 +219,7 @@ class Entangler(nn.Module):
         
         #z = F.avg_pool2d(z, kernel_size=16).squeeze()
         # [B, C, H, W] → [B*H*W, C]
-        z = z.permute(0, 2, 3, 1).reshape(-1, self.n_other_features )
+        z = z.permute(0, 2, 3, 1).reshape(-1, self.n_unspec_features )
         z = self.pred_unspecified(self.reverse_grad(z))
         return s, z
     

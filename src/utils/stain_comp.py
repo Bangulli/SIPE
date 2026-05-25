@@ -248,7 +248,7 @@ def compare(model, sourcedir, imdir_name):
     ds = BigPictureRepository('/mnt/nas6/data/BigPicture_CBIR/datasets/BPTorch/fold_0/BPR.json', load=True, wsidicomdataset_kwargs=kwargs, verbose=False)
     ds.source_precomputed_patches_from('data/rnd-subset-test')
     print(f"Dataset contains {len(ds)} foreground patches")
-    dl = DataLoader(ds, 1, True, collate_fn=bptorch_collate)
+    dl = DataLoader(ds, 1, False, collate_fn=bptorch_collate)
     
     ## transforms for visu
     converter = ToPILImage()
@@ -299,3 +299,40 @@ def compare(model, sourcedir, imdir_name):
         
     make_diagonal(recons, source_images, sourcedir/imdir_name)
     
+    for tissue in ["Lung structure (body structure)", "mamma", "Kidney structure (body structure)"]:
+        present_classes = []
+        virtual_staining_heads = {}
+        morphologic_bases = {}
+        source_images = {}
+        source_image_meta = {}
+        for batch in tqdm.tqdm(dl, desc='Finding stain examples'):
+            if not patch_is_foreground(converter(denormer(batch['image']).squeeze(0))):continue
+            label = defrag([batch['metadata'][0]['staining']])[0]
+            organ = [batch['metadata'][0]['organ']]
+            if organ != [tissue]:continue
+            if label in present_classes: continue
+            present_classes.append(label)
+            ## encode new image
+            s_proba, z = model(batch)
+            ## save stuff
+            img = converter(denormer(batch['image'].squeeze(0)))
+            label_s = shorten(label)
+            source_images[label_s] = img
+            virtual_staining_heads[label_s] = s_proba
+            morphologic_bases[label_s] = z
+            source_image_meta[label_s] = {'stain': label, 'site': batch['metadata'][0]['organ']}
+        
+        os.makedirs(sourcedir/imdir_name/tissue, exist_ok=True)
+        with open(sourcedir/imdir_name/tissue/'dense_side_by_side.json', 'w') as f:
+            json.dump(source_image_meta, f, indent=4)
+        
+        recons = {}
+        for lbl1 in tqdm.tqdm(source_images.keys(), desc='generating'):
+            current_recons = {}
+            for lbl2 in source_images.keys():
+                s = virtual_staining_heads[lbl2]
+                z = morphologic_bases[lbl1]
+                current_recons[lbl2] = model.recon_image_PIL(s, z, denormer)
+            recons[lbl1] = current_recons
+            
+        make_diagonal(recons, source_images, sourcedir/imdir_name/tissue)
