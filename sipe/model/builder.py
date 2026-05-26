@@ -123,7 +123,7 @@ CLASSES = {
 }
 
 
-FeatureMode = Literal["concat", "stain", "content"]
+FeatureMode = Literal["concat", "stain", "content", "featuremap"]
 
 
 def build_sipe_model(
@@ -226,6 +226,8 @@ class SIPEFeatureExtractor:
             self.output_dim = 64
         elif feature_mode == "content":
             self.output_dim = 704
+        elif feature_mode == "featuremap":
+            self.output_dim = 704
         else:
             raise ValueError(f"Unknown feature_mode: {feature_mode}")
 
@@ -278,6 +280,9 @@ class SIPEFeatureExtractor:
             elif self.feature_mode == "concat":
                 z_gap = z.mean(dim=(2, 3))
                 features = torch.cat([s, z_gap], dim=1)
+                
+            elif self.feature_mode == "featuremap":
+                features = z
 
             else:
                 raise ValueError(f"Unknown feature_mode: {self.feature_mode}")
