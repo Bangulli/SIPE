@@ -19,8 +19,12 @@ from src.utils.misc import make_name_from_list
 
 
 def get_encoder_and_transforms(base_model):
-    with open('token.txt', 'r') as f:
-        login(f.read())
+    try:
+        with open('token.txt', 'r') as f:
+            login(f.read())
+    except:
+        with open('/home/lorenz/BigPicture/SIPE/token.txt', 'r') as f:
+            login(f.read())
     model = timm.create_model(
         base_model,
         pretrained=True,
