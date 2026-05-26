@@ -13,6 +13,7 @@ token.txt
 /v2*/
 /EXP-SIPE*/
 /data/
+/ext_eval/
 
 # Training logs / artifacts
 wandb/
