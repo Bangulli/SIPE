@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
     
 if __name__ == '__main__':
     
-    sourcedir = pl.Path('/home/lorenz/BigPicture/SIPE/SIPE-50k-Curriculum')
+    sourcedir = pl.Path('/home/lorenz/BigPicture/SIPE/SIPE-50k-Curriculum-768')
     
     print(f'Running a quick and dirty test for trainer at {sourcedir}')
     
@@ -24,7 +24,14 @@ if __name__ == '__main__':
         classes = json.load(f)
     ## setup variables
     trainer = Trainer(H0_mini_for_Adversarial(classes, device='cuda:0'), None, wdir=sourcedir)
+    
+    ## vis best model in dir
     if (sourcedir/'history.json').exists(): model = trainer.load_best_model()
     else: model = trainer.load_model_at_epoch(1)
     test(model, sourcedir, 'images_best')
     compare(model, sourcedir, 'images_best')
+    
+    # ## vis latest
+    # model = trainer.load_model_at_epoch(-1)
+    # test(model, sourcedir, 'images_latest')
+    # compare(model, sourcedir, 'images_latest')

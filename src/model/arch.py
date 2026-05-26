@@ -35,11 +35,10 @@ def get_encoder_and_transforms(base_model):
 # MAIN ########################################################
 
 class H0_mini_for_Adversarial(nn.Module):
-    def __init__(self, possible_classes, base_model="hf-hub:bioptimus/H0-mini", emb_stain_size=64, device='cuda:0'):
+    def __init__(self, possible_classes, base_model="hf-hub:bioptimus/H0-mini", spec_size=64, unspec_size=704, device='cuda:0'):
         super().__init__()
         self.device = device
         self.to_pil = ToPILImage()
-        self.emb_stain_size = emb_stain_size ## how many elements of the feature vector should contain staining information
         num_features = 768 ## embedding size, depends on base_model
         self.possible_classes = sorted(self.defrag(list(possible_classes.keys()))) ## for reproducibility
         self.enc = MultiLabelBinarizer()
@@ -49,7 +48,7 @@ class H0_mini_for_Adversarial(nn.Module):
         self.backbone, self.transform = get_encoder_and_transforms(base_model) ## backbone model
         print('Backbone built!')
         
-        self.entangler = Entangler(768, emb_stain_size, 768, self.n_classes)
+        self.entangler = Entangler(768, spec_size, unspec_size, self.n_classes)
         print('Disentangler built!')
         
         self.image_decoder = get_decoder(num_features, 3) ## decoder for image recon, adds a projection layer to mix stain
