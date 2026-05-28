@@ -9,3 +9,6 @@ token.txt
 /EXP-SIPE*/
 /data/
 /ext_eval/
+/sipe/
+*.egg-info
+/build/
