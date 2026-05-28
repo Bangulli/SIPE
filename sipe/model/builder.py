@@ -228,6 +228,10 @@ class SIPEFeatureExtractor:
             self.output_dim = 704
         elif feature_mode == "featuremap":
             self.output_dim = 704
+        elif feature_mode == "featuremap_concat":
+            self.output_dim = 768
+        elif feature_mode == "featuremap_reen":
+            self.output_dim = 768
         else:
             raise ValueError(f"Unknown feature_mode: {feature_mode}")
 
@@ -283,6 +287,14 @@ class SIPEFeatureExtractor:
                 
             elif self.feature_mode == "featuremap":
                 features = z
+                
+            elif self.feature_mode == "featuremap_concat":
+                s = s[:, :, None, None].expand(-1, -1, 16, 16)
+                features = torch.cat([s, z], dim=1)
+
+            elif self.feature_mode == "featuremap_reen":
+                features = self.model.entangler.reentangle(s, z)
+
 
             else:
                 raise ValueError(f"Unknown feature_mode: {self.feature_mode}")
