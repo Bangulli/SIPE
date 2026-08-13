@@ -61,8 +61,8 @@ def run_inference(datapath, outputpath, inf_name, methods, trainer_path):
         if eval_method in ['cls', 'patch_token']: ## make default config model with default weights
             model = H0_mini_for_Adversarial(classes, device='cuda:1')
         else: 
-            trainer = Trainer(H0_mini_for_Adversarial(classes, device='cuda:1'), None, wdir=trainer_path)
-            model = trainer.load_best_model()
+            model = H0_mini_for_Adversarial(classes, device='cuda:1')
+            model.load("/home/lorenz/BigPicture/SIPE/SIPE-50k-Curriculum/checkpoints/ckpt_from_epoch_65")
 
         inferer = InferenceWrapper(model, eval_method)
             
@@ -72,7 +72,7 @@ def run_inference(datapath, outputpath, inf_name, methods, trainer_path):
             
         ###### setup dataset
         ds = BigPictureRepository(datapath, load=True, wsidicomdataset_kwargs=kwargs, verbose=False)
-        ds.source_precomputed_patches_from('rnd-subset-test')
+        ds.source_precomputed_patches_from('data/rnd-subset-test')
         print(f"Dataset contains {len(ds)} foreground patches")
     
         dl = torch.utils.data.DataLoader(ds, collate_fn=bptorch_collate, batch_size=128)
@@ -176,7 +176,7 @@ def eval_clust(emb_path, stain_path, stain_map, site_path, site_map, diag_path, 
 
 if __name__ == '__main__':
     datapath = pl.Path('/mnt/nas6/data/BigPicture_CBIR/datasets/BPTorch/fold_0/BPR.json')
-    outputpath = pl.Path('SIPE-1M-Curriculum/.results/clustering')
+    outputpath = pl.Path('SIPE-50k-Curriculum/.results/clustering')
     inf_name = 'infered'
 
     #run_inference(datapath, outputpath, inf_name, ['cls', 'patch_token', 'ours'], '/home/lorenz/BigPicture/SIPE/SIPE-1M-Curriculum')

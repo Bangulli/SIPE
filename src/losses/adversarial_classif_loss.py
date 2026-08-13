@@ -3,11 +3,12 @@ import torch, math
 from torchmetrics import Accuracy
    
 class AdversarialClassifLoss(nn.Module): 
-    def __init__(self, testmode, norm=True):
+    def __init__(self, testmode, norm=True, logkey='S'):
         super().__init__()
         self.testmode= testmode
         self.norm = norm
         self.compute = nn.CrossEntropyLoss()
+        self.logkey=logkey.upper()
         
     def forward(self, proj_stain_proba, proj_morph_proba, gt, device, logger, val, alpha):
         gt = gt.to(device)
@@ -23,8 +24,8 @@ class AdversarialClassifLoss(nn.Module):
         if self.testmode: print('losses:', f's={s_loss.item()}', f"z={z_loss.item()}")
         
         if logger is not None:
-            logger['CE'].append(s_loss.item())
-            logger['Adversarial CE'].append(z_loss.item())
+            logger[f'CE {self.logkey}'].append(s_loss.item())
+            logger[f'Adversarial CE {self.logkey}'].append(z_loss.item())
             
         if not val: return (s_loss)+(z_loss), logger
         else: return s_loss, logger 

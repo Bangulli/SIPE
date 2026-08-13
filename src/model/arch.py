@@ -39,20 +39,31 @@ def get_encoder_and_transforms(base_model):
 # MAIN ########################################################
 
 class H0_mini_for_Adversarial(nn.Module):
-    def __init__(self, possible_classes, base_model="hf-hub:bioptimus/H0-mini", spec_size=64, unspec_size=704, device='cuda:0'):
+    def __init__(self, possible_stain_classes, possible_organ_classes, possible_pathology_classes, base_model="hf-hub:bioptimus/H0-mini", spec_size=64, unspec_size=704, device='cuda:0'):
         super().__init__()
         self.device = device
         self.to_pil = ToPILImage()
         num_features = 768 ## embedding size, depends on base_model
-        self.possible_classes = sorted(self.defrag(list(possible_classes.keys()))) ## for reproducibility
-        self.enc = MultiLabelBinarizer()
-        self.enc.fit(self.possible_classes)
-        self.n_classes = len(self.enc.classes_)
+        
+        self.possible_stain_classes = sorted(self.defrag(list(possible_stain_classes.keys()))) ## for reproducibility
+        self.enc_s = MultiLabelBinarizer()
+        self.enc_s.fit(self.possible_stain_classes)
+        self.n_s_classes = len(self.enc_s.classes_)
+        
+        self.possible_organ_classes = sorted(self.defrag(list(possible_organ_classes.keys()))) ## for reproducibility
+        self.enc_o = MultiLabelBinarizer()
+        self.enc_o.fit(self.possible_organ_classes)
+        self.n_o_classes = len(self.enc_o.classes_)
+        
+        self.possible_pathology_classes = sorted(self.defrag(list(possible_pathology_classes.keys()))) ## for reproducibility
+        self.enc_p = MultiLabelBinarizer()
+        self.enc_p.fit(self.possible_pathology_classes)
+        self.n_p_classes = len(self.enc_p.classes_)
         
         self.backbone, self.transform = get_encoder_and_transforms(base_model) ## backbone model
         print('Backbone built!')
         
-        self.entangler = Entangler(768, spec_size, unspec_size, self.n_classes)
+        self.entangler = Entangler(768, spec_size, unspec_size, self.n_s_classes, self.n_o_classes, self.n_p_classes)
         print('Disentangler built!')
         
         self.image_decoder = get_decoder(num_features, 3) ## decoder for image recon, adds a projection layer to mix stain
@@ -82,10 +93,12 @@ class H0_mini_for_Adversarial(nn.Module):
         s, z = self.entangler.disentangle(tokens)
         
         ## get classification logits
-        s_classif, z_classif = self.entangler.classify(s, z)
+        s_classif_s, z_classif_s,  s_classif_o, z_classif_o, s_classif_p, z_classif_p = self.entangler.classify_all(s, z)
         
         ## project and split
-        batch['labels'] = torch.tensor(self.transform_labels([s['staining'] for s in batch['metadata']]), dtype=torch.float32)
+        batch['stain'] = torch.tensor(self.transform_labels([s['staining'] for s in batch['metadata']]), dtype=torch.float32)
+        batch['organ'] = torch.tensor(self.transform_organs([make_name_from_list(s['organ']) for s in batch['metadata']]), dtype=torch.float32)
+        batch['diagnosis'] = torch.tensor(self.transform_paths([make_name_from_list(s['diagnosis']) for s in batch['metadata']]), dtype=torch.float32)
         
         ## reconstruc stain vectors from class probas
         s_recon = self.entangler.porbas_to_specified(batch['labels'].to(self.device))
@@ -99,7 +112,7 @@ class H0_mini_for_Adversarial(nn.Module):
         
         disc_rec = self.discriminator(rec_img.detach())
         
-        return loss(batch, s_classif, z_classif, rec_img, s_recon, s, self.device, logger, val, disc_gt, disc_rec)
+        return loss(batch, s_classif_s, z_classif_s, s_classif_o, z_classif_o, s_classif_p, z_classif_p, rec_img, s_recon, s, self.device, logger, val, disc_gt, disc_rec)
 
     def recon_image(self, s, z, transform=None):
         if len(s.shape)==1: s=s.unsqueeze(0)
@@ -170,15 +183,21 @@ class H0_mini_for_Adversarial(nn.Module):
     
     def transform_labels(self, labels):
         labels = self.defrag(labels)
-        return self.enc.transform(labels)
+        return self.enc_s.transform(labels)
+    
+    def transform_organs(self, organs):
+        return self.enc_o.transform(organs)
+        
+    def transform_paths(self, paths):
+        return self.enc_p.transform(paths)
 
 # DISENTANGLER ########################################################
 
 class Entangler(nn.Module):
-    def __init__(self, n_features, n_spec_features, n_unspec_features, n_classes):
+    def __init__(self, n_features, n_spec_features, n_unspec_features, n_stain_classes, n_organ_classes, n_pathology_classes):
         super().__init__()
         self.n_features = n_features
-        self.n_classes = n_classes
+        self.n_stain_classes = n_stain_classes
         self.n_spec_features = n_spec_features
         self.n_unspec_features = n_unspec_features
         
@@ -186,13 +205,23 @@ class Entangler(nn.Module):
         self.to_specified = PooledProjector(n_features, n_spec_features)
         self.to_unspecified = ConvProjector(n_features, n_unspec_features)
         
-        ### classification
+        ### Stain classification
         self.act = nn.Softmax()
-        self.pred_specified = nn.Linear(n_spec_features, n_classes)
-        self.pred_unspecified = nn.Linear(n_unspec_features, n_classes)
+        self.pred_s_specified = nn.Linear(n_spec_features, n_stain_classes)
+        self.pred_s_unspecified = nn.Linear(n_unspec_features, n_stain_classes)
+        
+        ### Organ classification
+        self.act = nn.Softmax()
+        self.pred_o_specified = nn.Linear(n_spec_features, n_organ_classes)
+        self.pred_o_unspecified = nn.Linear(n_unspec_features, n_organ_classes)
+        
+        ### Pathology classification
+        self.act = nn.Softmax()
+        self.pred_p_specified = nn.Linear(n_spec_features, n_pathology_classes)
+        self.pred_p_unspecified = nn.Linear(n_unspec_features, n_pathology_classes)
         
         ### reentanglement
-        self.porbas_to_specified = nn.Linear(n_classes, n_spec_features)
+        self.porbas_to_specified = nn.Linear(n_stain_classes, n_spec_features)
         self.act2 = nn.ReLU()
         self.reentangler = nn.Conv2d(n_spec_features+n_unspec_features, n_features, 1)
     
@@ -218,13 +247,27 @@ class Entangler(nn.Module):
         return patches
     
     def classify(self, s, z):
-        s = self.pred_specified(s)
+        s_s = self.pred_s_specified(s)
+        z_s = z.permute(0, 2, 3, 1).reshape(-1, self.n_unspec_features )
+        z_s = self.pred_s_unspecified(self.reverse_grad(z_s))
+        return s_s, z_s
+    
+    def classify_all(self, s, z):
+        # grad reversol on unspecified to enforce disentanglement
+        s_s = self.pred_s_specified(s)
+        z_s = z.permute(0, 2, 3, 1).reshape(-1, self.n_unspec_features )
+        z_s = self.pred_s_unspecified(self.reverse_grad(z_s))
         
-        #z = F.avg_pool2d(z, kernel_size=16).squeeze()
-        # [B, C, H, W] → [B*H*W, C]
-        z = z.permute(0, 2, 3, 1).reshape(-1, self.n_unspec_features )
-        z = self.pred_unspecified(self.reverse_grad(z))
-        return s, z
+        # grad reversal on specified to enforce information retention in unspecified component
+        s_o = self.pred_o_specified(self.reverse_grad(s))
+        z_o = z.permute(0, 2, 3, 1).reshape(-1, self.n_unspec_features )
+        z_o = self.pred_o_unspecified(z_o)
+        
+        s_p = self.pred_p_specified(self.reverse_grad(s))
+        z_p = z.permute(0, 2, 3, 1).reshape(-1, self.n_unspec_features )
+        z_p = self.pred_p_unspecified(z_p)
+        
+        return s_s, z_s, s_o, z_o, s_p, z_p
     
     def to_probas(self, s, z):
         s_probas = self.act(s)

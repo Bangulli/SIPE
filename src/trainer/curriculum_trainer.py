@@ -18,6 +18,7 @@ import copy
 ######## Internal ########
 from src.losses.image_recon_loss import GAN_Loss
 from src.model.arch import H0_mini_for_Adversarial
+from src.utils.misc import make_name_from_list
 ##########################
 
 class Curriculum(list):
@@ -186,8 +187,12 @@ class CurriculumTrainer:
                 'Stain probs2vec': [],
                 'InfoNCE Stain': [],
                 'InfoNCE Morph': [],
-                'Adversarial CE': [],
-                'CE':[],
+                'Adversarial CE S': [],
+                'CE S':[],
+                'Adversarial CE O': [],
+                'CE O':[],
+                'Adversarial CE P': [],
+                'CE P':[],
                 's std': [],
                 's norm': [],
             }
@@ -217,8 +222,12 @@ class CurriculumTrainer:
                     'Stain probs2vec': [],
                     'InfoNCE Stain': [],
                     'InfoNCE Morph': [],
-                    'Adversarial CE': [],
-                    'CE':[],
+                    'Adversarial CE S': [],
+                    'CE S':[],
+                    'Adversarial CE O': [],
+                    'CE O':[],
+                    'Adversarial CE P': [],
+                    'CE P':[],
                     's std': [],
                     's norm': [],
                 }
@@ -243,8 +252,12 @@ class CurriculumTrainer:
                     'Stain probs2vec': [],
                     'InfoNCE Stain': [],
                     'InfoNCE Morph': [],
-                    'Adversarial CE': [],
-                    'CE':[],
+                    'Adversarial CE S': [],
+                    'CE S':[],
+                    'Adversarial CE O': [],
+                    'CE O':[],
+                    'Adversarial CE P': [],
+                    'CE P':[],
                     's std': [],
                     's norm': [],
                 }
@@ -278,8 +291,12 @@ class CurriculumTrainer:
                         'Stain probs2vec': [],
                         'InfoNCE Stain': [],
                         'InfoNCE Morph': [],
-                        'Adversarial CE': [],
-                        'CE':[],
+                        'Adversarial CE S': [],
+                        'CE S':[],
+                        'Adversarial CE O': [],
+                        'CE O':[],
+                        'Adversarial CE P': [],
+                        'CE P':[],
                         's std': [],
                         's norm': [],
                     }
@@ -303,8 +320,12 @@ class CurriculumTrainer:
                     'Recon Img': [],
                     'S cycle': [],
                     'Z cycle': [],
-                    'Adversarial CE': [],
-                    'CE':[],
+                    'Adversarial CE S': [],
+                    'CE S':[],
+                    'Adversarial CE O': [],
+                    'CE O':[],
+                    'Adversarial CE P': [],
+                    'CE P':[],
                 }
             if type(alpha)==float: self.loss_c.set_adverse_alpha(alpha)
             else: self.loss_c.set_adverse_alpha(alpha[i])
@@ -336,8 +357,12 @@ class CurriculumTrainer:
                     'Recon Img': [],
                     'S cycle': [],
                     'Z cycle': [],
-                    'Adversarial CE': [],
-                    'CE':[],
+                    'Adversarial CE S': [],
+                    'CE S':[],
+                    'Adversarial CE O': [],
+                    'CE O':[],
+                    'Adversarial CE P': [],
+                    'CE P':[],
                 }
                 self.model.eval()
                 val_losses = []
@@ -356,7 +381,7 @@ class CurriculumTrainer:
         batch1 = batch
         s1, z1 = self.model(batch1)
         recon1 = self.model.recon_image(s1, z1)
-        s1_class, z1_class = self.model.entangler.classify(s1, z1)
+        s1_class_s, z1_class_s, s1_class_o, z1_class_o, s1_class_p, z1_class_p = self.model.entangler.classify_all(s1, z1)
         
         ## shift along the batch dimension to mix and specified/unspecified pairs and create second batch
         s1_prime = torch.roll(s1, 1, 0) 
@@ -370,11 +395,14 @@ class CurriculumTrainer:
         s2_prime = torch.roll(s2, -1, 0)
         
         ## organize gts
-        gt_labels = torch.tensor(self.model.transform_labels([s['staining'] for s in batch1['metadata']]), dtype=torch.float32)
+        gt_labels_s = torch.tensor(self.model.transform_labels([s['staining'] for s in batch1['metadata']]), dtype=torch.float32)
+        gt_labels_o = torch.tensor(self.transform_organs([make_name_from_list(s['organ']) for s in batch['metadata']]), dtype=torch.float32)
+        gt_labels_p = torch.tensor(self.transform_paths([make_name_from_list(s['diagnosis']) for s in batch['metadata']]), dtype=torch.float32)
+        
         gt_images = batch1['image']
         
         ## compute loss
-        return self.loss_c(gt_labels, gt_images, recon1, s1, s2_prime, z1, z2, s1_class, z1_class, logger, val)#, disc_gt, disc_rec)
+        return self.loss_c(gt_labels_s, gt_labels_o, gt_labels_p, gt_images, recon1, s1, s2_prime, z1, z2, s1_class_s, z1_class_s,  s1_class_o, z1_class_o, s1_class_p, z1_class_p, logger, val)#, disc_gt, disc_rec)
         
     def _roll_list(self, lst, shifts): ## Equivalent to torch.roll(tensor, shifts, dim=0)
         if shifts > 0:

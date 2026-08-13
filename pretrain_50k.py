@@ -3,7 +3,7 @@ from torch.utils.data import DataLoader
 from BPTorch.utils import bptorch_collate
 from pprint import pprint
 from src.model.arch import H0_mini_for_Adversarial
-from torchvision.transforms import ToPILImage
+from torchvision.transforms import ToPILImage, RandomAffine, RandomGrayscale, RandomInvert, RandomErasing, GaussianBlur, Compose
 from src.utils.transfroms import UnNormalize
 from src.trainer.trainer import Trainer
 from src.trainer.curriculum_trainer import CurriculumTrainer, Curriculum
@@ -49,13 +49,18 @@ if __name__ == '__main__':
     ## setup instances of model and trainer
     with open('/home/lorenz/BigPicture/SIPE/classes.json', 'r') as f:
         classes = json.load(f)
+    with open('/home/lorenz/BigPicture/SIPE/organs.json', 'r') as f:
+        organs = json.load(f)
+    with open('/home/lorenz/BigPicture/SIPE/paths.json', 'r') as f:
+        paths = json.load(f)
+        
     print(f'Training with the following {len(classes)} class distribution')
     pprint(classes)
     print('############################ Begin ############################')
-    model = H0_mini_for_Adversarial(classes, device='cuda:0')
+    model = H0_mini_for_Adversarial(classes, organs, paths, device='cuda:0')
     
     kwargs = WsiDicomDataset.get_default_kwargs()
-    kwargs['transforms'] = model.transform
+    kwargs['transforms'] = Compose([GaussianBlur(3), RandomAffine(3), RandomErasing(p=0.5), RandomGrayscale(p=0.1), RandomInvert(p=0.5), model.transform])
     ## load trainset and point to patch source
     trainset = BigPictureRepository('/mnt/nas6/data/BigPicture_CBIR/datasets/BPTorch/fold_1/BPR.json', load=True, wsidicomdataset_kwargs=kwargs, verbose=False) ## loading valset becuase the content gets overwritten by pointing to preextracted patches. this is just faster than loading the full training fold every time
     trainset.source_precomputed_patches_from('data/rnd-subsubset-50k')
@@ -66,12 +71,12 @@ if __name__ == '__main__':
     valset = BigPictureRepository('/mnt/nas6/data/BigPicture_CBIR/datasets/BPTorch/fold_1/BPR.json', load=True, wsidicomdataset_kwargs=kwargs, verbose=False)
     valset.source_precomputed_patches_from('data/rnd-subset-val')
     
-    cr_trainer = CurriculumTrainer(model, SIPE_Loss_Adversarial(recon_mode=True), SIPE_Loss_Adversarial(), SIPE_Loss_Adversarial_Cycle(), wdir='SIPE-50k-Curriculum-768', device='cuda:0')
+    cr_trainer = CurriculumTrainer(model, SIPE_Loss_Adversarial(recon_mode=True), SIPE_Loss_Adversarial(), SIPE_Loss_Adversarial_Cycle(), wdir='13-08-26_SIPE-50k-Curriculum', device='cuda:0')
     cr = Curriculum()
     cr.add_step(step_type='recon', epochs=5, adverse_alpha=1.0, lr=1e-3, restarts=5, norm=True, freeze_bb=True, freeze_tangler=False)
     alpha = np.arange(0.1, 1.0, 0.1).tolist()
-    alpha += (20-len(alpha))*[1.0]
-    cr.add_step(step_type='cycle', epochs=20, adverse_alpha=alpha, lr=1e-3, restarts=10, norm = True, freeze_bb=True, freeze_tangler=False)
-    cr.add_step(step_type='cycle', epochs=20, adverse_alpha=1.0, lr=1e-3, restarts=10, norm = True, freeze_bb=True, freeze_tangler=False)
-    cr.add_step(step_type='cycle', epochs=20, adverse_alpha=1.0, lr=1e-3, restarts=10, norm = True, freeze_bb=True, freeze_tangler=False)
+    alpha += (100-len(alpha))*[1.0]
+    cr.add_step(step_type='cycle', epochs=100, adverse_alpha=alpha, lr=1e-3, restarts=25, norm = True, freeze_bb=True, freeze_tangler=False)
+    cr.add_step(step_type='cycle', epochs=20, adverse_alpha=1.0, lr=1e-4, restarts=20, norm = True, freeze_bb=True, freeze_tangler=False)
+    #cr.add_step(step_type='cycle', epochs=20, adverse_alpha=1.0, lr=1e-3, restarts=10, norm = True, freeze_bb=True, freeze_tangler=False)
     cr_trainer.train(trainset, valset, cr, batch_size=512)
