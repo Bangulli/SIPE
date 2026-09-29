@@ -1,0 +1,71 @@
+seed_everything: 42
+trainer:
+  accelerator: gpu
+  devices: 1
+  precision: 16-mixed
+  max_epochs: 50
+  log_every_n_steps: 25
+  default_root_dir: ./runs/cats
+  logger:
+    class_path: lightning.pytorch.loggers.WandbLogger
+    init_args:
+      project: cats
+      group: SCORPION
+      job_type: baseline
+      tags:
+        - baseline
+        - SCORPION
+      save_dir: ./wandb
+      # Upload checkpoints selected by ModelCheckpoint to W&B
+      log_model: false
+  callbacks:
+    - class_path: lightning.pytorch.callbacks.ModelCheckpoint
+      init_args:
+        dirpath: ./runs/cats/checkpoints
+        filename: "epoch={epoch:03d}-val_loss={val/loss:.4f}"
+        monitor: val/loss
+        mode: min
+        # Keep the best 3 + latest training state
+        save_top_k: 3
+        save_last: true
+        save_weights_only: false
+        # Important because the metric contains "/"
+        auto_insert_metric_name: false
+    - class_path: lightning.pytorch.callbacks.LearningRateMonitor
+      init_args:
+        logging_interval: step
+model:
+  network:
+    backbone_name: hf-hub:bioptimus/H0-mini
+    specified_dim: 64
+    unspecified_dim: 704
+    pretrained: true
+    output_size: 224
+  num_domains: 5
+  reconstruction_weight: 20.0
+  adversarial_weight: 1.0
+  specified_domain_weight: 1.0
+  unspecified_domain_weight: 1.0
+  grl_alpha: 1.0
+  grl_warmup_steps: 0
+  freeze_backbone: true
+  image_key: image
+  domain_key: domain
+optimizer:
+  class_path: torch.optim.AdamW
+  init_args:
+    lr: 3.0e-4
+    weight_decay: 1.0e-2
+data:
+  class_path: sipe.data.scorpion.SCORPIONDataModule
+  init_args:
+    data_root: data/processed/SCORPION_tiles_224px_0p5mpp
+    batch_size: 16
+    num_workers: 8
+    image_size: 224
+    domain_column: scanner
+    group_column: slide_id
+    val_fraction: 0.1
+    test_fraction: 0.1
+    pin_memory: true
+    persistent_workers: true

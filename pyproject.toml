@@ -24,7 +24,6 @@ dependencies = [
   "click>=8.5,<9",
   "pyyaml>=6,<7",
   "tqdm>=4.67,<5",
-
   # Scientific Python
   "numpy>=2.5,<3",
   "pandas>=3,<4",
@@ -34,15 +33,16 @@ dependencies = [
   "matplotlib>=3.10,<4",
   "pillow>=12,<13",
   "opencv-python>=4.13,<5",
-
   # Deep learning
   "torch>=2.14,<2.15",
   "torchvision>=0.29,<0.30",
+  "lightning>=2.6.6,<3",
   "timm>=1.0.29,<2",
   "transformers>=5.17,<6",
-
   # Metrics / losses
   "pytorch-msssim>=1,<2",
+  "wandb>=0.30.0",
+  "jsonargparse[signatures]>=4.27.7",
 ]
 
 
@@ -93,3 +93,6 @@ select = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[project.scripts]
+sipe = "sipe.cli:main"

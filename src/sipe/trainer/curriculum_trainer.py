@@ -1,38 +1,30 @@
-import copy
-import datetime
-import json
-import os
-import pathlib as pl
-from operator import itemgetter
+from __future__ import annotations
 
-import matplotlib.pyplot as plt
+import copy
+import json
+from pathlib import Path
+from typing import Any, Sequence
+
 import torch
-from BPTorch.utils import bptorch_collate
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 from torch.utils.data import DataLoader
-from tqdm import tqdm as ProgBar
 
-from sipe.losses.image_recon_loss import GAN_Loss
-from sipe.model.arch import H0_mini_for_Adversarial
 from sipe.utils.misc import make_name_from_list
 
 
 class Curriculum(list):
-    def __init__(self):
-        super().__init__()
-
     def add_step(
         self,
-        step_type="recon",
-        epochs=5,
-        adverse_alpha=0.1,
-        lr=3e-4,
-        restarts=5,
-        norm=True,
-        freeze_bb=True,
-        freeze_tangler=True,
-    ):
+        step_type: str = "recon",
+        epochs: int = 5,
+        adverse_alpha: float | Sequence[float] = 0.1,
+        lr: float = 3e-4,
+        restarts: int = 5,
+        norm: bool = True,
+        freeze_bb: bool = True,
+        freeze_tangler: bool = True,
+    ) -> None:
         self.append(
             {
                 "type": step_type,
@@ -46,511 +38,272 @@ class Curriculum(list):
             }
         )
 
-    def save(self, path):
-        with open(path, "w") as f:
+    def save(self, path: str | Path) -> None:
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("w") as f:
             json.dump(self, f, indent=4)
 
     @classmethod
-    def load(cls, path):
-        with open(path, "r") as f:
+    def load(cls, path: str | Path) -> "Curriculum":
+        with Path(path).open() as f:
             data = json.load(f)
+
         curriculum = cls()
         curriculum.extend(data)
         return curriculum
 
-    def extend(self, cr):
-        self += cr
-
 
 class CurriculumTrainer:
+    """Minimal trainer for the SIPE curriculum.
+
+    The trainer is intentionally agnostic to the dataset implementation.
+    It only receives PyTorch DataLoaders and expects batches compatible
+    with the SIPE model.
+    """
+
     def __init__(
         self,
-        model,
-        loss_recon,
-        loss_adverse,
-        loss_cycle=None,
-        wdir="trainer",
-        scheduler=CosineAnnealingWarmRestarts,
-        optim=AdamW,
-        device="cuda:1",
-    ):
-        self.wdir = pl.Path(wdir)
-        os.makedirs(self.wdir, exist_ok=True)
-        if isinstance(model, H0_mini_for_Adversarial):
-            self.model = model
-        elif isinstance(model, CurriculumTrainer):
-            print(f"Forking model from {model.wdir}")
-            self.model, epoch = model._load_pretrained()
-            with open(self.wdir / "NOTE.txt", "w") as f:
-                f.write(f"Forked from {model.wdir}, epoch {epoch}")
-        else:
-            raise ValueError(f"Got unsupported model object {type(model)}")
+        model: torch.nn.Module,
+        loss_recon: Any,
+        loss_adverse: Any,
+        loss_cycle: Any | None = None,
+        wdir: str | Path = "trainer",
+        scheduler_cls=CosineAnnealingWarmRestarts,
+        optimizer_cls=AdamW,
+        device: str | torch.device = "cuda",
+    ) -> None:
+        self.model = model
         self.loss_r = loss_recon
         self.loss_a = loss_adverse
         self.loss_c = loss_cycle
-        self.scheduler_base = scheduler
-        self.optim_base = optim
+
+        self.wdir = Path(wdir)
+        self.wdir.mkdir(parents=True, exist_ok=True)
+
+        self.scheduler_cls = scheduler_cls
+        self.optimizer_cls = optimizer_cls
+        self.device = torch.device(device)
+
+        self.optimizer = None
+        self.scheduler = None
         self.loss_history = {"training": [], "validation": []}
-        self.device = device
 
-    def _prep_wdir(self, pth):
-        pth = pl.Path(pth)
-        if os.path.exists(pth):
-            override = datetime.datetime.now().strftime(
-                r"trainer_from_%H:%M:%S-%d.%m.%y"
-            )
-            print(f"INFO: {pth} already exists, using {pth.parent / override} instead")
-            pth = pth.parent / override
-        os.mkdir(pth)
-        return pth
-
-    def _save_ckpt(self, ckpt_dir, epoch):
-        self.model.save(
-            self.wdir / ckpt_dir / f"ckpt_from_epoch_{epoch}", overwrite=True
-        )
-
-    def _plt_progress(self):
-        plt.plot(self.loss_history["training"], label="training loss")
-        plt.plot(self.loss_history["validation"], label="validation loss")
-        plt.ylabel("loss")
-        plt.xlabel("epoch")
-        plt.legend()
-        plt.title(f"Training/Validation loss per epoch")
-        plt.savefig(self.wdir / "training_losses.png")
-        plt.close()
-        plt.clf()
-
-    def _plt_batch_progress(self, batch_losses, ckpt_dir, epoch):
-        os.makedirs(self.wdir / ckpt_dir / f"ckpt_from_epoch_{epoch}", exist_ok=True)
-        plt.plot(batch_losses, label="training loss")
-        plt.ylabel("loss")
-        plt.xlabel("batch")
-        plt.legend()
-        plt.title(f"Training loss per batch")
-        plt.savefig(
-            self.wdir / ckpt_dir / f"ckpt_from_epoch_{epoch}/batched_losses.png"
-        )
-        plt.close()
-        plt.clf()
-
-    def _plt_individual_loss_progress(self, logger, ckpt_dir, epoch):
-        os.makedirs(self.wdir / ckpt_dir / f"ckpt_from_epoch_{epoch}", exist_ok=True)
-        [plt.plot(v, label=k) for k, v in logger.items() if any(v)]
-        plt.ylabel("loss")
-        plt.xlabel("batch")
-        plt.legend()
-        plt.title(f"Training loss per batch")
-        plt.tight_layout()
-        plt.savefig(
-            self.wdir
-            / ckpt_dir
-            / f"ckpt_from_epoch_{epoch}/batched_individual_losses.png"
-        )
-        plt.close()
-        plt.clf()
-        with open(
-            self.wdir
-            / ckpt_dir
-            / f"ckpt_from_epoch_{epoch}/batched_individual_losses.json",
-            "w",
-        ) as f:
-            json.dump(logger, f, indent=4)
-
-    def _save_history(self):
-        with open(self.wdir / "history.json", "w") as f:
-            json.dump(self.loss_history, f, indent=4)
-        # torch.save(self.optim, self.wdir/'optim.bin')
-        # torch.save(self.scheduler, self.wdir/'scheduler.bin')
-        # torch.save(self.loss, self.wdir/'loss.bin')
-
-    def load(self, ckpt_dir, ckpt):
-        if os.path.exists(self.wdir / "history.json"):
-            with open(self.wdir / "history.json", "r") as f:
-                self.loss_history = json.load(f)
-        self.model.load(self.wdir / ckpt_dir / f"ckpt_from_epoch_{ckpt}")
-
-    def train(self, train, val, curriculum, ckpt_dir="checkpoints", batch_size=32):
-        os.makedirs(self.wdir / ckpt_dir, exist_ok=True)
-
-        ## send perceptive loss to device
-        if isinstance(self.loss_a.image_recon_loss, GAN_Loss):
-            self.loss_a.image_recon_loss.to(self.device)
-        if isinstance(self.loss_c.image_recon_loss, GAN_Loss):
-            self.loss_c.image_recon_loss.to(self.device)
-        if isinstance(self.loss_r.image_recon_loss, GAN_Loss):
-            self.loss_r.image_recon_loss.to(self.device)
-
-        if not os.path.exists(self.wdir / ckpt_dir / "curriculum.json"):
-            curriculum.save(self.wdir / ckpt_dir / "curriculum.json")
-        else:
-            extended_cr = Curriculum.load(self.wdir / ckpt_dir / "curriculum.json")
-            extended_cr.extend(curriculum)
-            extended_cr.save(self.wdir / ckpt_dir / "curriculum.json")
-
-        if os.path.exists(self.wdir / "history.json"):
-            with open(self.wdir / "history.json", "r") as f:
-                self.loss_history = json.load(f)
-            self.model = self.load_model_at_epoch(-1)
-
-        train_loader = DataLoader(
-            train, batch_size, collate_fn=bptorch_collate, shuffle=True
-        )  ## needs pre extracted patches to run efficiently
-        val_loader = DataLoader(val, batch_size, collate_fn=bptorch_collate)
         self.model.to(self.device)
+        self._move_losses_to_device()
 
-        strt = (
-            len(
-                [
-                    d
-                    for d in os.listdir(self.wdir / ckpt_dir)
-                    if (self.wdir / ckpt_dir / d).is_dir()
-                ]
-            )
-            + 1
-        )
-        for i, step in enumerate(curriculum):
-            (
-                step_type,
-                epochs,
-                lr,
-                adverse_alpha,
-                restarts,
-                adv_norm,
-                freeze_bb,
-                freeze_tangler,
-            ) = itemgetter(
-                "type",
-                "epochs",
-                "lr",
-                "adverse_alpha",
-                "restarts",
-                "adverse_norm",
-                "freeze_backbone",
-                "freeze_tangler",
-            )(step)
-            self.optim = self.optim_base(self.model.parameters(), lr=lr)
-            self.scheduler = self.scheduler_base(self.optim, restarts)
-            self.model.freeze_backbone(freeze_bb)
-            self.model.freeze_or_unfreeze_disentangler(freeze_tangler)
-            if step_type.lower() == "recon":
-                self._train_recon(strt, epochs, train_loader, val_loader, ckpt_dir, i)
-            elif step_type.lower() == "adverse":
-                self._train_adverse(
-                    strt,
-                    epochs,
-                    train_loader,
-                    val_loader,
-                    ckpt_dir,
-                    adverse_alpha,
-                    adv_norm,
-                    i,
-                )
-            elif step_type.lower() == "cycle":
-                assert self.loss_c is not None, (
-                    "Can't train a cycle paradigm when no cycle loss function has been passed to the trainer."
-                )
-                self._train_cycle(
-                    strt,
-                    epochs,
-                    train_loader,
-                    val_loader,
-                    ckpt_dir,
-                    adverse_alpha,
-                    adv_norm,
-                    i,
-                )
-            else:
+    def train(
+        self,
+        train_loader: DataLoader,
+        val_loader: DataLoader,
+        curriculum: Curriculum,
+        ckpt_dir: str = "checkpoints",
+    ) -> dict[str, list[float]]:
+        checkpoint_dir = self.wdir / ckpt_dir
+        checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        curriculum.save(checkpoint_dir / "curriculum.json")
+
+        epoch = 0
+
+        for step_idx, step in enumerate(curriculum):
+            step_type = step["type"].lower()
+            epochs = step["epochs"]
+
+            if step_type not in {"recon", "adverse", "cycle"}:
                 raise ValueError(
-                    f"Allowed step types are [recon, adverse], but got {step_type.lower()} instead"
+                    f"Unknown curriculum step {step_type!r}; "
+                    "expected one of: recon, adverse, cycle"
                 )
-            strt += epochs
 
-    def _train_recon(self, strt, epochs, train_loader, val_loader, ckpt_dir, step):
-        ######### recon step ########################################################################
-        for epoch in range(strt, epochs + strt):
-            logger = {
-                "Recon Img": [],
-                "Stain probs2vec": [],
-                "InfoNCE Stain": [],
-                "InfoNCE Morph": [],
-                "Adversarial CE S": [],
-                "CE S": [],
-                "Adversarial CE O": [],
-                "CE O": [],
-                "Adversarial CE P": [],
-                "CE P": [],
-                "s std": [],
-                "s norm": [],
-            }
-            print(
-                f"---------------------- Step: {step} - {epoch}/{epochs + strt - 1} - Recon ----------------------"
+            if step_type == "cycle" and self.loss_c is None:
+                raise ValueError("A cycle step requires loss_cycle.")
+
+            self._configure_model(step)
+
+            self.optimizer = self.optimizer_cls(
+                (p for p in self.model.parameters() if p.requires_grad),
+                lr=step["lr"],
             )
-            with torch.enable_grad():
-                self.model.train()
-                batch_losses = []
-                for i, batch in enumerate(
-                    ProgBar(train_loader, desc=f"Training Batches")
-                ):
-                    self.optim.zero_grad()
-                    loss, logger = self.model.loss(
-                        batch, self.loss_r, logger, val=False
-                    )
-                    # print(f'Batch: {i} - Loss: {loss.item()}')
-                    batch_losses.append(loss.item())
-                    loss.backward()
-                    self.optim.step()
-                    if i % 20 == 0:
-                        self._save_ckpt(ckpt_dir, epoch)
-                        self._plt_batch_progress(batch_losses, ckpt_dir, epoch)
-                        self._plt_individual_loss_progress(logger, ckpt_dir, epoch)
+            self.scheduler = self.scheduler_cls(
+                self.optimizer,
+                T_0=step["restarts"],
+            )
+
+            alphas = self._expand_alpha(step["adverse_alpha"], epochs)
+
+            for local_epoch in range(epochs):
+                current_alpha = alphas[local_epoch]
+
+                if step_type in {"adverse", "cycle"}:
+                    loss_fn = self.loss_a if step_type == "adverse" else self.loss_c
+                    loss_fn.set_adverse_alpha(current_alpha)
+                    loss_fn.set_adverse_norm(step["adverse_norm"])
+
+                train_loss = self._run_epoch(
+                    train_loader,
+                    step_type=step_type,
+                    training=True,
+                )
+                val_loss = self._run_epoch(
+                    val_loader,
+                    step_type=step_type,
+                    training=False,
+                )
+
+                self.loss_history["training"].append(train_loss)
+                self.loss_history["validation"].append(val_loss)
 
                 self.scheduler.step()
-                self.loss_history["training"].append(
-                    sum(batch_losses) / len(batch_losses)
+                epoch += 1
+
+                print(
+                    f"step={step_idx} "
+                    f"type={step_type} "
+                    f"epoch={epoch} "
+                    f"train={train_loss:.6f} "
+                    f"val={val_loss:.6f}"
                 )
 
-                ## validation step
-            with torch.no_grad():
-                logger = {
-                    "Recon Img": [],
-                    "Stain probs2vec": [],
-                    "InfoNCE Stain": [],
-                    "InfoNCE Morph": [],
-                    "Adversarial CE S": [],
-                    "CE S": [],
-                    "Adversarial CE O": [],
-                    "CE O": [],
-                    "Adversarial CE P": [],
-                    "CE P": [],
-                    "s std": [],
-                    "s norm": [],
-                }
-                self.model.eval()
-                val_losses = []
-                for batch in ProgBar(val_loader, desc=f"Validating Batches"):
-                    loss, logger = self.model.loss(
-                        batch, self.loss_a, logger, val=True
-                    )  ## add validation flag because the adversarial loss breaks the logic, so its not evaluated.
-                    val_losses.append(loss.item())
-                self.loss_history["validation"].append(
-                    sum(val_losses) / len(val_losses)
+                self._save_checkpoint(checkpoint_dir, epoch)
+                self._save_history()
+
+        return self.loss_history
+
+    def _run_epoch(
+        self,
+        loader: DataLoader,
+        *,
+        step_type: str,
+        training: bool,
+    ) -> float:
+        self.model.train(training)
+
+        total_loss = 0.0
+        n_batches = 0
+
+        context = torch.enable_grad() if training else torch.no_grad()
+
+        with context:
+            for batch in loader:
+                if training:
+                    self.optimizer.zero_grad(set_to_none=True)
+
+                loss = self._compute_loss(
+                    batch,
+                    step_type=step_type,
+                    val=not training,
                 )
 
-            ## save checkpoint
-            self._save_ckpt(ckpt_dir, epoch)
-            self._save_history()
-            self._plt_progress()
+                if training:
+                    loss.backward()
+                    self.optimizer.step()
 
-    def _train_adverse(
-        self, strt, epochs, train_loader, val_loader, ckpt_dir, alpha, norm, step
+                total_loss += loss.detach().item()
+                n_batches += 1
+
+        if n_batches == 0:
+            raise RuntimeError("DataLoader yielded no batches.")
+
+        return total_loss / n_batches
+
+    def _compute_loss(
+        self,
+        batch: Any,
+        *,
+        step_type: str,
+        val: bool,
+    ) -> torch.Tensor:
+        logger = self._make_logger(step_type)
+
+        if step_type == "cycle":
+            loss, _ = self._compute_cycle_loss_for_batch(
+                batch,
+                logger=logger,
+                val=val,
+            )
+            return loss
+
+        if step_type == "adverse":
+            loss_fn = self.loss_a
+        else:
+            # Preserve the old trainer behaviour: reconstruction training used
+            # loss_r, while reconstruction validation used loss_a with val=True.
+            loss_fn = self.loss_a if val else self.loss_r
+
+        loss, _ = self.model.loss(
+            batch,
+            loss_fn,
+            logger,
+            val=val,
+        )
+        return loss
+
+    def _compute_cycle_loss_for_batch(
+        self,
+        batch: dict[str, Any],
+        logger: dict[str, list] | None = None,
+        val: bool = False,
     ):
-        ######### adversarial step ########################################################################
-        if type(alpha) != float:
-            assert len(alpha) == len(range(strt, epochs + strt)), (
-                "Size of alphas list has to match amount of epochs."
-            )
-        for i, epoch in enumerate(range(strt, epochs + strt)):
-            logger = {
-                "Recon Img": [],
-                "Stain probs2vec": [],
-                "InfoNCE Stain": [],
-                "InfoNCE Morph": [],
-                "Adversarial CE S": [],
-                "CE S": [],
-                "Adversarial CE O": [],
-                "CE O": [],
-                "Adversarial CE P": [],
-                "CE P": [],
-                "s std": [],
-                "s norm": [],
-            }
-            if type(alpha) == float:
-                self.loss_a.set_adverse_alpha(alpha)
-            else:
-                self.loss_a.set_adverse_alpha(alpha[i])
-            cur_alpha = alpha if type(alpha) == float else alpha[i]
-            self.loss_a.set_adverse_norm(norm)
-            print(
-                f"---------------------- Step: {step} - {epoch}/{epochs + strt - 1} - Adverse - Alpha: {cur_alpha:.2f} ----------------------"
-            )
-            with torch.enable_grad():
-                self.model.train()
-                batch_losses = []
-                for i, batch in enumerate(
-                    ProgBar(train_loader, desc=f"Training Batches")
-                ):
-                    self.optim.zero_grad()
-                    loss, logger = self.model.loss(
-                        batch, self.loss_a, logger, val=False
-                    )
-                    # print(f'Batch: {i} - Loss: {loss.item()}')
-                    batch_losses.append(loss.item())
-                    loss.backward()
-                    self.optim.step()
-                    if i % 20 == 0:
-                        self._save_ckpt(ckpt_dir, epoch)
-                        self._plt_batch_progress(batch_losses, ckpt_dir, epoch)
-                        self._plt_individual_loss_progress(logger, ckpt_dir, epoch)
-
-                self.scheduler.step()
-                self.loss_history["training"].append(
-                    sum(batch_losses) / len(batch_losses)
-                )
-
-            ## validation step
-            with torch.no_grad():
-                logger = {
-                    "Recon Img": [],
-                    "Stain probs2vec": [],
-                    "InfoNCE Stain": [],
-                    "InfoNCE Morph": [],
-                    "Adversarial CE S": [],
-                    "CE S": [],
-                    "Adversarial CE O": [],
-                    "CE O": [],
-                    "Adversarial CE P": [],
-                    "CE P": [],
-                    "s std": [],
-                    "s norm": [],
-                }
-                self.model.eval()
-                val_losses = []
-                for batch in ProgBar(val_loader, desc=f"Validating Batches"):
-                    loss, logger = self.model.loss(
-                        batch, self.loss_a, logger, val=True
-                    )  ## add validation flag because the adversarial loss breaks the logic, so its not evaluated.
-                    val_losses.append(loss.item())
-                self.loss_history["validation"].append(
-                    sum(val_losses) / len(val_losses)
-                )
-
-            ## save checkpoint
-            self._save_ckpt(ckpt_dir, epoch)
-            self._save_history()
-            self._plt_progress()
-
-    def _train_cycle(
-        self, strt, epochs, train_loader, val_loader, ckpt_dir, alpha, norm, step
-    ):
-        self.loss_c.to(self.device)
-        ######### recon step ########################################################################
-        for i, epoch in enumerate(range(strt, epochs + strt)):
-            logger = {
-                "Recon Img": [],
-                "S cycle": [],
-                "Z cycle": [],
-                "Adversarial CE S": [],
-                "CE S": [],
-                "Adversarial CE O": [],
-                "CE O": [],
-                "Adversarial CE P": [],
-                "CE P": [],
-            }
-            if type(alpha) == float:
-                self.loss_c.set_adverse_alpha(alpha)
-            else:
-                self.loss_c.set_adverse_alpha(alpha[i])
-            cur_alpha = alpha if type(alpha) == float else alpha[i]
-            self.loss_c.set_adverse_norm(norm)
-            print(
-                f"---------------------- Step: {step} - {epoch}/{epochs + strt - 1} - alpha: {cur_alpha:.2f} - Cycle ----------------------"
-            )
-            with torch.enable_grad():
-                self.model.train()
-                batch_losses = []
-                for i, batch in enumerate(
-                    ProgBar(train_loader, desc=f"Training Batches")
-                ):
-                    self.optim.zero_grad()
-
-                    loss, logger = self._compute_cycle_loss_for_batch(batch, logger)
-
-                    batch_losses.append(loss.item())
-                    loss.backward()
-                    self.optim.step()
-                    if i % 20 == 0:
-                        self._save_ckpt(ckpt_dir, epoch)
-                        self._plt_batch_progress(batch_losses, ckpt_dir, epoch)
-                        self._plt_individual_loss_progress(logger, ckpt_dir, epoch)
-
-                self.scheduler.step()
-                self.loss_history["training"].append(
-                    sum(batch_losses) / len(batch_losses)
-                )
-
-                ## validation step
-            with torch.no_grad():
-                logger = {
-                    "Recon Img": [],
-                    "S cycle": [],
-                    "Z cycle": [],
-                    "Adversarial CE S": [],
-                    "CE S": [],
-                    "Adversarial CE O": [],
-                    "CE O": [],
-                    "Adversarial CE P": [],
-                    "CE P": [],
-                }
-                self.model.eval()
-                val_losses = []
-                for batch in ProgBar(val_loader, desc=f"Validating Batches"):
-                    loss, logger = self._compute_cycle_loss_for_batch(
-                        batch, logger, True
-                    )
-                    val_losses.append(loss.item())
-                self.loss_history["validation"].append(
-                    sum(val_losses) / len(val_losses)
-                )
-
-            ## save checkpoint
-            self._save_ckpt(ckpt_dir, epoch)
-            self._save_history()
-            self._plt_progress()
-
-    def _compute_cycle_loss_for_batch(self, batch, logger=None, val=False):
-        ## encode initial batch
         batch1 = batch
+
+        # First pass.
         s1, z1 = self.model(batch1)
         recon1 = self.model.recon_image(s1, z1)
-        s1_class_s, z1_class_s, s1_class_o, z1_class_o, s1_class_p, z1_class_p = (
-            self.model.entangler.classify_all(s1, z1)
+
+        (
+            s1_class_s,
+            z1_class_s,
+            s1_class_o,
+            z1_class_o,
+            s1_class_p,
+            z1_class_p,
+        ) = self.model.entangler.classify_all(s1, z1)
+
+        # Mix specified representations across the batch.
+        s1_prime = torch.roll(s1, 1, dims=0)
+        metadata_prime = self._roll_list(
+            copy.deepcopy(batch1["metadata"]),
+            1,
         )
 
-        ## shift along the batch dimension to mix and specified/unspecified pairs and create second batch
-        s1_prime = torch.roll(s1, 1, 0)
-        meta_prime = self._roll_list(copy.deepcopy(batch1["metadata"]), 1)
         batch2 = {
             "image": self.model.recon_image(s1_prime, z1).detach(),
-            "metadata": meta_prime,
-        }  ## detach to avoid gradient flow through first pass
+            "metadata": metadata_prime,
+        }
 
-        ## encode second batch
+        # Second pass.
         s2, z2 = self.model(batch2)
+        s2_prime = torch.roll(s2, -1, dims=0)
 
-        ## unshift to re-establish correspondence
-        s2_prime = torch.roll(s2, -1, 0)
-
-        ## organize gts
-        gt_labels_s = torch.tensor(
-            self.model.transform_labels([s["staining"] for s in batch1["metadata"]]),
-            dtype=torch.float32,
-        )
-        gt_labels_o = torch.tensor(
-            self.transform_organs(
-                [make_name_from_list(s["organ"]) for s in batch["metadata"]]
+        gt_labels_s = torch.as_tensor(
+            self.model.transform_labels(
+                [sample["staining"] for sample in batch1["metadata"]]
             ),
             dtype=torch.float32,
+            device=self.device,
         )
-        gt_labels_p = torch.tensor(
-            self.transform_paths(
-                [make_name_from_list(s["diagnosis"]) for s in batch["metadata"]]
+
+        gt_labels_o = torch.as_tensor(
+            self.model.transform_organs(
+                [make_name_from_list(sample["organ"]) for sample in batch1["metadata"]]
             ),
             dtype=torch.float32,
+            device=self.device,
         )
 
-        gt_images = batch1["image"]
+        gt_labels_p = torch.as_tensor(
+            self.model.transform_paths(
+                [
+                    make_name_from_list(sample["diagnosis"])
+                    for sample in batch1["metadata"]
+                ]
+            ),
+            dtype=torch.float32,
+            device=self.device,
+        )
 
-        ## compute loss
+        gt_images = batch1["image"].to(self.device)
+
         return self.loss_c(
             gt_labels_s,
             gt_labels_o,
@@ -569,68 +322,145 @@ class CurriculumTrainer:
             z1_class_p,
             logger,
             val,
-        )  # , disc_gt, disc_rec)
+        )
 
-    def _roll_list(
-        self, lst, shifts
-    ):  ## Equivalent to torch.roll(tensor, shifts, dim=0)
-        if shifts > 0:
-            for idx in range(shifts):
-                lst.insert(0, lst.pop(-1))
-        else:
-            for idx in range(abs(shifts)):
-                lst.append(lst.pop(0))
-        return lst
+    def _configure_model(self, step: dict[str, Any]) -> None:
+        # These are SIPE model capabilities rather than concrete class checks.
+        if hasattr(self.model, "freeze_backbone"):
+            self.model.freeze_backbone(step["freeze_backbone"])
 
-    def load_best_model(self, ckpt_dir="checkpoints"):
-        if os.path.exists(self.wdir / "history.json"):
-            with open(self.wdir / "history.json", "r") as f:
-                self.loss_history = json.load(f)
-            values = self.loss_history["validation"]
-            best_epoch = (
-                min(range(len(values)), key=values.__getitem__) + 1
-            )  ## epochs are 1 based indexed.
-            print(
-                f"Best loss value of {values[best_epoch - 1]} was achieved at epoch {best_epoch}"
+        if hasattr(self.model, "freeze_or_unfreeze_disentangler"):
+            self.model.freeze_or_unfreeze_disentangler(step["freeze_tangler"])
+
+    def _move_losses_to_device(self) -> None:
+        for loss in (self.loss_r, self.loss_a, self.loss_c):
+            if loss is None:
+                continue
+
+            if isinstance(loss, torch.nn.Module):
+                loss.to(self.device)
+
+            image_recon_loss = getattr(loss, "image_recon_loss", None)
+            if isinstance(image_recon_loss, torch.nn.Module):
+                image_recon_loss.to(self.device)
+
+    @staticmethod
+    def _expand_alpha(
+        alpha: float | Sequence[float],
+        epochs: int,
+    ) -> list[float]:
+        if isinstance(alpha, (int, float)):
+            return [float(alpha)] * epochs
+
+        values = list(alpha)
+        if len(values) != epochs:
+            raise ValueError(
+                f"Expected {epochs} adverse_alpha values, got {len(values)}."
             )
-            self.load(ckpt_dir, best_epoch)
-            return self.model
-        elif os.path.exists(self.wdir / ckpt_dir / "ckpt_from_epoch_1"):
-            print(f"Cant find loss history but falling back to available checkpoint")
-            self.load(ckpt_dir, 1)
-            return self.model
-        else:
-            raise RuntimeError("No loss history found to infer the best model from")
+        return [float(value) for value in values]
 
-    def load_model_at_epoch(self, epoch, ckpt_dir="checkpoints"):
-        if epoch > -1:
-            self.load(ckpt_dir, epoch)
-            return self.model
-        else:
-            with open(self.wdir / "history.json", "r") as f:
-                self.loss_history = json.load(f)
-            epoch = len(self.loss_history["validation"])
-            print("Loading latest model from epoch", epoch)
-            self.load(ckpt_dir, epoch)
-            return self.model
+    @staticmethod
+    def _roll_list(items: list[Any], shifts: int) -> list[Any]:
+        if not items:
+            return items
 
-    def _load_pretrained(self, ckpt_dir="checkpoints"):
-        if os.path.exists(self.wdir / "history.json"):
-            with open(self.wdir / "history.json", "r") as f:
-                self.loss_history = json.load(f)
-            values = self.loss_history["validation"]
-            best_epoch = (
-                min(range(len(values)), key=values.__getitem__) + 1
-            )  ## epochs are 1 based indexed.
-            print(
-                f"Best loss value of {values[best_epoch - 1]} was achieved at epoch {best_epoch}"
-            )
-            self.load(ckpt_dir, best_epoch)
-            return self.model, best_epoch
-        elif os.path.exists(self.wdir / ckpt_dir / "ckpt_from_epoch_1"):
-            print(f"Cant find loss history but falling back to available checkpoint")
-            self.load(ckpt_dir, 1)
-            return self.model, 1
-        else:
-            raise RuntimeError("No loss history found to infer the best model from")
+        shifts %= len(items)
+        return items[-shifts:] + items[:-shifts]
 
+    @staticmethod
+    def _make_logger(step_type: str) -> dict[str, list]:
+        if step_type == "cycle":
+            keys = [
+                "Recon Img",
+                "S cycle",
+                "Z cycle",
+                "Adversarial CE S",
+                "CE S",
+                "Adversarial CE O",
+                "CE O",
+                "Adversarial CE P",
+                "CE P",
+            ]
+        else:
+            keys = [
+                "Recon Img",
+                "Stain probs2vec",
+                "InfoNCE Stain",
+                "InfoNCE Morph",
+                "Adversarial CE S",
+                "CE S",
+                "Adversarial CE O",
+                "CE O",
+                "Adversarial CE P",
+                "CE P",
+                "s std",
+                "s norm",
+            ]
+
+        return {key: [] for key in keys}
+
+    def _save_checkpoint(self, checkpoint_dir: Path, epoch: int) -> None:
+        checkpoint = {
+            "epoch": epoch,
+            "model": self.model.state_dict(),
+            "optimizer": self.optimizer.state_dict() if self.optimizer else None,
+            "scheduler": self.scheduler.state_dict() if self.scheduler else None,
+            "loss_history": self.loss_history,
+        }
+        torch.save(
+            checkpoint,
+            checkpoint_dir / f"epoch_{epoch:04d}.pt",
+        )
+
+    def load_checkpoint(
+        self,
+        path: str | Path,
+        *,
+        load_optimizer: bool = False,
+    ) -> int:
+        checkpoint = torch.load(
+            path,
+            map_location=self.device,
+            weights_only=False,
+        )
+
+        self.model.load_state_dict(checkpoint["model"])
+        self.loss_history = checkpoint.get(
+            "loss_history",
+            {"training": [], "validation": []},
+        )
+
+        if load_optimizer:
+            if self.optimizer is None or self.scheduler is None:
+                raise RuntimeError(
+                    "Optimizer and scheduler must be initialized before "
+                    "loading their state."
+                )
+
+            if checkpoint.get("optimizer") is not None:
+                self.optimizer.load_state_dict(checkpoint["optimizer"])
+
+            if checkpoint.get("scheduler") is not None:
+                self.scheduler.load_state_dict(checkpoint["scheduler"])
+
+        return int(checkpoint["epoch"])
+
+    def _save_history(self) -> None:
+        with (self.wdir / "history.json").open("w") as f:
+            json.dump(self.loss_history, f, indent=4)
+
+    def load_best_model(
+        self,
+        ckpt_dir: str = "checkpoints",
+    ) -> torch.nn.Module:
+        values = self.loss_history["validation"]
+        if not values:
+            raise RuntimeError("No validation history available.")
+
+        best_epoch = min(
+            range(1, len(values) + 1),
+            key=lambda epoch: values[epoch - 1],
+        )
+
+        self.load_checkpoint(self.wdir / ckpt_dir / f"epoch_{best_epoch:04d}.pt")
+        return self.model

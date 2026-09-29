@@ -1,17 +1,11 @@
 import json
-import os
-import time
 import warnings
 
-import numpy as np
-import torch
-import torchvision.transforms as T
 from BPTorch.datasets import BigPictureRepository, WsiDicomDataset
 
-from src.losses.loss_fusion import SIPE_Loss_Adversarial, SIPE_Loss_Adversarial_Cycle
-from src.model.arch import H0_mini_for_Adversarial
-from src.trainer.curriculum_trainer import Curriculum, CurriculumTrainer
-from src.trainer.trainer import Trainer
+from sipe.losses.loss_fusion import SIPE_Loss_Adversarial, SIPE_Loss_Adversarial_Cycle
+from sipe.model.arch import H0_mini_for_Adversarial
+from sipe.trainer.curriculum_trainer import Curriculum, CurriculumTrainer
 
 warnings.filterwarnings("ignore")
 
