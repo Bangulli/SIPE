@@ -4,7 +4,7 @@ from torch import nn
 
 
 class AdversarialClassifLoss(nn.Module):
-    def __init__(self, testmode, norm=True, logkey="S"):
+    def __init__(self, testmode=False, norm=True, logkey="S"):
         super().__init__()
         self.testmode = testmode
         self.norm = norm
@@ -51,4 +51,3 @@ class AdversarialClassifLoss(nn.Module):
 
     def set_norm(self, norm):
         self.norm = norm
-

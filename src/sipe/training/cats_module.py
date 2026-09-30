@@ -1,72 +1,63 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
 from typing import Any
 
 import lightning as L
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 
+from sipe.losses.adversarial_classif_loss import AdversarialClassifLoss
+from sipe.losses.image_recon_loss import ImageReconLoss
 from sipe.model.arch import CATS
-from sipe.training.grl import GradientReversal
+
+from .curriculum import CurriculumPhase, StepCurriculum
+from .grl import GradientReversal
 
 
 class CATSModule(L.LightningModule):
-    """Lightning training wrapper for CATS.
+    """Step-based Lightning port of the legacy CATS curriculum trainer.
 
-    The architecture owns only representation/reconstruction modules.
-    This wrapper owns all training-specific components:
-
-    - specified-domain classifier on s
-    - patch-wise domain classifier on z
-    - gradient reversal on z
-    - reconstruction/adversarial objectives
-    - GRL scheduling and logging
-
-    Batch contract
-    --------------
-    By default a batch must be a mapping containing:
-
-        {
-            "image": Tensor[B, C, H, W],
-            "domain": LongTensor[B],
-        }
-
-    ``image_key`` and ``domain_key`` can be changed from the CLI.
+    The original stain branch is adapted to one SCORPION scanner/domain branch.
+    The original organ/pathology heads are intentionally not reintroduced.
     """
 
     def __init__(
         self,
         network: CATS,
         num_domains: int,
-        reconstruction_weight: float = 20.0,
-        adversarial_weight: float = 1.0,
-        specified_domain_weight: float = 1.0,
-        unspecified_domain_weight: float = 1.0,
+        curriculum: list[dict[str, Any]],
         grl_alpha: float = 1.0,
-        grl_warmup_steps: int = 0,
-        freeze_backbone: bool = True,
         image_key: str = "image",
         domain_key: str = "domain",
+        recon_phase_reconstruction_weight: float = 1.0,
+        adverse_phase_reconstruction_weight: float = 1.0,
+        cycle_phase_reconstruction_weight: float = 20.0,
+        cycle_s_weight: float = 1.0,
+        cycle_z_weight: float = 0.5,
+        freeze_backbone: bool = False,
     ) -> None:
         super().__init__()
 
-        if num_domains < 2:
-            raise ValueError("num_domains must be at least 2.")
-        if reconstruction_weight < 0:
-            raise ValueError("reconstruction_weight must be non-negative.")
-        if adversarial_weight < 0:
-            raise ValueError("adversarial_weight must be non-negative.")
-        if specified_domain_weight < 0 or unspecified_domain_weight < 0:
-            raise ValueError("Domain-loss weights must be non-negative.")
-        if grl_alpha < 0:
-            raise ValueError("grl_alpha must be non-negative.")
-        if grl_warmup_steps < 0:
-            raise ValueError("grl_warmup_steps must be non-negative.")
-
         self.network = network
         self.num_domains = int(num_domains)
+        self.image_key = image_key
+        self.domain_key = domain_key
+
+        self.curriculum = StepCurriculum(curriculum)
+
+        self.recon_phase_reconstruction_weight = float(
+            recon_phase_reconstruction_weight
+        )
+        self.adverse_phase_reconstruction_weight = float(
+            adverse_phase_reconstruction_weight
+        )
+        self.cycle_phase_reconstruction_weight = float(
+            cycle_phase_reconstruction_weight
+        )
+        self.cycle_s_weight = float(cycle_s_weight)
+        self.cycle_z_weight = float(cycle_z_weight)
 
         self.specified_classifier = nn.Linear(
             network.specified_dim,
@@ -78,213 +69,450 @@ class CATSModule(L.LightningModule):
         )
         self.grl = GradientReversal(alpha=grl_alpha)
 
-        self.reconstruction_weight = float(reconstruction_weight)
-        self.adversarial_weight = float(adversarial_weight)
-        self.specified_domain_weight = float(specified_domain_weight)
-        self.unspecified_domain_weight = float(unspecified_domain_weight)
-        self.grl_alpha = float(grl_alpha)
-        self.grl_warmup_steps = int(grl_warmup_steps)
-        self.freeze_backbone_flag = bool(freeze_backbone)
+        # Reuse the old SIPE losses instead of approximating them.
+        self.image_recon_loss = ImageReconLoss()
+        self.domain_classif_loss = AdversarialClassifLoss(logkey="S")
 
-        self.image_key = image_key
-        self.domain_key = domain_key
+        self._active_phase_idx = -1
+        self._phase_scheduler: CosineAnnealingWarmRestarts | None = None
 
-        if self.freeze_backbone_flag:
-            self.network.freeze_backbone(True)
-
-        # LightningCLI saves the full object graph/config separately. Avoid
-        # serializing the nn.Module instance as a hyperparameter.
         self.save_hyperparameters(ignore=["network"])
+        if freeze_backbone:
+            self.network.freeze_backbone()
+
+    @property
+    def total_curriculum_steps(self) -> int:
+        return self.curriculum.total_steps
 
     def forward(self, images: torch.Tensor) -> dict[str, torch.Tensor]:
-        """Inference-facing forward: no adversarial heads are applied."""
         return self.network(images)
 
-    def encode(
+    def on_fit_start(self) -> None:
+        if self.trainer.max_steps not in (-1, self.curriculum.total_steps):
+            self.print(
+                f"WARNING: trainer.max_steps={self.trainer.max_steps}, "
+                f"curriculum={self.curriculum.total_steps} steps."
+            )
+
+    def on_train_batch_start(
         self,
-        images: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        return self.network.encode(images)
+        batch: dict[str, Any],
+        batch_idx: int,
+    ) -> None:
+        del batch, batch_idx
 
-    def _current_grl_alpha(self) -> float:
-        if self.grl_warmup_steps == 0:
-            return self.grl_alpha
+        phase_idx, phase, local_step = self.curriculum.at(int(self.global_step))
+        if phase_idx != self._active_phase_idx:
+            self._activate_phase(
+                phase_idx=phase_idx,
+                phase=phase,
+                local_step=local_step,
+            )
 
-        progress = min(
-            1.0,
-            float(self.global_step) / float(self.grl_warmup_steps),
-        )
-        return self.grl_alpha * progress
-
-    def _domain_logits(
+    def on_train_batch_end(
         self,
-        s: torch.Tensor,
-        z: torch.Tensor,
+        outputs: Any,
+        batch: dict[str, Any],
+        batch_idx: int,
+    ) -> None:
+        del outputs, batch, batch_idx
+
+        if self._phase_scheduler is None or self._active_phase_idx < 0:
+            return
+
+        phase = self.curriculum.phases[self._active_phase_idx]
+        phase_start = self.curriculum.phase_start(self._active_phase_idx)
+
+        # global_step has advanced after optimizer.step().  Set the LR that will
+        # be used for the next optimizer update, preserving the legacy
+        # optimizer.step(); scheduler.step() ordering.
+        completed_steps = int(self.global_step) - phase_start
+        if completed_steps < phase.steps:
+            self._phase_scheduler.step(completed_steps)
+
+    def on_train_epoch_start(self) -> None:
+        if self._active_phase_idx < 0:
+            return
+
+        phase = self.curriculum.phases[self._active_phase_idx]
+        if phase.freeze_backbone:
+            self.network.backbone.eval()
+        if phase.freeze_tangler:
+            self._set_tangler_mode(train=False)
+
+    def training_step(
+        self,
+        batch: dict[str, Any],
+        batch_idx: int,
+    ) -> torch.Tensor:
+        del batch_idx
+        return self._shared_step(batch, stage="train")["loss"]
+
+    def validation_step(
+        self,
+        batch: dict[str, Any],
+        batch_idx: int,
+    ) -> None:
+        del batch_idx
+        self._shared_step(batch, stage="val")
+
+    def test_step(
+        self,
+        batch: dict[str, Any],
+        batch_idx: int,
+    ) -> None:
+        del batch_idx
+        self._shared_step(batch, stage="test")
+
+    def predict_step(
+        self,
+        batch: dict[str, Any],
+        batch_idx: int,
+        dataloader_idx: int = 0,
+    ) -> dict[str, torch.Tensor]:
+        del batch_idx, dataloader_idx
+        return self.network(batch[self.image_key])
+
+    def _activate_phase(
+        self,
         *,
-        grl_alpha: float,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Return sample-wise logits from s and patch-wise logits from z."""
-        logits_s = self.specified_classifier(s)
+        phase_idx: int,
+        phase: CurriculumPhase,
+        local_step: int,
+    ) -> None:
+        optimizer = self.optimizers(use_pl_optimizer=False)
 
-        # [B, C, H, W] -> [B, H*W, C]
-        z_tokens = z.flatten(2).transpose(1, 2)
-        z_reversed = self.grl(z_tokens, alpha=grl_alpha)
-        logits_z = self.unspecified_classifier(z_reversed)
+        # Legacy trainer constructed a fresh AdamW at every phase.
+        # Clearing Adam state reproduces this without replacing Lightning's
+        # optimizer object. Do not clear on a mid-phase checkpoint resume.
+        if phase.reset_optimizer_state and phase_idx > 0 and local_step == 0:
+            optimizer.state.clear()
 
-        return logits_s, logits_z
+        self._set_backbone_frozen(phase.freeze_backbone)
+        self._set_tangler_frozen(phase.freeze_tangler)
 
-    def _unpack_batch(
-        self,
-        batch: Mapping[str, Any],
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        if not isinstance(batch, Mapping):
-            raise TypeError(
-                f"CATSModule expects a mapping batch. Got {type(batch).__name__}."
+        for group in optimizer.param_groups:
+            group["lr"] = phase.lr
+            group["initial_lr"] = phase.lr
+
+        if phase.restart_steps is None:
+            self._phase_scheduler = None
+        else:
+            self._phase_scheduler = CosineAnnealingWarmRestarts(
+                optimizer,
+                T_0=phase.restart_steps,
             )
+            if local_step > 0:
+                self._phase_scheduler.step(local_step)
 
-        try:
-            images = batch[self.image_key]
-            domains = batch[self.domain_key]
-        except KeyError as exc:
-            raise KeyError(
-                f"Batch must contain {self.image_key!r} and {self.domain_key!r}. "
-                f"Available keys: {tuple(batch.keys())}."
-            ) from exc
+        self.domain_classif_loss.set_norm(phase.adverse_norm)
+        self._active_phase_idx = phase_idx
 
-        if not isinstance(images, torch.Tensor):
-            raise TypeError(f"{self.image_key!r} must be a torch.Tensor.")
-        if not isinstance(domains, torch.Tensor):
-            domains = torch.as_tensor(domains, device=images.device)
-
-        # Allow [B, 1] as a convenience, but keep the task explicitly
-        # single-label categorical.
-        if domains.ndim == 2 and domains.shape[1] == 1:
-            domains = domains[:, 0]
-        if domains.ndim != 1:
-            raise ValueError(
-                f"{self.domain_key!r} must have shape [B] (integer class ids), "
-                f"got {tuple(domains.shape)}."
-            )
-
-        return images, domains.long()
+        self.print(
+            f"Curriculum phase {phase_idx}: {phase.name} "
+            f"(mode={phase.mode}, global_step={self.global_step}, "
+            f"local_step={local_step}, lr={phase.lr})"
+        )
 
     def _shared_step(
         self,
-        batch: Mapping[str, Any],
-        *,
+        batch: dict[str, Any],
         stage: str,
-    ) -> torch.Tensor:
+    ) -> dict[str, torch.Tensor]:
         images, domains = self._unpack_batch(batch)
+        phase_idx, phase, local_step = self._phase_for_stage(stage)
+        alpha = phase.alpha_at(local_step)
 
         outputs = self.network(images)
-        s = outputs["s"]
-        z = outputs["z"]
+        s1 = outputs["s"]
+        z1 = outputs["z"]
         reconstruction = outputs["reconstruction"]
 
-        alpha = self._current_grl_alpha()
-        logits_s, logits_z = self._domain_logits(
-            s,
-            z,
-            grl_alpha=alpha,
+        reconstruction_loss = self.image_recon_loss(
+            reconstruction,
+            images,
         )
 
-        reconstruction_loss = F.mse_loss(reconstruction, images)
+        zero = reconstruction_loss.new_zeros(())
+        domain_loss = zero
+        cycle_s_l1 = zero
+        cycle_z_l1 = zero
+        cycle_s_loss = zero
+        cycle_z_loss = zero
 
-        specified_domain_loss = F.cross_entropy(
-            logits_s,
-            domains,
-        )
+        if phase.mode == "recon":
+            # SIPE_Loss_Adversarial(recon_mode=True)
+            loss = self.recon_phase_reconstruction_weight * reconstruction_loss
 
-        batch_size, num_patches, _ = logits_z.shape
-        patch_domains = domains[:, None].expand(batch_size, num_patches).reshape(-1)
-        unspecified_domain_loss = F.cross_entropy(
-            logits_z.reshape(-1, self.num_domains),
-            patch_domains,
-        )
+        elif phase.mode == "adverse":
+            domain_loss = self._domain_loss(
+                s=s1,
+                z=z1,
+                domains=domains,
+                alpha=alpha,
+                norm=phase.adverse_norm,
+                val=stage != "train",
+            )
+            loss = (
+                self.adverse_phase_reconstruction_weight * reconstruction_loss
+                + domain_loss
+            )
 
-        adversarial_loss = (
-            self.specified_domain_weight * specified_domain_loss
-            + self.unspecified_domain_weight * unspecified_domain_loss
-        )
+        elif phase.mode == "cycle":
+            cycle_s_l1, cycle_z_l1 = self._cycle_losses(
+                s1=s1,
+                z1=z1,
+            )
+            cycle_s_loss = self.cycle_s_weight * cycle_s_l1
+            cycle_z_loss = self.cycle_z_weight * cycle_z_l1
 
-        loss = (
-            self.reconstruction_weight * reconstruction_loss
-            + self.adversarial_weight * adversarial_loss
-        )
+            domain_loss = self._domain_loss(
+                s=s1,
+                z=z1,
+                domains=domains,
+                alpha=alpha,
+                norm=phase.adverse_norm,
+                val=stage != "train",
+            )
 
-        specified_accuracy = (logits_s.argmax(dim=-1) == domains).float().mean()
+            # SIPE_Loss_Adversarial_Cycle:
+            #   20 * recon + S_cycle + 0.5 * Z_cycle + adversarial losses
+            loss = (
+                self.cycle_phase_reconstruction_weight * reconstruction_loss
+                + cycle_s_loss
+                + cycle_z_loss
+                + domain_loss
+            )
+        else:
+            raise RuntimeError(f"Unsupported phase mode: {phase.mode}")
 
-        unspecified_accuracy = (
-            (logits_z.argmax(dim=-1).reshape(-1) == patch_domains).float().mean()
+        domain_s_acc, domain_z_acc = self._domain_accuracies(
+            s=s1,
+            z=z1,
+            domains=domains,
         )
 
         metrics = {
-            f"{stage}/loss": loss,
             f"{stage}/reconstruction_loss": reconstruction_loss,
-            f"{stage}/domain_s_loss": specified_domain_loss,
-            f"{stage}/domain_z_loss": unspecified_domain_loss,
-            f"{stage}/domain_s_acc": specified_accuracy,
-            f"{stage}/domain_z_acc": unspecified_accuracy,
+            f"{stage}/domain_loss": domain_loss,
+            f"{stage}/domain_s_acc": domain_s_acc,
+            f"{stage}/domain_z_acc": domain_z_acc,
+            f"{stage}/cycle_s_l1": cycle_s_l1,
+            f"{stage}/cycle_z_l1": cycle_z_l1,
+            f"{stage}/cycle_s_loss": cycle_s_loss,
+            f"{stage}/cycle_z_loss": cycle_z_loss,
+            f"{stage}/s_abs_mean": s1.abs().mean(),
+            f"{stage}/z_abs_mean": z1.abs().mean(),
+            f"{stage}/s_std": s1.std(),
+            f"{stage}/z_std": z1.std(),
         }
 
         self.log_dict(
             metrics,
             on_step=stage == "train",
             on_epoch=True,
-            prog_bar=stage != "train",
-            sync_dist=True,
+            prog_bar=False,
+            batch_size=images.shape[0],
+        )
+        self.log(
+            f"{stage}/loss",
+            loss,
+            on_step=stage == "train",
+            on_epoch=True,
+            prog_bar=True,
             batch_size=images.shape[0],
         )
 
         if stage == "train":
+            optimizer = self.optimizers(use_pl_optimizer=False)
             self.log(
-                "train/grl_alpha",
-                alpha,
+                "train/curriculum_phase",
+                float(phase_idx),
                 on_step=True,
                 on_epoch=False,
-                prog_bar=False,
-                sync_dist=False,
-                batch_size=images.shape[0],
+            )
+            self.log(
+                "train/adverse_alpha",
+                float(alpha),
+                on_step=True,
+                on_epoch=False,
+            )
+            self.log(
+                "train/lr",
+                float(optimizer.param_groups[0]["lr"]),
+                on_step=True,
+                on_epoch=False,
             )
 
-        return loss
+        return {
+            "loss": loss,
+            "reconstruction_loss": reconstruction_loss,
+            "domain_loss": domain_loss,
+            "cycle_s_loss": cycle_s_loss,
+            "cycle_z_loss": cycle_z_loss,
+        }
 
-    def training_step(
+    def _cycle_losses(
         self,
-        batch: Mapping[str, Any],
-        batch_idx: int,
+        *,
+        s1: torch.Tensor,
+        z1: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        if s1.shape[0] < 2:
+            raise RuntimeError("Cycle training requires a batch size of at least 2.")
+
+        # Exact graph from legacy CurriculumTrainer:
+        # roll s -> reconstruct -> detach reconstructed image -> re-encode.
+        s1_prime = torch.roll(s1, shifts=1, dims=0)
+        mixed_images = self.network.decode(s1_prime, z1).detach()
+
+        s2, z2 = self.network.encode(mixed_images)
+        s2_prime = torch.roll(s2, shifts=-1, dims=0)
+
+        # s1/z1 are deliberately NOT detached here.
+        return (
+            F.l1_loss(s2_prime, s1),
+            F.l1_loss(z2, z1),
+        )
+
+    def _domain_logits(
+        self,
+        *,
+        s: torch.Tensor,
+        z: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        specified_logits = self.specified_classifier(s)
+
+        # Match legacy Entangler.classify_all: flatten all z patches and apply
+        # gradient reversal before the unspecified classifier.
+        z_tokens = z.permute(0, 2, 3, 1).reshape(
+            -1,
+            self.network.unspecified_dim,
+        )
+        unspecified_logits = self.unspecified_classifier(self.grl(z_tokens))
+        return specified_logits, unspecified_logits
+
+    def _domain_loss(
+        self,
+        *,
+        s: torch.Tensor,
+        z: torch.Tensor,
+        domains: torch.Tensor,
+        alpha: float,
+        norm: bool,
+        val: bool,
     ) -> torch.Tensor:
-        del batch_idx
-        return self._shared_step(batch, stage="train")
+        specified_logits, unspecified_logits = self._domain_logits(
+            s=s,
+            z=z,
+        )
 
-    def validation_step(
+        # Old code fed MultiLabelBinarizer vectors. Scanner IDs are mutually
+        # exclusive, so one-hot vectors are the SCORPION analogue.
+        targets = F.one_hot(
+            domains,
+            num_classes=self.num_domains,
+        ).to(dtype=specified_logits.dtype)
+
+        self.domain_classif_loss.set_norm(norm)
+        legacy_logger = {
+            "Adversarial CE S": [],
+            "CE S": [],
+        }
+
+        domain_loss, _ = self.domain_classif_loss(
+            specified_logits,
+            unspecified_logits,
+            targets,
+            self.device,
+            legacy_logger,
+            val,
+            alpha,
+        )
+        return domain_loss
+
+    @torch.no_grad()
+    def _domain_accuracies(
         self,
-        batch: Mapping[str, Any],
-        batch_idx: int,
-    ) -> torch.Tensor:
-        del batch_idx
-        return self._shared_step(batch, stage="val")
+        *,
+        s: torch.Tensor,
+        z: torch.Tensor,
+        domains: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        specified_logits = self.specified_classifier(s.detach())
 
-    def test_step(
+        z_tokens = (
+            z.detach()
+            .permute(0, 2, 3, 1)
+            .reshape(
+                -1,
+                self.network.unspecified_dim,
+            )
+        )
+        unspecified_logits = self.unspecified_classifier(z_tokens)
+
+        specified_accuracy = (specified_logits.argmax(dim=-1) == domains).float().mean()
+
+        patch_targets = (
+            domains[:, None]
+            .expand(
+                -1,
+                z.shape[-2] * z.shape[-1],
+            )
+            .reshape(-1)
+        )
+
+        unspecified_accuracy = (
+            (unspecified_logits.argmax(dim=-1) == patch_targets).float().mean()
+        )
+
+        return specified_accuracy, unspecified_accuracy
+
+    def _phase_for_stage(
         self,
-        batch: Mapping[str, Any],
-        batch_idx: int,
-    ) -> torch.Tensor:
-        del batch_idx
-        return self._shared_step(batch, stage="test")
+        stage: str,
+    ) -> tuple[int, CurriculumPhase, int]:
+        step = int(self.global_step)
+        if stage == "train":
+            return self.curriculum.at(step)
 
-    def predict_step(
+        # Validation can happen immediately after the last update of a phase.
+        return self.curriculum.at(max(step - 1, 0))
+
+    def _unpack_batch(
         self,
-        batch: Mapping[str, Any],
-        batch_idx: int,
-        dataloader_idx: int = 0,
-    ) -> dict[str, torch.Tensor]:
-        del batch_idx, dataloader_idx
-        images, _ = self._unpack_batch(batch)
-        return self.network(images)
+        batch: dict[str, Any],
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        images = batch[self.image_key]
+        domains = batch[self.domain_key]
+        if domains.ndim > 1:
+            domains = domains.squeeze(-1)
+        return images, domains.long()
 
-    def on_train_epoch_start(self) -> None:
-        # Trainer calls .train() recursively. Put a frozen backbone back into
-        # eval mode so dropout/normalization state, if any, also stays frozen.
-        if self.freeze_backbone_flag:
-            self.network.backbone.eval()
+    def _set_backbone_frozen(self, freeze: bool) -> None:
+        for parameter in self.network.backbone.parameters():
+            parameter.requires_grad_(not freeze)
+        self.network.backbone.train(not freeze)
+
+    def _set_tangler_frozen(self, freeze: bool) -> None:
+        # Legacy entangler = disentangler + classifiers + re-entangler.
+        modules: list[nn.Module] = [
+            self.network.disentangler,
+            self.network.reentangler,
+            self.specified_classifier,
+            self.unspecified_classifier,
+        ]
+        for module in modules:
+            for parameter in module.parameters():
+                parameter.requires_grad_(not freeze)
+        self._set_tangler_mode(train=not freeze)
+
+    def _set_tangler_mode(self, *, train: bool) -> None:
+        modules: list[nn.Module] = [
+            self.network.disentangler,
+            self.network.reentangler,
+            self.specified_classifier,
+            self.unspecified_classifier,
+        ]
+        for module in modules:
+            module.train(train)

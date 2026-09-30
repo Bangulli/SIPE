@@ -215,5 +215,8 @@ class CATS(nn.Module):
             "reconstruction": reconstruction,
         }
 
-    def freeze_backbone(self, freeze: bool = True) -> None:
-        self.backbone.requires_grad_(not freeze)
+    def freeze_backbone(self) -> None:
+        self.backbone.requires_grad_(False)
+
+    def unfreeze_backbone(self) -> None:
+        self.backbone.requires_grad_(True)

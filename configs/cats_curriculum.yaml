@@ -1,0 +1,121 @@
+seed_everything: 42
+trainer:
+  accelerator: gpu
+  devices: 1
+  precision: 16-mixed
+  # The curriculum below contains 5k + 100k + 20k optimizer steps.
+  max_epochs: -1
+  max_steps: 125000
+  # Step-based validation rather than epoch-based validation.
+  check_val_every_n_epoch: null
+  val_check_interval: 500
+  log_every_n_steps: 25
+  default_root_dir: ./runs/cats
+  logger:
+    class_path: lightning.pytorch.loggers.WandbLogger
+    init_args:
+      project: cats
+      group: SCORPION
+      job_type: baseline
+      tags:
+        - baseline
+        - SCORPION
+      save_dir: ./wandb
+      log_model: false
+  callbacks:
+    - class_path: lightning.pytorch.callbacks.ModelCheckpoint
+      init_args:
+        dirpath: ./runs/cats/checkpoints
+        filename: "step={step:07d}-val_loss={val/loss:.4f}"
+        monitor: val/loss
+        mode: min
+        save_top_k: 3
+        save_last: true
+        save_weights_only: false
+        auto_insert_metric_name: false
+    - class_path: lightning.pytorch.callbacks.LearningRateMonitor
+      init_args:
+        logging_interval: step
+model:
+  network:
+    backbone_name: hf-hub:bioptimus/H0-mini
+    specified_dim: 64
+    unspecified_dim: 704
+    pretrained: true
+    output_size: 224
+  num_domains: 5
+  reconstruction_weight: 20.0
+  adversarial_weight: 1.0
+  specified_domain_weight: 1.0
+  unspecified_domain_weight: 1.0
+  cycle_weight: 1.0
+  # The legacy trainer shows how the cycle is wired, but the actual latent
+  # distance is defined in SIPE_Loss_Adversarial_Cycle, not in the trainer.
+  # Keep this explicit so you can switch to mse if that old loss used MSE.
+  cycle_distance: l1
+  # GRL strength itself. Curriculum "adversarial_scale" below controls the
+  # loss strength, corresponding more closely to the old adverse_alpha.
+  grl_alpha: 1.0
+  freeze_backbone: true
+  image_key: image
+  domain_key: domain
+  curriculum:
+    # Old: recon, 5 epochs, lr=1e-3, restarts=5
+    # Here 1 old "epoch unit" is represented by 1000 optimizer steps purely as
+    # an example. Adjust the absolute counts for your compute budget.
+    - name: recon
+      mode: recon
+      steps: 5000
+      lr: 1.0e-3
+      restart_steps: 5000
+      freeze_backbone: true
+      freeze_tangler: false
+      reset_optimizer_state: true
+    # Old: cycle, 100 epochs, adverse_alpha ramps 0.1 -> 1.0 over ~9 epochs,
+    # lr=1e-3, restarts=25.
+    - name: cycle_main
+      mode: cycle
+      steps: 100000
+      lr: 1.0e-3
+      restart_steps: 25000
+      adversarial_scale_start: 0.1
+      adversarial_scale_end: 1.0
+      adversarial_ramp_steps: 9000
+      cycle_scale: 1.0
+      freeze_backbone: true
+      freeze_tangler: false
+      reset_optimizer_state: true
+    # Old: cycle, 20 epochs, lr=1e-4, restarts=20.
+    - name: cycle_finetune
+      mode: cycle
+      steps: 20000
+      lr: 1.0e-4
+      restart_steps: 20000
+      adversarial_scale_start: 1.0
+      adversarial_scale_end: 1.0
+      cycle_scale: 1.0
+      freeze_backbone: true
+      freeze_tangler: false
+      reset_optimizer_state: true
+# Keep the optimizer itself in LightningCLI. The curriculum changes its LR and
+# optionally clears AdamW state at phase boundaries; do not also configure a
+# Lightning LR scheduler when using restart_steps above.
+optimizer:
+  class_path: torch.optim.AdamW
+  init_args:
+    # Initial value only; phase 0 overrides it immediately.
+    lr: 1.0e-3
+    weight_decay: 1.0e-2
+data:
+  class_path: sipe.data.scorpion.SCORPIONDataModule
+  init_args:
+    data_root: data/processed/SCORPION_tiles_224px_0p5mpp
+    batch_size: 16
+    num_workers: 8
+    image_size: 224
+    domain_column: scanner
+    group_column: slide_id
+    val_fraction: 0.1
+    test_fraction: 0.1
+    pin_memory: true
+    persistent_workers: true

@@ -1,84 +1,73 @@
-# CATS Lightning refactor
+# CATS legacy-faithful step curriculum
 
-This package is based on the current `arch.py`, but moves all training-specific
-domain-adversarial machinery out of the architecture.
+This refactor keeps the old training behavior as closely as possible while
+making the schedule optimizer-step based.
 
-## Suggested project layout
+## Preserved from the old trainer
+
+- recon / adverse / cycle phases;
+- fresh AdamW state at each phase boundary;
+- `CosineAnnealingWarmRestarts`;
+- `adverse_alpha` and `adverse_norm`;
+- backbone and entangler freezing;
+- the original `ImageReconLoss`;
+- the original `AdversarialClassifLoss`;
+- the original cycle graph;
+- `20 * reconstruction + 1 * S-cycle + 0.5 * Z-cycle`.
+
+The only intentional task-level difference is that SCORPION has one
+scanner/domain branch instead of the old stain + organ + pathology branches.
+
+## Step conversion
+
+The config uses:
+
+- 5 epochs -> 5k optimizer steps
+- 100 epochs -> 100k optimizer steps
+- 20 epochs -> 20k optimizer steps
+
+and preserves the old restart ratios:
+
+- 5 -> 5k
+- 25 -> 25k
+- 20 -> 20k
+
+Those absolute step counts are a compute-budget choice, not a claim that one
+old epoch equals 1000 optimizer updates.
+
+The old alpha list changed once per epoch. Here it changes once per
+`adverse_alpha_interval_steps`; after the list is exhausted the last value is
+held.
+
+## Exact cycle graph
 
 ```text
-src/sipe/
-├── model/
-│   └── arch.py
-├── training/
-│   ├── __init__.py
-│   ├── grl.py
-│   └── cats_module.py
-└── cli.py
-
-configs/
-└── cats.yaml
+x
+ -> encode -> s1, z1
+ -> roll s1
+ -> decode(roll(s1), z1)
+ -> detach generated image only
+ -> encode -> s2, z2
+ -> unroll s2
+ -> L1(s2_unrolled, s1)
+ -> L1(z2, z1)
 ```
 
-## Responsibility split
-
-`model/arch.py`
-- backbone
-- disentangler
-- re-entangler
-- image decoder
-- `encode`, `decode`, and inference `forward`
-
-`training/grl.py`
-- generic gradient-reversal primitive
-
-`training/cats_module.py`
-- specified and unspecified domain classifiers
-- GRL application
-- reconstruction loss
-- domain/adversarial losses
-- optional linear GRL warm-up
-- Lightning train/validation/test/predict hooks
-- metrics/logging
-
-`cli.py`
-- LightningCLI entry point
-
-The first version intentionally does **not** include cycle consistency. It is a
-clean reconstruction + adversarial baseline. A paired or cycle objective can be
-added later without modifying `arch.py`.
-
-## Batch contract
-
-The default batch format is:
-
-```python
-{
-    "image": image_tensor,   # [B, C, H, W]
-    "domain": domain_id,     # [B], integer class ids
-}
-```
-
-The keys can be changed with `model.image_key` and `model.domain_key`.
+`s1` and `z1` are not detached.
 
 ## Run
 
 ```bash
-python -m sipe.cli fit --config configs/cats.yaml
+uv run sipe fit --config configs/cats_legacy_steps.yaml
 ```
 
-or, if you add this to `pyproject.toml`:
-
-```toml
-[project.scripts]
-sipe = "sipe.cli:main"
-```
-
-then:
+For a smoke test:
 
 ```bash
-sipe fit --config configs/cats.yaml
+uv run sipe fit \
+  --config configs/cats_legacy_steps.yaml \
+  --trainer.logger=false \
+  --trainer.callbacks=[] \
+  --trainer.enable_checkpointing=false \
+  --trainer.max_steps=100
 ```
-
-LightningCLI can automatically construct the single optimizer/scheduler from
-the top-level `optimizer` / `lr_scheduler` config groups, so
-`CATSModule.configure_optimizers()` is intentionally omitted.
