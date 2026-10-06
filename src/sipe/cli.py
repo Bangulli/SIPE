@@ -6,8 +6,10 @@ import socket
 import subprocess
 from datetime import datetime
 from pathlib import Path
+from typing import Literal
 
 import lightning as L
+import torch
 from lightning.pytorch.callbacks import ModelCheckpoint
 from lightning.pytorch.cli import LightningCLI, SaveConfigCallback
 from lightning.pytorch.loggers import WandbLogger
@@ -66,7 +68,18 @@ class SIPECLI(LightningCLI):
     config, so a run picked on the W&B website maps back to its checkpoints.
     """
 
+    def add_arguments_to_parser(self, parser) -> None:
+        # float32 matmul precision on Tensor Core GPUs. "highest" is the torch default
+        # (no TF32); "high" enables TF32. Kept in the config so each run records it.
+        parser.add_argument(
+            "--matmul_precision",
+            type=Literal["highest", "high", "medium"],
+            default="highest",
+        )
+
     def before_instantiate_classes(self) -> None:
+        config = self.config[self.subcommand] if self.subcommand else self.config
+        torch.set_float32_matmul_precision(config.matmul_precision)
         if self.subcommand != "fit":
             return
         run_dir = os.environ.get(RUN_DIR_ENV)

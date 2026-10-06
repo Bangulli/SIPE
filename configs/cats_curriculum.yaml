@@ -1,4 +1,5 @@
 seed_everything: 42
+matmul_precision: high  # TF32 for fp32 matmuls (A100); torch default is "highest"
 trainer:
   accelerator: gpu
   devices: 1
