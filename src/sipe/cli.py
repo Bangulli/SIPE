@@ -10,6 +10,7 @@ from pathlib import Path
 import lightning as L
 from lightning.pytorch.callbacks import ModelCheckpoint
 from lightning.pytorch.cli import LightningCLI, SaveConfigCallback
+from lightning.pytorch.loggers import WandbLogger
 
 from sipe.training.cats_module import CATSModule
 
@@ -59,7 +60,10 @@ class RunDirSaveConfigCallback(SaveConfigCallback):
 class SIPECLI(LightningCLI):
     """Each `fit` gets runs/<YYYY-MM-DD_HH-MM-SS>_<host>_<rand>/.
 
-    It holds checkpoints/, config.yaml and git.txt (commit, dirty flag, diff).
+    It holds checkpoints/, config.yaml, git.txt (commit, dirty flag, diff) and,
+    with a WandbLogger, wandb.txt plus the local wandb files. The W&B run is named
+    after the run dir (unless a name is configured) and gets `run_dir` in its
+    config, so a run picked on the W&B website maps back to its checkpoints.
     """
 
     def before_instantiate_classes(self) -> None:
@@ -73,11 +77,40 @@ class SIPECLI(LightningCLI):
             write_git_info(Path(run_dir) / "git.txt")
             os.environ[RUN_DIR_ENV] = run_dir
         self.config.fit.trainer.default_root_dir = run_dir
+        for logger_cfg in _wandb_logger_configs(self.config.fit.trainer.logger):
+            init_args = logger_cfg.init_args
+            init_args.save_dir = run_dir
+            if init_args.get("name") is None:
+                init_args.name = Path(run_dir).name
 
     def before_fit(self) -> None:
         for cb in self.trainer.checkpoint_callbacks:
             if isinstance(cb, ModelCheckpoint) and cb.dirpath is None:
                 cb.dirpath = str(Path(self.trainer.default_root_dir) / "checkpoints")
+        if not self.trainer.is_global_zero:
+            return
+        run_dir = Path(self.trainer.default_root_dir).resolve()
+        for logger in self.trainer.loggers:
+            if isinstance(logger, WandbLogger):
+                run = logger.experiment
+                run.config.update({"run_dir": str(run_dir)}, allow_val_change=True)
+                (run_dir / "wandb.txt").write_text(
+                    f"id: {run.id}\n"
+                    f"path: {run.entity}/{run.project}/{run.id}\n"
+                    f"url: {run.url}\n"
+                    f"local: {run.dir}\n"
+                )
+
+
+def _wandb_logger_configs(logger_cfg):
+    """WandbLogger entries of a trainer.logger config (bool, single or list)."""
+    entries = logger_cfg if isinstance(logger_cfg, list) else [logger_cfg]
+    return [
+        e
+        for e in entries
+        if getattr(e, "class_path", None) is not None
+        and e.class_path.split(".")[-1] == "WandbLogger"
+    ]
 
 
 def main() -> None:
