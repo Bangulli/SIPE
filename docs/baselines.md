@@ -1,7 +1,5 @@
 # Phase 5 — Baselines
 
-Don't add baselines before the parity audit is complete, unless explicitly asked.
-
 ## Rules
 
 - Keep baselines modular; one baseline per branch/PR.

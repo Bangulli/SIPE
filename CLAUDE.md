@@ -3,9 +3,12 @@
 Port/refactor of https://github.com/Bangulli/SIPE (SIPE/CATS) to the **SCORPION multi-scanner
 histopathology dataset**, modernized around PyTorch Lightning / LightningCLI.
 
-**Current phase: 1 — parity audit.** Follow `docs/parity-audit.md`.
-Later phases: `docs/refactor-guidelines.md` (simplification), `docs/baselines.md` (baselines).
-Order: behavioral fidelity → tests → simplification → baselines.
+**Goal:** get CATS converging on SCORPION and benchmark it against baselines, fast. Fix only
+what blocks convergence or makes results invalid. Each run must save its config and git commit
+hash.
+
+**Current phase: convergence + baselines.** Data sanity tests: `docs/parity-audit.md`.
+Baselines: `docs/baselines.md`.
 
 ## Layout
 
@@ -36,36 +39,42 @@ Order: behavioral fidelity → tests → simplification → baselines.
 - Splits must be grouped by WSI (no leakage).
 - The CATS cycle objective does not need a paired sampler; pairing info may be exposed for
   evaluation or future paired objectives.
-- **Augmentations** (legacy): GaussianBlur, RandomAffine, RandomErasing, RandomGrayscale,
-  RandomInvert. Current torchvision's `RandomErasing` needs a tensor: PIL transforms before
-  `ToTensor`, `RandomErasing` after. When changing augmentation code, separate (1) the intended
-  augmentation, (2) library-compatibility changes, (3) real changes to probability/order.
+- **Augmentations** (legacy, `../SIPE-main/pretrain_50k.py:63`): `GaussianBlur(3),
+  RandomAffine(3), RandomErasing(p=0.5), RandomGrayscale(p=0.1), RandomInvert(p=0.5)`, then the
+  timm H0-mini transform. `train_1M.py` uses no augmentation. `RandomErasing` has always needed
+  a tensor, so BPTorch probably fed tensors (timm 1.x `MaybeToTensor` passes them through). The
+  refactor (`src/sipe/data/scorpion.py`) applies PIL ops → `ToTensor` → `RandomErasing`, which
+  moves Erasing after Grayscale/Invert (an order change). It also adds random flips.
 
-# Legacy training semantics to preserve
+# Legacy reference behavior
 
-Believed correct from a previous review, **not yet verified in this repo**: confirm each one
-during the parity audit, then mark it verified here.
+Reference, not invariants. Checked against `../SIPE-main` on 2026-10-02 (L = legacy, R = refactor
+`src/sipe/training/cats_module.py`). Deviate when it helps convergence; just say so.
 
-- **Curriculum fields:** `type, epochs, lr, adverse_alpha, restarts, norm/adverse_norm,
-  freeze_backbone, freeze_tangler`.
-- **Optimizer reset:** legacy builds a new AdamW per phase. Refactor reproduces it by clearing
-  AdamW state (both moments) and applying the phase LR at the transition, without replacing
-  Lightning's optimizer. Resuming mid-phase must NOT clear state (don't reset just because
-  `on_train_batch_start` first sees a phase after resume).
-- **Scheduler:** new `CosineAnnealingWarmRestarts(optimizer, T_0=restarts)` per phase. Legacy
-  steps it per epoch; refactor per step (`restart_steps`). Order: `optimizer.step()` then
-  `scheduler.step()`. No second Lightning scheduler on the same optimizer.
-- **`adverse_alpha` ≠ GRL alpha.** Legacy calls `loss.set_adverse_alpha(alpha)`, consumed inside
-  the original `AdversarialClassifLoss`. The GRL has its own alpha (normally 1.0). Don't replace
-  `adverse_alpha` by scaling the domain loss unless proven equivalent. Prefer reusing the
-  original loss.
-- **`adverse_norm`:** forwarded via `loss.set_adverse_norm(norm)`. Keep it until its effect is
-  inspected.
-- **Reconstruction-only phase:** `L = ImageReconLoss(reconstruction, image)`, no ×20.
-- **Cycle phase** (legacy `SIPE_Loss_Adversarial_Cycle` in `../SIPE-main`):
-  `20·ImageReconLoss + 1.0·L1(s_cycle, s_orig) + 0.5·L1(z_cycle, z_orig) + adversarial/domain
-  losses`. The 0.5 is intentional. No renormalizing, no L1→MSE, no extra detaches.
-- **Cycle graph** (easy to break during cleanup; protect with a test):
+- **Curriculum fields:** `type, epochs, lr, adverse_alpha, restarts, adverse_norm,
+  freeze_backbone, freeze_tangler` (`add_step` args: `step_type`, `norm`, `freeze_bb`;
+  L `trainer/curriculum_trainer.py:28-38`). `adverse_alpha` may be a per-epoch list. pretrain_50k
+  ramps 0.1→0.9 over 9 epochs, then 1.0 (`pretrain_50k.py:77-79`). R: list +
+  `adverse_alpha_interval_steps`.
+- **Optimizer reset:** L builds a new `AdamW(model.parameters(), lr=lr)` per phase with torch
+  defaults (wd 0.01). That resets both moments and the per-param `step`. R calls
+  `optimizer.state.clear()` (clears all three) and sets the phase LR. It skips the clear when
+  resuming mid-phase. L has no mid-phase resume (it saves model weights only).
+- **Scheduler:** new `CosineAnnealingWarmRestarts(optimizer, T_0=restarts)` per phase. L steps it
+  per epoch after the batch loop. R steps per optimizer step (`restart_steps`). Both call
+  `optimizer.step()` before `scheduler.step()`. No Lightning `lr_scheduler` is configured.
+- **`adverse_alpha`:** a multiplier on the z-branch (adversarial) CE term only, inside
+  `AdversarialClassifLoss` (L `losses/adversarial_classif_loss.py:20-22`). The s-CE is unscaled.
+  The GRL alpha is separate and fixed at 1.0. In validation the z term is dropped.
+- **`adverse_norm`:** divides both s-CE and z-CE by `log(n_classes)` (log 5 for SCORPION).
+- **Reconstruction-only phase:** `L = MSE(reconstruction, image)`, no ×20. L validates this phase
+  with the adverse loss (recon + s-CE + …). R validates recon only.
+- **Adverse phase** (unused by the legacy scripts): recon (no ×20) + domain losses.
+- **Cycle phase** (`SIPE_Loss_Adversarial_Cycle`): `20·MSE + L1(s_cycle, s_orig) +
+  0.5·L1(z_cycle, z_orig) + domain losses`. Classification uses first-pass `s1`, `z1`.
+  Note: L's cycle path does not run as committed (`curriculum_trainer.py:399-400` call
+  `self.transform_organs`, which doesn't exist on the trainer).
+- **Cycle graph** (R matches L):
 
   ```python
   s1, z1 = model(batch1)
@@ -77,16 +86,16 @@ during the parity audit, then mark it verified here.
   z_cycle_loss = 0.5 * L1(z2, z1)
   ```
 
-- **Domain classifiers:** `s` predicts the scanner normally; `z` predicts it through gradient
-  reversal. Classification on `z` is patch-wise/spatial if the architecture is spatial, with the
-  scanner target expanded to spatial positions.
-- **Frozen backbone:** H0-mini is frozen unless a config says otherwise. Frozen means
-  `requires_grad=False` AND eval mode (Lightning may call `.train()` on the whole module).
-- **`freeze_tangler`:** legacy freezes the components producing/recombining the latents and their
-  classifiers. Check exactly which current modules are affected; don't rely on similar names.
-- **Optimization setup:** batch size 512 (close to the original author). Never silently change
-  batch size, optimizer, augmentation, precision, effective batch size or curriculum length while
-  claiming parity. If memory/runtime forces a change, state it and its likely consequences.
+- **Domain classifiers:** `s` → linear. `z` → per-patch (16×16) GRL → linear, with the target
+  `repeat_interleave`d over patches.
+- **Frozen backbone:** L only sets `requires_grad=False` and runs the backbone in train mode. R
+  also sets eval mode. For H0-mini (no dropout or drop-path) the two are numerically identical.
+  pretrain_50k keeps the backbone frozen. train_1M unfreezes it (lr 1e-5, bs 128).
+- **`freeze_tangler`:** L freezes the whole `Entangler`: projectors, all heads and the
+  reentangler. The decoder is not frozen. R freezes disentangler, reentangler and both scanner
+  classifiers. All legacy curricula use `False`.
+- **Optimization setup:** L pretrain_50k runs bs 512, fp32. The R configs use `16-mixed`. State
+  any batch size, precision or schedule change when reporting results.
 
 # Architecture intent
 
