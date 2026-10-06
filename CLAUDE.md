@@ -108,6 +108,9 @@ Reference, not invariants. Checked against `../SIPE-main` on 2026-10-02 (L = leg
 # Logging
 
 - Lightning + W&B. Logging lives in callbacks where practical, not in model/training logic.
+- Each `fit` writes `runs/<stamp>_<host>_<rand>/` (checkpoints/, config.yaml, git.txt,
+  wandb.txt, wandb/). The W&B run name equals the run dir name, and the W&B config holds
+  `run_dir`. Keep this link.
 - Key metrics: reconstruction loss, scanner loss, scanner accuracy from `s` and from `z`, cycle
   `s`/`z` losses, LR, curriculum phase, `adverse_alpha`; latent diagnostics (mean |s|, mean |z|,
   std s, std z) for divergence.
@@ -131,6 +134,10 @@ uv run sipe fit --config <config.yaml> \
   --trainer.fast_dev_run=true --trainer.logger=false \
   --trainer.enable_checkpointing=false        # add --trainer.callbacks=[] if callbacks need a full run
 ```
+
+`fast_dev_run` replaces loggers with a dummy, so it doesn't test logger or W&B code. For that,
+run `--trainer.max_steps=2 --trainer.limit_train_batches=2 --trainer.limit_val_batches=1` with
+`WANDB_MODE=offline`.
 
 Don't hard-code a config filename into tooling unless it is the canonical project config.
 
