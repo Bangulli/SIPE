@@ -8,7 +8,6 @@ trainer:
   check_val_every_n_epoch: null
   val_check_interval: 100
   log_every_n_steps: 25
-  default_root_dir: ./runs/cats
   logger:
     class_path: lightning.pytorch.loggers.WandbLogger
     init_args:
@@ -24,7 +23,6 @@ trainer:
   callbacks:
     - class_path: lightning.pytorch.callbacks.ModelCheckpoint
       init_args:
-        dirpath: ./runs/cats/checkpoints
         filename: "step={step:07d}-val_loss={val/loss:.4f}"
         monitor: val/loss
         mode: min
