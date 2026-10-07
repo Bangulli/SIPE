@@ -24,13 +24,11 @@ trainer:
   callbacks:
     - class_path: lightning.pytorch.callbacks.ModelCheckpoint
       init_args:
-        filename: "step={step:07d}-val_loss={val/loss:.4f}"
-        monitor: val/loss
-        mode: min
-        save_top_k: 3
+        # Only last.ckpt (overwritten at each validation): val/loss changes meaning
+        # between curriculum phases, so "best" by val/loss is not meaningful.
+        save_top_k: 0
         save_last: true
         save_weights_only: false
-        auto_insert_metric_name: false
     - class_path: lightning.pytorch.callbacks.LearningRateMonitor
       init_args:
         logging_interval: step

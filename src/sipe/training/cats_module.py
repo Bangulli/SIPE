@@ -76,7 +76,9 @@ class CATSModule(L.LightningModule):
         self._active_phase_idx = -1
         self._phase_scheduler: CosineAnnealingWarmRestarts | None = None
 
-        self.save_hyperparameters(ignore=["network"])
+        # Under LightningCLI this stores the parsed config, so `network` is saved as
+        # {class_path, init_args} and CATSModule.load_from_checkpoint(ckpt) rebuilds it.
+        self.save_hyperparameters()
         if freeze_backbone:
             self.network.freeze_backbone()
 

@@ -21,15 +21,11 @@ trainer:
   callbacks:
     - class_path: lightning.pytorch.callbacks.ModelCheckpoint
       init_args:
-        filename: "epoch={epoch:03d}-val_loss={val/loss:.4f}"
-        monitor: val/loss
-        mode: min
-        # Keep the best 3 + latest training state
-        save_top_k: 3
+        # Only last.ckpt (overwritten at each validation): val/loss changes meaning
+        # between curriculum phases, so "best" by val/loss is not meaningful.
+        save_top_k: 0
         save_last: true
         save_weights_only: false
-        # Important because the metric contains "/"
-        auto_insert_metric_name: false
     - class_path: lightning.pytorch.callbacks.LearningRateMonitor
       init_args:
         logging_interval: step
