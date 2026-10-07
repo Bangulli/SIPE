@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +10,8 @@ import torch
 import torchvision.transforms as T
 from PIL import Image
 from torch.utils.data import DataLoader, Dataset
+
+from sipe.model.encoders import encoder_meta
 
 from .utils import (
     filename_from_row,
@@ -127,8 +129,7 @@ class SCORPIONDataModule(L.LightningDataModule):
         batch_size: int = 16,
         num_workers: int = 8,
         image_size: int = 224,
-        mean: Sequence[float] = (0.485, 0.456, 0.406),
-        std: Sequence[float] = (0.229, 0.224, 0.225),
+        encoder: str = "h0-mini",
         horizontal_flip: bool = True,
         vertical_flip: bool = True,
         path_column: str = "path",
@@ -144,6 +145,7 @@ class SCORPIONDataModule(L.LightningDataModule):
         drop_last: bool = True,
     ) -> None:
         super().__init__()
+        self.save_hyperparameters()
 
         if batch_size <= 0:
             raise ValueError("batch_size must be positive.")
@@ -164,8 +166,12 @@ class SCORPIONDataModule(L.LightningDataModule):
         self.batch_size = int(batch_size)
         self.num_workers = int(num_workers)
         self.image_size = int(image_size)
-        self.mean = tuple(float(x) for x in mean)
-        self.std = tuple(float(x) for x in std)
+        # Normalization follows the backbone's timm data config (linked from
+        # model.network.init_args.encoder by the CLI).
+        self.encoder = encoder
+        meta = encoder_meta(encoder)
+        self.mean = meta.mean
+        self.std = meta.std
         self.horizontal_flip = bool(horizontal_flip)
         self.vertical_flip = bool(vertical_flip)
 

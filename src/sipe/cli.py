@@ -76,6 +76,11 @@ class SIPECLI(LightningCLI):
             type=Literal["highest", "high", "medium"],
             default="highest",
         )
+        # The backbone fixes the input normalization: the datamodule reads mean/std
+        # from the same encoder builder, so training and benchmarks cannot diverge.
+        parser.link_arguments(
+            "model.network.init_args.encoder", "data.init_args.encoder"
+        )
 
     def before_instantiate_classes(self) -> None:
         config = self.config[self.subcommand] if self.subcommand else self.config

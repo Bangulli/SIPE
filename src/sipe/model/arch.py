@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import math
 
-import timm
 import torch
 import torch.nn as nn
+
+from sipe.model.encoders import build_encoder
 
 
 class SpecifiedProjector(nn.Module):
@@ -126,7 +127,7 @@ class CATS(nn.Module):
 
     def __init__(
         self,
-        backbone_name: str = "hf-hub:bioptimus/H0-mini",
+        encoder: str = "h0-mini",
         specified_dim: int = 64,
         unspecified_dim: int = 704,
         pretrained: bool = True,
@@ -137,14 +138,12 @@ class CATS(nn.Module):
         self.specified_dim = int(specified_dim)
         self.unspecified_dim = int(unspecified_dim)
 
-        self.backbone = timm.create_model(
-            backbone_name,
-            pretrained=pretrained,
-            mlp_layer=timm.layers.SwiGLUPacked,
-            act_layer=nn.SiLU,
-        )
+        bundle = build_encoder(encoder, pretrained=pretrained)
+        self.backbone = bundle.backbone
+        self.encoder_meta = bundle.meta
+        self.eval_transform = bundle.transform
 
-        self.feature_dim = int(self.backbone.num_features)
+        self.feature_dim = self.encoder_meta.embed_dim
 
         self.disentangler = Disentangler(
             in_features=self.feature_dim,

@@ -40,7 +40,7 @@ trainer:
         every_n_steps: 100
 model:
   network:
-    backbone_name: hf-hub:bioptimus/H0-mini
+    encoder: h0-mini
     specified_dim: 64
     unspecified_dim: 704
     pretrained: true
