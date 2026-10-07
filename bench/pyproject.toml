@@ -1,0 +1,47 @@
+# Benchmark environment (PLISM + HEST, official code). Separate from the training env
+# because HEST/TRIDENT need transformers<5 while sipe declares transformers>=5.
+# Run everything through ./bench/run (sets a dedicated venv; see docs/benchmarks.md).
+[project]
+name = "sipe-bench"
+version = "0.1.0"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "sipe",
+  "hest[benchmark]",
+  "owkin-plismbench",
+  # plismbench evaluate --device gpu
+  "cupy-cuda12x>=13",
+  # cv2 without GUI libs (libxcb is absent in the container); replaces opencv-python below.
+  "opencv-python-headless>=4.13,<5",
+  # bundled libvips for pyvips (no system libvips in the container)
+  "pyvips-binary",
+  "pytest>=8",
+]
+
+[tool.uv]
+package = false
+# Upstream pins that conflict with the training stack. Each override is a deliberate
+# deviation from the benchmark repos' declared deps; record it with results.
+override-dependencies = [
+  # sipe declares >=5.17 but does not import transformers; HEST/TRIDENT need <5.
+  "transformers>=4.49,<5",
+  # plismbench pins timm==1.0.12 and torchvision ^0.21; sipe needs newer.
+  "timm>=1.0.29,<2",
+  "torchvision>=0.29,<0.30",
+  # plismbench pins typer ^0.15, which crashes on click>=8.2 (sipe needs click>=8.5).
+  "typer>=0.16",
+  # Drop the GUI build pulled by sipe/trident/ultralytics; same cv2 module via -headless.
+  "opencv-python; sys_platform == 'never'",
+]
+
+[tool.uv.sources]
+sipe = { path = "..", editable = true }
+hest = { path = "../../HEST", editable = true }
+owkin-plismbench = { path = "../../plism-benchmark", editable = true }
+torch = { index = "pytorch-cu126" }
+torchvision = { index = "pytorch-cu126" }
+
+[[tool.uv.index]]
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
+explicit = true

@@ -1,0 +1,9 @@
+#!/bin/sh
+# Run a command in the bench env: bench/run python ..., bench/run plismbench ...
+# Pins a dedicated venv so the claude-box uv wrapper (venv keyed on git root) does not
+# reuse the SIPE training env. On the host without the wrapper, uv uses bench/.venv.
+here=$(cd "$(dirname "$0")" && pwd -P)
+if [ -d "$HOME/venvs" ] && [ -z "${UV_PROJECT_ENVIRONMENT:-}" ]; then
+  export UV_PROJECT_ENVIRONMENT="$HOME/venvs/SIPE-bench"
+fi
+exec uv run --project "$here" "$@"
