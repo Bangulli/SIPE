@@ -45,6 +45,7 @@ class CATSModule(L.LightningModule):
         feature_pixel_weight: float = 1.0,
         pooled_adversary_hidden_dim: int | None = None,
         pooled_adversary_weight: float = 1.0,
+        adversary_input_norm: bool = False,
     ) -> None:
         super().__init__()
 
@@ -72,6 +73,11 @@ class CATSModule(L.LightningModule):
         self.feature_cycle_domain_weight = float(feature_cycle_domain_weight)
         self.feature_pixel_weight = float(feature_pixel_weight)
         self.pooled_adversary_weight = float(pooled_adversary_weight)
+        # Not in legacy: parameter-free LayerNorm on z before both GRL adversaries.
+        # Without it the encoder can raise the reversed CE without bound by scaling
+        # z (CATSv2 run 2026-10-08_18-52-15: |z| 0.8 -> 1,100 once alpha >= 0.4),
+        # since nothing else in the feature objective fixes z's scale.
+        self.adversary_input_norm = bool(adversary_input_norm)
         if any(p.mode == "feature" for p in self.curriculum.phases) and not hasattr(
             network, "decode_features"
         ):
@@ -492,7 +498,8 @@ class CATSModule(L.LightningModule):
         norm: bool,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         assert self.pooled_classifier is not None
-        logits = self.pooled_classifier(self.grl(z.mean(dim=(2, 3))))
+        pooled = self._adversary_input(z.mean(dim=(2, 3)))
+        logits = self.pooled_classifier(self.grl(pooled))
         ce = alpha * F.cross_entropy(logits.float(), domains)
         if norm:
             ce = ce / math.log(self.num_domains)
@@ -536,8 +543,16 @@ class CATSModule(L.LightningModule):
             -1,
             self.network.unspecified_dim,
         )
-        unspecified_logits = self.unspecified_classifier(self.grl(z_tokens))
+        unspecified_logits = self.unspecified_classifier(
+            self.grl(self._adversary_input(z_tokens))
+        )
         return specified_logits, unspecified_logits
+
+    def _adversary_input(self, z: torch.Tensor) -> torch.Tensor:
+        """[N, C] z features as seen by an adversary (optionally scale-free)."""
+        if not self.adversary_input_norm:
+            return z
+        return F.layer_norm(z.float(), (z.shape[-1],))
 
     def _domain_loss(
         self,
@@ -596,7 +611,9 @@ class CATSModule(L.LightningModule):
                 self.network.unspecified_dim,
             )
         )
-        unspecified_logits = self.unspecified_classifier(z_tokens)
+        unspecified_logits = self.unspecified_classifier(
+            self._adversary_input(z_tokens)
+        )
 
         specified_accuracy = (specified_logits.argmax(dim=-1) == domains).float().mean()
 

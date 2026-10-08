@@ -79,3 +79,35 @@ def test_feature_mode_rejects_legacy_network() -> None:
 
     with pytest.raises(ValueError, match="CATSv2"):
         CATSModule(network=CATS(pretrained=False), num_domains=5, curriculum=[PHASE])
+
+
+def test_adversary_input_norm_is_scale_free(network: CATSv2) -> None:
+    module = CATSModule(
+        network=network,
+        num_domains=5,
+        curriculum=[PHASE],
+        pooled_adversary_hidden_dim=32,
+        adversary_input_norm=True,
+    )
+    domains = torch.tensor([0, 1, 2, 3])
+    z = torch.randn(4, network.unspecified_dim, 16, 16, requires_grad=True)
+    pooled, _ = module._pooled_adversary(z=z, domains=domains, alpha=1.0, norm=True)
+    patch = module._domain_loss(
+        s=torch.randn(4, network.specified_dim),
+        z=z,
+        domains=domains,
+        alpha=1.0,
+        norm=True,
+        val=False,
+    )
+    with torch.no_grad():
+        pooled_big, _ = module._pooled_adversary(
+            z=1000 * z, domains=domains, alpha=1.0, norm=True
+        )
+    # Up to LayerNorm eps: GAP(z) of random z has small variance.
+    torch.testing.assert_close(pooled_big, pooled.detach(), rtol=1e-3, atol=1e-3)
+    # Scaling z cannot change the adversary losses, so their gradient has no
+    # component along z itself (the direction the 2026-10-08 run blew up in).
+    (grad,) = torch.autograd.grad(pooled + patch, z)
+    radial = (grad * z).sum() / (grad.norm() * z.norm())
+    assert radial.abs().item() < 1e-4
