@@ -1,0 +1,97 @@
+seed_everything: 42
+matmul_precision: high  # TF32 for fp32 matmuls (A100); torch default is "highest"
+trainer:
+  accelerator: gpu
+  devices: 1
+  precision: 16-mixed
+  max_epochs: -1
+  max_steps: 6000
+  check_val_every_n_epoch: null
+  val_check_interval: 100
+  log_every_n_steps: 25
+  logger:
+    class_path: lightning.pytorch.loggers.WandbLogger
+    init_args:
+      project: cats
+      group: SCORPION
+      job_type: v2-unpaired
+      tags:
+        - CATS
+        - SCORPION
+        - v2-unpaired
+      save_dir: ./wandb
+      log_model: false
+  callbacks:
+    - class_path: lightning.pytorch.callbacks.ModelCheckpoint
+      init_args:
+        # Only last.ckpt (overwritten at each validation): val/loss changes meaning
+        # between curriculum phases, so "best" by val/loss is not meaningful.
+        save_top_k: 0
+        save_last: true
+        save_weights_only: false
+    - class_path: lightning.pytorch.callbacks.LearningRateMonitor
+      init_args:
+        logging_interval: step
+    - class_path: sipe.training.callbacks.ReconstructionLogger
+      init_args:
+        num_images: 4
+        every_n_steps: 100
+model:
+  # CATSv2 (not legacy): identity-initialized residual z (GAP(z) == backbone GAP at
+  # step 0), s = MLP(GAP) + LayerNorm, FiLM re-entangler, feature-space decoding.
+  # Rationale and diagnosis: /box/.claude/plans/so-i-tried-with-synchronous-bee.md
+  network:
+    class_path: sipe.model.arch.CATSv2
+    init_args:
+      encoder: h0-mini
+      specified_dim: 64
+      specified_hidden_dim: 256
+      unspecified_hidden_dim: 1024
+      reentangler_hidden_dim: 1024
+      pretrained: true
+      output_size: 224
+  num_domains: 5
+  grl_alpha: 1.0
+  image_key: image
+  domain_key: domain
+  # Unpaired feature-space objective (mode: feature). Scanner labels only; pair_id
+  # is never used for training.
+  feature_recon_weight: 1.0
+  feature_cycle_s_weight: 1.0
+  feature_cycle_z_weight: 1.0
+  feature_cycle_domain_weight: 1.0
+  # Pixel decoder on detached features: visualization only.
+  feature_pixel_weight: 1.0
+  # MLP adversary on GAP(z) through the GRL, next to the per-token linear one.
+  pooled_adversary_hidden_dim: 512
+  pooled_adversary_weight: 1.0
+  curriculum:
+    # No reconstruction warm-up: the network starts at identity (recon loss 0).
+    - name: feature
+      mode: feature
+      steps: 6000
+      lr: 3.0e-4
+      restart_steps: 6000 # one cosine decay
+      # adversarial weight ramp 0.1 -> 1.0 over the first 3000 steps
+      adverse_alpha: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+      adverse_alpha_interval_steps: 300
+      adverse_norm: true
+      freeze_backbone: true
+      freeze_tangler: false
+optimizer:
+  class_path: torch.optim.AdamW
+  init_args:
+    lr: 3.0e-4
+data:
+  class_path: sipe.data.scorpion.SCORPIONDataModule
+  init_args:
+    data_root: data/processed/SCORPION_tiles_224px_0p5mpp
+    batch_size: 512
+    num_workers: 8
+    image_size: 224
+    domain_column: scanner
+    group_column: slide_id
+    val_fraction: 0.1
+    test_fraction: 0.1
+    pin_memory: true
+    persistent_workers: true

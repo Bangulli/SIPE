@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Any
 
 import lightning as L
@@ -37,6 +38,13 @@ class CATSModule(L.LightningModule):
         cycle_s_weight: float = 1.0,
         cycle_z_weight: float = 0.5,
         freeze_backbone: bool = False,
+        feature_recon_weight: float = 1.0,
+        feature_cycle_s_weight: float = 1.0,
+        feature_cycle_z_weight: float = 1.0,
+        feature_cycle_domain_weight: float = 1.0,
+        feature_pixel_weight: float = 1.0,
+        pooled_adversary_hidden_dim: int | None = None,
+        pooled_adversary_weight: float = 1.0,
     ) -> None:
         super().__init__()
 
@@ -58,6 +66,16 @@ class CATSModule(L.LightningModule):
         )
         self.cycle_s_weight = float(cycle_s_weight)
         self.cycle_z_weight = float(cycle_z_weight)
+        self.feature_recon_weight = float(feature_recon_weight)
+        self.feature_cycle_s_weight = float(feature_cycle_s_weight)
+        self.feature_cycle_z_weight = float(feature_cycle_z_weight)
+        self.feature_cycle_domain_weight = float(feature_cycle_domain_weight)
+        self.feature_pixel_weight = float(feature_pixel_weight)
+        self.pooled_adversary_weight = float(pooled_adversary_weight)
+        if any(p.mode == "feature" for p in self.curriculum.phases) and not hasattr(
+            network, "decode_features"
+        ):
+            raise ValueError("Curriculum mode 'feature' needs a CATSv2-style network.")
 
         self.specified_classifier = nn.Linear(
             network.specified_dim,
@@ -68,6 +86,17 @@ class CATSModule(L.LightningModule):
             self.num_domains,
         )
         self.grl = GradientReversal(alpha=grl_alpha)
+        # Not in legacy: MLP adversary on GAP(z), the pooled embedding that PLISM
+        # compares. A per-token linear adversary at chance does not rule out
+        # pooled / nonlinear scanner information. None keeps the legacy module set
+        # (and legacy checkpoints loadable strictly).
+        self.pooled_classifier: nn.Module | None = None
+        if pooled_adversary_hidden_dim is not None:
+            self.pooled_classifier = nn.Sequential(
+                nn.Linear(network.unspecified_dim, pooled_adversary_hidden_dim),
+                nn.GELU(),
+                nn.Linear(pooled_adversary_hidden_dim, self.num_domains),
+            )
 
         # Reuse the old SIPE losses instead of approximating them.
         self.image_recon_loss = ImageReconLoss()
@@ -225,7 +254,10 @@ class CATSModule(L.LightningModule):
         phase_idx, phase, local_step = self._phase_for_stage(stage)
         alpha = phase.alpha_at(local_step)
 
-        outputs = self.network(images)
+        if phase.mode == "feature":
+            outputs = self._feature_forward(images)
+        else:
+            outputs = self.network(images)
         s1 = outputs["s"]
         z1 = outputs["z"]
         reconstruction = outputs["reconstruction"]
@@ -241,6 +273,7 @@ class CATSModule(L.LightningModule):
         cycle_z_l1 = zero
         cycle_s_loss = zero
         cycle_z_loss = zero
+        extra_metrics: dict[str, torch.Tensor] = {}
 
         if phase.mode == "recon":
             # SIPE_Loss_Adversarial(recon_mode=True)
@@ -285,8 +318,48 @@ class CATSModule(L.LightningModule):
                 + cycle_z_loss
                 + domain_loss
             )
+        elif phase.mode == "feature":
+            feature_recon_loss = self._feature_recon_loss(
+                outputs["reconstructed_features"], outputs["feature_map"]
+            )
+            cycle = self._feature_cycle_losses(s1=s1, z1=z1, domains=domains)
+            cycle_s_l1, cycle_z_l1 = cycle["s_l1"], cycle["z_l1"]
+            cycle_s_loss = self.feature_cycle_s_weight * cycle_s_l1
+            cycle_z_loss = self.feature_cycle_z_weight * cycle_z_l1
+            domain_loss = self._domain_loss(
+                s=s1,
+                z=z1,
+                domains=domains,
+                alpha=alpha,
+                norm=phase.adverse_norm,
+                val=stage != "train",
+            )
+            # The pixel decoder sees detached features: it only renders images
+            # for inspection and does not shape s or z.
+            loss = (
+                self.feature_recon_weight * feature_recon_loss
+                + cycle_s_loss
+                + cycle_z_loss
+                + self.feature_cycle_domain_weight * cycle["domain_ce"]
+                + domain_loss
+                + self.feature_pixel_weight * reconstruction_loss
+            )
+            extra_metrics = {
+                f"{stage}/feature_recon_loss": feature_recon_loss,
+                f"{stage}/feature_cycle_domain_ce": cycle["domain_ce"],
+                f"{stage}/feature_cycle_domain_acc": cycle["domain_acc"],
+            }
         else:
             raise RuntimeError(f"Unsupported phase mode: {phase.mode}")
+
+        if self.pooled_classifier is not None and phase.mode != "recon":
+            pooled_ce, pooled_acc = self._pooled_adversary(
+                z=z1, domains=domains, alpha=alpha, norm=phase.adverse_norm
+            )
+            if stage == "train":
+                loss = loss + self.pooled_adversary_weight * pooled_ce
+            extra_metrics[f"{stage}/pooled_adversary_ce"] = pooled_ce
+            extra_metrics[f"{stage}/domain_zgap_acc"] = pooled_acc
 
         domain_s_acc, domain_z_acc = self._domain_accuracies(
             s=s1,
@@ -307,6 +380,7 @@ class CATSModule(L.LightningModule):
             f"{stage}/z_abs_mean": z1.abs().mean(),
             f"{stage}/s_std": s1.std(),
             f"{stage}/z_std": z1.std(),
+            **extra_metrics,
         }
 
         self.log_dict(
@@ -353,6 +427,77 @@ class CATSModule(L.LightningModule):
             "cycle_s_loss": cycle_s_loss,
             "cycle_z_loss": cycle_z_loss,
         }
+
+    def _feature_forward(self, images: torch.Tensor) -> dict[str, torch.Tensor]:
+        network = self.network
+        feature_map = network.backbone_feature_map(images)
+        s, z = network.disentangle(feature_map)
+        features = network.decode_features(s, z)
+        return {
+            "s": s,
+            "z": z,
+            "feature_map": feature_map,
+            "reconstructed_features": features,
+            "reconstruction": network.decoder(features.detach()),
+        }
+
+    @staticmethod
+    def _feature_recon_loss(
+        prediction: torch.Tensor, target: torch.Tensor
+    ) -> torch.Tensor:
+        # Scale-free: MSE relative to the target variance + per-token cosine.
+        target = target.detach().float()
+        prediction = prediction.float()
+        mse = F.mse_loss(prediction, target) / target.var().clamp_min(1e-6)
+        cosine = F.cosine_similarity(prediction, target, dim=1).mean()
+        return mse + (1 - cosine)
+
+    def _feature_cycle_losses(
+        self,
+        *,
+        s1: torch.Tensor,
+        z1: torch.Tensor,
+        domains: torch.Tensor,
+    ) -> dict[str, torch.Tensor]:
+        """Swap s in feature space and re-disentangle (no pixels, no backbone pass).
+
+        Unlike the legacy pixel cycle, the swapped features are not detached: the
+        re-entangler learns to write the donor's scanner (s CE on donor labels) and
+        the z branch learns to ignore s-induced changes (z cycle).
+        """
+        if s1.shape[0] < 2:
+            raise RuntimeError("Cycle training requires a batch size of at least 2.")
+        s_donor = torch.roll(s1, shifts=1, dims=0)
+        donor_domains = torch.roll(domains, shifts=1, dims=0)
+        swapped = self.network.decode_features(s_donor, z1)
+        s2, z2 = self.network.disentangle(swapped)
+        z_scale = z1.detach().abs().mean().clamp_min(1e-6)
+        logits = self.specified_classifier(s2)
+        domain_ce = F.cross_entropy(logits.float(), donor_domains)
+        if self.domain_classif_loss.norm:
+            domain_ce = domain_ce / math.log(self.num_domains)
+        return {
+            "s_l1": F.l1_loss(s2, s_donor),
+            "z_l1": F.l1_loss(z2, z1) / z_scale,
+            "domain_ce": domain_ce,
+            "domain_acc": (logits.argmax(-1) == donor_domains).float().mean(),
+        }
+
+    def _pooled_adversary(
+        self,
+        *,
+        z: torch.Tensor,
+        domains: torch.Tensor,
+        alpha: float,
+        norm: bool,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        assert self.pooled_classifier is not None
+        logits = self.pooled_classifier(self.grl(z.mean(dim=(2, 3))))
+        ce = alpha * F.cross_entropy(logits.float(), domains)
+        if norm:
+            ce = ce / math.log(self.num_domains)
+        accuracy = (logits.detach().argmax(-1) == domains).float().mean()
+        return ce, accuracy
 
     def _cycle_losses(
         self,
@@ -504,6 +649,8 @@ class CATSModule(L.LightningModule):
             self.specified_classifier,
             self.unspecified_classifier,
         ]
+        if self.pooled_classifier is not None:
+            modules.append(self.pooled_classifier)
         for module in modules:
             for parameter in module.parameters():
                 parameter.requires_grad_(not freeze)
@@ -516,5 +663,7 @@ class CATSModule(L.LightningModule):
             self.specified_classifier,
             self.unspecified_classifier,
         ]
+        if self.pooled_classifier is not None:
+            modules.append(self.pooled_classifier)
         for module in modules:
             module.train(train)

@@ -3,7 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-_VALID_MODES = {"recon", "adverse", "cycle"}
+# "feature": CATSv2 feature-space objective (not in legacy; see CATSModule).
+_VALID_MODES = {"recon", "adverse", "cycle", "feature"}
 
 
 @dataclass(frozen=True)

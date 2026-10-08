@@ -2,6 +2,8 @@
 
 Representations:
 - `z_gap` (default, the benchmarked CATS representation): GAP of the spatial z map.
+- `z_pre_gap`: GAP of z before the unspecified projector's ReLU (diagnostic: the
+  ReLU makes z all-positive, which inflates cosine similarity).
 - `s`: the global scanner-specific code.
 - `backbone_gap`: GAP of the backbone patch tokens (prefix tokens dropped); the
   reference for `z_gap` under the same weights and normalization.
@@ -20,7 +22,7 @@ import torchvision.transforms as T
 from sipe.model.arch import CATS
 from sipe.model.encoders import EncoderMeta
 
-REPRESENTATIONS = ("z_gap", "s", "backbone_gap", "backbone_cls")
+REPRESENTATIONS = ("z_gap", "z_pre_gap", "s", "backbone_gap", "backbone_cls")
 
 
 class CATSFeatures(nn.Module):
@@ -39,6 +41,7 @@ class CATSFeatures(nn.Module):
     def output_dim(self) -> int:
         return {
             "z_gap": self.network.unspecified_dim,
+            "z_pre_gap": self.network.unspecified_dim,
             "s": self.network.specified_dim,
             "backbone_gap": self.network.feature_dim,
             "backbone_cls": self.network.feature_dim,
@@ -47,6 +50,8 @@ class CATSFeatures(nn.Module):
     def forward(self, images: torch.Tensor) -> torch.Tensor:
         if self.representation == "z_gap":
             return self.network.encode(images)[1].mean(dim=(2, 3))
+        if self.representation == "z_pre_gap":
+            return self.network.unspecified_preactivation(images).mean(dim=(2, 3))
         if self.representation == "s":
             return self.network.encode(images)[0]
         if self.representation == "backbone_gap":
