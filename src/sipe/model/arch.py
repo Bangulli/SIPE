@@ -164,7 +164,9 @@ class CATS(nn.Module):
 
     def backbone_feature_map(self, images: torch.Tensor) -> torch.Tensor:
         """Return backbone patch tokens reshaped as [B, C, H, W]."""
-        tokens = self.backbone(images)
+        # forward_features, not forward: forward applies the HF config's global_pool
+        # (H0-mini: none -> tokens; H-optimus-1: "token" -> pooled CLS [B, C]).
+        tokens = self.backbone.forward_features(images)
 
         if tokens.ndim != 3:
             raise RuntimeError(

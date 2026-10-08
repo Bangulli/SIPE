@@ -51,7 +51,7 @@ class CATSFeatures(nn.Module):
             return self.network.encode(images)[0]
         if self.representation == "backbone_gap":
             return self.network.backbone_feature_map(images).mean(dim=(2, 3))
-        return self.network.backbone(images)[:, 0]
+        return self.network.backbone.forward_features(images)[:, 0]
 
 
 def plism_transform(meta: EncoderMeta) -> Callable:
