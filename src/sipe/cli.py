@@ -20,17 +20,19 @@ from sipe.training.cats_module import CATSModule
 RUN_DIR_ENV = "SIPE_RUN_DIR"
 
 
-def _git(*args: str) -> str:
-    cwd = Path(__file__).resolve().parent
+def _git(*args: str, cwd: Path | None = None) -> str:
+    """Run git in `cwd` (default: the SIPE repo)."""
+    cwd = cwd if cwd is not None else Path(__file__).resolve().parent
     return subprocess.run(
         ["git", *args], cwd=cwd, capture_output=True, text=True
     ).stdout
 
 
-def write_git_info(path: Path) -> None:
-    status = _git("status", "--porcelain")
+def write_git_info(path: Path, repo: Path | None = None) -> None:
+    """Write commit, dirty flag and (if dirty) the diff of `repo` (default: SIPE)."""
+    status = _git("status", "--porcelain", cwd=repo)
     lines = [
-        f"commit: {_git('rev-parse', 'HEAD').strip()}",
+        f"commit: {_git('rev-parse', 'HEAD', cwd=repo).strip()}",
         f"dirty: {bool(status.strip())}",
     ]
     if status.strip():
@@ -39,9 +41,15 @@ def write_git_info(path: Path) -> None:
             "# git status --porcelain",
             status,
             "# git diff HEAD",
-            _git("diff", "HEAD"),
+            _git("diff", "HEAD", cwd=repo),
         ]
     path.write_text("\n".join(lines) + "\n")
+
+
+def run_dir_name() -> str:
+    """<YYYY-MM-DD_HH-MM-SS>_<host>_<rand>, shared by training and bench run dirs."""
+    stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    return f"{stamp}_{socket.gethostname()}_{secrets.token_hex(2)}"
 
 
 class RunDirSaveConfigCallback(SaveConfigCallback):
@@ -89,8 +97,7 @@ class SIPECLI(LightningCLI):
             return
         run_dir = os.environ.get(RUN_DIR_ENV)
         if run_dir is None:
-            stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            run_dir = f"runs/{stamp}_{socket.gethostname()}_{secrets.token_hex(2)}"
+            run_dir = f"runs/{run_dir_name()}"
             Path(run_dir).mkdir(parents=True)
             write_git_info(Path(run_dir) / "git.txt")
             os.environ[RUN_DIR_ENV] = run_dir

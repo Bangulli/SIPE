@@ -71,3 +71,25 @@ uv run sipe fit \
   --trainer.enable_checkpointing=false \
   --trainer.max_steps=100
 ```
+
+## Benchmark a checkpoint (PLISM, HEST)
+
+Runs the official PLISM and HEST code in the separate bench env (`bench/run`). See
+`docs/benchmarks.md` for details and outputs (`runs/bench/<stamp>_<host>_<rand>_<tag>/`).
+
+```bash
+CKPT=runs/<run>/checkpoints/last.ckpt
+
+# PLISM robustness: 91 slides, metrics on 8139 tiles/slide (plismbench defaults)
+bench/run python -m sipe.bench.plism --ckpt $CKPT --tag cats_<run>_z_gap
+
+# HEST-Benchmark: all tasks
+bench/run python -m sipe.bench.hest --ckpt $CKPT --tag cats_<run>_z_gap --datasets '*'
+```
+
+- The default representation is `z_gap` (GAP of `z`, 704-d). For reference rows with the
+  same weights, add `--representation backbone_cls` or `--representation backbone_gap`.
+- In claude-box (`/dev/shm` is 64 MB), add `--workers 0` (PLISM) or `--num-workers 0`
+  (HEST), and pick a GPU with `CUDA_VISIBLE_DEVICES`.
+- Tests: `uv run pytest tests/test_bench_checkpoint.py` and
+  `bench/run pytest tests/test_bench_adapters.py`.
