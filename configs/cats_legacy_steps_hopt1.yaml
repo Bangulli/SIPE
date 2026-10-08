@@ -1,0 +1,115 @@
+seed_everything: 42
+matmul_precision: high  # TF32 for fp32 matmuls (A100); torch default is "highest"
+trainer:
+  accelerator: gpu
+  devices: 1
+  precision: 16-mixed
+  max_epochs: -1
+  max_steps: 12250
+  check_val_every_n_epoch: null
+  val_check_interval: 100
+  log_every_n_steps: 25
+  logger:
+    class_path: lightning.pytorch.loggers.WandbLogger
+    init_args:
+      project: cats
+      group: SCORPION
+      job_type: legacy-step
+      tags:
+        - CATS
+        - SCORPION
+        - legacy-step
+      save_dir: ./wandb
+      log_model: false
+  callbacks:
+    - class_path: lightning.pytorch.callbacks.ModelCheckpoint
+      init_args:
+        # Only last.ckpt (overwritten at each validation): val/loss changes meaning
+        # between curriculum phases, so "best" by val/loss is not meaningful.
+        save_top_k: 0
+        save_last: true
+        save_weights_only: false
+    - class_path: lightning.pytorch.callbacks.LearningRateMonitor
+      init_args:
+        logging_interval: step
+    - class_path: sipe.training.callbacks.ReconstructionLogger
+      init_args:
+        num_images: 4
+        every_n_steps: 100
+model:
+  network:
+    encoder: h-optimus-1
+    specified_dim: 64
+    unspecified_dim: 704
+    pretrained: true
+    output_size: 224
+  num_domains: 5
+  # Old GRL uses alpha=1. Curriculum adverse_alpha belongs to
+  # AdversarialClassifLoss, not to gradient reversal.
+  grl_alpha: 1.0
+  image_key: image
+  domain_key: domain
+  # Exact constants visible in the legacy loss code.
+  recon_phase_reconstruction_weight: 1.0
+  adverse_phase_reconstruction_weight: 1.0
+  cycle_phase_reconstruction_weight: 20.0
+  cycle_s_weight: 1.0
+  cycle_z_weight: 0.5
+  curriculum:
+    - name: recon
+      mode: recon
+      steps: 490 # 5 × 98
+      lr: 1.0e-3
+      restart_steps: 490 # old T_0 = 5 epochs
+      adverse_alpha: 1.0
+      adverse_norm: true
+      freeze_backbone: true
+      freeze_tangler: false
+    - name: cycle_main
+      mode: cycle
+      steps: 9800 # 100 × 98
+      lr: 1.0e-3
+      restart_steps: 2450 # 25 × 98
+      adverse_alpha:
+        - 0.1
+        - 0.2
+        - 0.3
+        - 0.4
+        - 0.5
+        - 0.6
+        - 0.7
+        - 0.8
+        - 0.9
+        - 1.0
+      adverse_alpha_interval_steps: 98
+      adverse_norm: true
+      freeze_backbone: true
+      freeze_tangler: false
+    - name: cycle_finetune
+      mode: cycle
+      steps: 1960 # 20 × 98
+      lr: 1.0e-4
+      restart_steps: 1960 # 20 × 98
+      adverse_alpha: 1.0
+      adverse_norm: true
+      freeze_backbone: true
+      freeze_tangler: false
+# One Lightning-managed AdamW. The module clears Adam state at curriculum
+# boundaries to mimic the old "new AdamW per phase" behavior.
+optimizer:
+  class_path: torch.optim.AdamW
+  init_args:
+    lr: 1.0e-3
+data:
+  class_path: sipe.data.scorpion.SCORPIONDataModule
+  init_args:
+    data_root: data/processed/SCORPION_tiles_224px_0p5mpp
+    batch_size: 512
+    num_workers: 8
+    image_size: 224
+    domain_column: scanner
+    group_column: slide_id
+    val_fraction: 0.1
+    test_fraction: 0.1
+    pin_memory: true
+    persistent_workers: true
