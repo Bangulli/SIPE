@@ -49,6 +49,9 @@ class CATSFeatures(nn.Module):
 
     def forward(self, images: torch.Tensor) -> torch.Tensor:
         if self.representation == "z_gap":
+            # CATSVAE: posterior mean, which needs no scanner label.
+            if hasattr(self.network, "encode_unspecified"):
+                return self.network.encode_unspecified(images).mean(dim=(2, 3))
             return self.network.encode(images)[1].mean(dim=(2, 3))
         if self.representation == "z_pre_gap":
             return self.network.unspecified_preactivation(images).mean(dim=(2, 3))

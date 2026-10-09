@@ -1,4 +1,4 @@
-"""Rebuild a trained CATS model from a self-contained Lightning checkpoint."""
+"""Rebuild a trained CATS / ScannerVAE model from a self-contained checkpoint."""
 
 from __future__ import annotations
 
@@ -13,21 +13,23 @@ import torch
 from sipe.model.arch import CATS
 from sipe.training.cats_module import CATSModule
 from sipe.training.curriculum import CurriculumPhase
+from sipe.training.scanner_vae_module import CHECKPOINT_TAG, ScannerVAEModule
 
 log = logging.getLogger(__name__)
 
 
 @dataclass
 class LoadedCATS:
-    module: CATSModule
-    network: CATS
+    module: CATSModule | ScannerVAEModule
+    network: CATS | Any
     mean: tuple[float, ...]
     std: tuple[float, ...]
     image_size: int
     global_step: int
-    phase_index: int
-    phase: CurriculumPhase
-    local_step: int
+    # Curriculum position (CATSModule only; None for ScannerVAEModule).
+    phase_index: int | None
+    phase: CurriculumPhase | None
+    local_step: int | None
     provenance: dict[str, Any] = field(default_factory=dict)
 
 
@@ -58,18 +60,20 @@ def load_cats_checkpoint(
     ckpt_path: str | Path,
     map_location: str | torch.device = "cpu",
 ) -> LoadedCATS:
-    """Load a CATSModule checkpoint (eval mode) plus its training provenance.
+    """Load a CATSModule / ScannerVAEModule checkpoint (eval mode) + provenance.
 
     The module is rebuilt from the hparams that LightningCLI saved (network as
     {class_path, init_args}) and loaded strictly. With `pretrained: true` timm first
     loads the backbone from the HF cache; the checkpoint weights then overwrite it.
     """
     ckpt_path = Path(ckpt_path).resolve()
+    raw = torch.load(ckpt_path, map_location="cpu", weights_only=True, mmap=True)
+    if raw.get("sipe_module") == CHECKPOINT_TAG:
+        return _load_scanner_vae(ckpt_path, raw, map_location)
+
     module = CATSModule.load_from_checkpoint(ckpt_path, map_location=map_location)
     module.eval()
     network = module.network
-
-    raw = torch.load(ckpt_path, map_location="cpu", weights_only=True, mmap=True)
     global_step = int(raw["global_step"])
     curriculum = module.curriculum
     if global_step > curriculum.total_steps:
@@ -115,5 +119,38 @@ def load_cats_checkpoint(
         phase_index=phase_index,
         phase=phase,
         local_step=local_step,
+        provenance=provenance,
+    )
+
+
+def _load_scanner_vae(
+    ckpt_path: Path, raw: dict[str, Any], map_location: str | torch.device
+) -> LoadedCATS:
+    module = ScannerVAEModule.load_from_checkpoint(ckpt_path, map_location=map_location)
+    module.eval()
+    network = module.network
+    meta = network.encoder_meta
+    run_dir = ckpt_path.parent.parent
+    global_step = int(raw["global_step"])
+    provenance = {
+        "path": str(ckpt_path),
+        "sha256": sha256(ckpt_path),
+        "module": CHECKPOINT_TAG,
+        "global_step": global_step,
+        "epoch": int(raw["epoch"]),
+        "network": raw["hyper_parameters"]["network"],
+        "train_run_dir": str(run_dir),
+        "train_git": _read_git_txt(run_dir / "git.txt"),
+    }
+    return LoadedCATS(
+        module=module,
+        network=network,
+        mean=meta.mean,
+        std=meta.std,
+        image_size=meta.input_size[-1],
+        global_step=global_step,
+        phase_index=None,
+        phase=None,
+        local_step=None,
         provenance=provenance,
     )

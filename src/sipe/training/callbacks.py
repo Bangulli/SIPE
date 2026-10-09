@@ -95,9 +95,17 @@ class ReconstructionLogger(L.Callback):
         self._last_logged_step = step
 
         images = batch[pl_module.image_key][: self.num_images]
+        # Label-conditioned networks (CATSVAE, conditioning="label") take s from the
+        # scanner label; the swapped/re-encoded panels then use the rolled labels.
+        label_kwargs: dict = {}
+        rolled_kwargs: dict = {}
+        if getattr(pl_module.network, "needs_domains", False):
+            domains = batch[pl_module.domain_key][: self.num_images].long().view(-1)
+            label_kwargs = {"domains": domains}
+            rolled_kwargs = {"domains": torch.roll(domains, shifts=1, dims=0)}
 
         with torch.no_grad():
-            output = pl_module.network(images)
+            output = pl_module.network(images, **label_kwargs)
 
             s = output["s"]
             z = output["z"]
@@ -108,7 +116,7 @@ class ReconstructionLogger(L.Callback):
             mixed = pl_module.network.decode(s_swapped, z)
 
             # What does the encoder recover from the synthetic image?
-            s2, z2 = pl_module.network.encode(mixed)
+            s2, z2 = pl_module.network.encode(mixed, **rolled_kwargs)
             mixed_reconstruction = pl_module.network.decode(s2, z2)
 
             z_only = pl_module.network.decode(

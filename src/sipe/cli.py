@@ -139,8 +139,19 @@ def _wandb_logger_configs(logger_cfg):
 
 
 def main() -> None:
+    _run(CATSModule)
+
+
+def main_vae() -> None:
+    """`sipe-vae`: same run-dir/W&B handling, ScannerVAEModule as the model."""
+    from sipe.training.scanner_vae_module import ScannerVAEModule
+
+    _run(ScannerVAEModule)
+
+
+def _run(model_class: type[L.LightningModule]) -> None:
     SIPECLI(
-        model_class=CATSModule,
+        model_class=model_class,
         datamodule_class=L.LightningDataModule,
         subclass_mode_data=True,
         seed_everything_default=42,

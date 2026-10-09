@@ -10,6 +10,11 @@ Fast screening of CATS checkpoints before the full PLISM/HEST benchmarks.
 - Scanner probes (leakage the training adversary may miss): standardized logistic
   regression and a 1-hidden-layer MLP, trained on `--probe-train-split` features and
   tested on `--split` features (different WSIs). Chance = 1 / n_scanners.
+- Region probe (content that survives a scanner change): within `--split`, a
+  standardized logistic regression predicts the tissue region (slide + sample, 49
+  tiles each) from tiles of all scanners but one and is tested on the held-out
+  scanner; accuracy is averaged over held-out scanners. SCORPION has no tissue
+  labels, so region identity stands in for content. Chance = 1 / n_regions.
 
 `pair_id` is used for evaluation only.
 
@@ -74,6 +79,7 @@ def extract(
         )
     meta = pd.concat(rows, ignore_index=True)
     meta["slide_id"] = meta["pair_id"].str.split("-").str[0]
+    meta["region_id"] = meta["pair_id"].str.partition("-tile_")[0]
     return {k: np.concatenate(v) for k, v in out.items()}, meta
 
 
@@ -148,6 +154,22 @@ def scanner_probes(
     }
 
 
+def region_probe(feats: np.ndarray, meta: pd.DataFrame) -> dict[str, float]:
+    """Leave-one-scanner-out linear probe of region identity."""
+    regions = meta["region_id"].to_numpy()
+    scanners = meta["scanner"].to_numpy()
+    accuracies = {}
+    for held_out in sorted(set(scanners)):
+        test = scanners == held_out
+        probe = make_pipeline(StandardScaler(), LogisticRegression(max_iter=2000))
+        probe.fit(feats[~test], regions[~test])
+        accuracies[held_out] = float(probe.score(feats[test], regions[test]))
+    return {
+        "region_probe_acc": float(np.mean(list(accuracies.values()))),
+        **{f"region_probe_acc_{k}": v for k, v in accuracies.items()},
+    }
+
+
 def main(argv: list[str] | None = None) -> Path:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--ckpt", type=Path, required=True)
@@ -175,6 +197,10 @@ def main(argv: list[str] | None = None) -> Path:
     ckpt = args.ckpt.resolve()
     loaded = load_cats_checkpoint(ckpt)
     network = loaded.network.to(device).eval()
+    if getattr(network, "needs_domains", False) and "s" in args.representations:
+        # Label-conditioned s is the scanner embedding itself: nothing to evaluate.
+        log.info("Skipping representation 's' (label-conditioned network).")
+        args.representations = [r for r in args.representations if r != "s"]
     features = {r: CATSFeatures(network, r) for r in args.representations}
 
     # Same data config (root, split seed/fractions) as the training run.
@@ -237,6 +263,7 @@ def main(argv: list[str] | None = None) -> Path:
                 test_feats[rep],
                 test_meta["domain"].to_numpy(),
             ),
+            **region_probe(test_feats[rep], test_meta),
         }
         log.info("%s: %s", rep, summary[rep])
 
