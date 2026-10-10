@@ -75,17 +75,20 @@ from its z. The gain is a SCORPION-specific alignment, not scanner removal.
    |---|---|---|---|---|---|---|
    | `qvc6voso` (`runs/2026-10-09_23-37-17_lxbelshark_f08b`) | GRL, β 0.1 | 0.74 / 0.80 | 0.051 | 2.04 | 0.24 | 0.23 |
    | `o375g4md` (`runs/2026-10-10_12-05-05_lxbelshark_9597`) | GRL, β 1 | 0.78 / 0.80 | 0.244 | 0.52 | 0.86 | 0.25 |
-   | `da7vqx1r` (`runs/2026-10-10_13-16-50_lxbelshark_ca85`) | Fader, β 0.1, 5 adversary steps | 0.75 / 0.80 (min 0.69 at step 2000) | 0.080 | 3.0 | 0.23 | 0.47 |
+   | `da7vqx1r` (`runs/2026-10-10_13-16-50_lxbelshark_ca85`) | Fader, β 0.1, 5 adversary steps | 0.72 / 0.80 (mean of last 10 vals 0.72; min 0.69 at step 2000) | 0.095 | 3.7 | 0.23 | 0.60 |
 
    - β 0.1 GRL: stable, but the KL barely compresses and the GRL is fooled again.
    - β 1: reconstruction is 5× worse and σ is near the prior, yet the scanner is still
      readable. A stronger bottleneck removes content, not scanner. **Dead end.**
-   - Fader: **still running** at the last check (step 4,300/6,000).
-     - Its adversary is honest (training fit accuracy about 0.54, chance 0.2), but the
-       encoder is losing (confusion about 1.24; 1.0 = uniform).
-     - Scanner removal is at most slightly better than GRL; probe values move by about
-       ±0.03 between validations.
-     - Its final numbers still need to be checked.
+   - Fader (finished, 6,000 steps): **no real gain over GRL.**
+     - Probe gap 0.08 (z 0.72 vs backbone 0.80) vs 0.06 for GRL, within the ±0.03 noise
+       between validations.
+     - The adversary is honest and wins at the end. While the encoder's cosine LR decays
+       (the adversary's LR is constant), its training fit accuracy rises from 0.54 to 0.78,
+       val adversary accuracy from 0.42 to 0.60, and confusion from 1.24 to 1.84.
+       Meanwhile recon worsens (0.080 → 0.095), KL rises (3.0 → 3.7) and |z| grows.
+     - Conclusion: in a fair game, an adversary on z can't remove the scanner at this
+       weight. No SCORPION proxy or PLISM run.
    - The β=1 run ran on `5a77728` with the uncommitted Fader diff (GRL mode); that code is
      the same as what was committed in `ff26970`.
 
@@ -109,13 +112,14 @@ from its z. The gain is a SCORPION-specific alignment, not scanner removal.
 
 ## 4. Open points / next steps
 
-- Check the final Fader numbers. If the probe gap improves, run the SCORPION proxy and
-  then PLISM.
-- Fader knobs: a larger `adversary_weight` (3–5) and fewer `adversary_steps` (1–2), so the
-  encoder can keep up.
-- Next ideas from the VAE plan: a conditional discriminator on generated features (Mathieu
-  `L_adv`), then a paired translation loss using SCORPION `pair_id` (allowed if unpaired
-  stalls).
+- Launch PairedVAE (`uv run sipe fit --config configs/paired_vae.yaml`), then check it
+  against the backbone: probe gap, `val/retrieval_top1_zgap` vs `_backbone`, and `s` probe
+  (should be high).
+- Stage 2: Mathieu's class-conditional GAN in embedding space, unpaired, as a new module
+  class and config.
+- If adversaries on z come back: the Fader knobs not tried are a larger
+  `adversary_weight` (3–5), fewer `adversary_steps`, and decaying the adversary's LR with
+  the encoder's (the end of the Fader run was dominated by the adversary).
 - Not started: H-optimus-1 training (memory at bs 512 untested; `unspecified_dim` choice
   open), HEST runs on a winning model ("does no harm" check), and baselines beyond raw GAP.
 - Each run (and the H0-mini GAP baseline) has one seed, so small differences
