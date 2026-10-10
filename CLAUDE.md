@@ -10,6 +10,14 @@ hash.
 **Current phase: convergence + baselines.** Data sanity tests: `docs/parity-audit.md`.
 Baselines: `docs/baselines.md`.
 
+**Progress log: `docs/progress.md`.** Whenever you check or interpret runs (training runs,
+SCORPION proxy, PLISM/HEST bench runs), update it in the same turn:
+- add or update the run's row: run dir, W&B id, config, key metrics, verdict;
+- mark runs still in progress, and the step you read;
+- adjust "Open points / next steps";
+- update the "as of" date.
+Say in your reply that you updated it.
+
 ## Layout
 
 - `main` = original author code. Read-only checkout at `../SIPE-main` (never modify it).
