@@ -19,7 +19,7 @@ def _write_cats_checkpoint(run_dir: Path, global_step: int) -> Path:
     hparams hold `network` as {class_path, init_args} plus `_instantiator`, as
     SIPECLI writes them; the random weights stand in for trained ones.
     """
-    model_cfg = yaml.safe_load(CONFIG.read_text())["model"]
+    model_cfg = yaml.safe_load(CONFIG.read_text())["model"]["init_args"]
     network_args = {**model_cfg.pop("network"), "pretrained": False}
     torch.manual_seed(0)
     module = CATSModule(network=CATS(**network_args), **model_cfg)

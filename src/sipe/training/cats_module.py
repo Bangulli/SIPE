@@ -3,7 +3,6 @@ from __future__ import annotations
 import math
 from typing import Any
 
-import lightning as L
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -13,11 +12,12 @@ from sipe.losses.adversarial_classif_loss import AdversarialClassifLoss
 from sipe.losses.image_recon_loss import ImageReconLoss
 from sipe.model.arch import CATS
 
+from .base import SIPEModule
 from .curriculum import CurriculumPhase, StepCurriculum
 from .grl import GradientReversal
 
 
-class CATSModule(L.LightningModule):
+class CATSModule(SIPEModule):
     """Step-based Lightning port of the legacy CATS curriculum trainer.
 
     The original stain branch is adapted to one SCORPION scanner/domain branch.

@@ -30,22 +30,24 @@ trainer:
       init_args:
         logging_interval: step
 model:
-  network:
-    encoder: h0-mini
-    specified_dim: 64
-    unspecified_dim: 704
-    pretrained: true
-    output_size: 224
-  num_domains: 5
-  reconstruction_weight: 20.0
-  adversarial_weight: 1.0
-  specified_domain_weight: 1.0
-  unspecified_domain_weight: 1.0
-  grl_alpha: 1.0
-  grl_warmup_steps: 0
-  freeze_backbone: true
-  image_key: image
-  domain_key: domain
+  class_path: sipe.training.cats_module.CATSModule
+  init_args:
+    network:
+      encoder: h0-mini
+      specified_dim: 64
+      unspecified_dim: 704
+      pretrained: true
+      output_size: 224
+    num_domains: 5
+    reconstruction_weight: 20.0
+    adversarial_weight: 1.0
+    specified_domain_weight: 1.0
+    unspecified_domain_weight: 1.0
+    grl_alpha: 1.0
+    grl_warmup_steps: 0
+    freeze_backbone: true
+    image_key: image
+    domain_key: domain
 optimizer:
   class_path: torch.optim.AdamW
   init_args:

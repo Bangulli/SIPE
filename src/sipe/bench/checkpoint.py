@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -11,24 +12,22 @@ from typing import Any
 import torch
 
 from sipe.model.arch import CATS
+from sipe.training.base import CHECKPOINT_KEY, SIPEModule, class_path
 from sipe.training.cats_module import CATSModule
 from sipe.training.curriculum import CurriculumPhase
-from sipe.training.paired_vae_module import CHECKPOINT_TAG as PAIRED_VAE_TAG
-from sipe.training.paired_vae_module import PairedVAEModule
-from sipe.training.scanner_vae_module import CHECKPOINT_TAG, ScannerVAEModule
 
 log = logging.getLogger(__name__)
 
 
 @dataclass
 class LoadedCATS:
-    module: CATSModule | ScannerVAEModule | PairedVAEModule
+    module: SIPEModule
     network: CATS | Any
     mean: tuple[float, ...]
     std: tuple[float, ...]
     image_size: int
     global_step: int
-    # Curriculum position (CATSModule only; None for the VAE modules).
+    # Curriculum position (CATSModule only; None for other modules).
     phase_index: int | None
     phase: CurriculumPhase | None
     local_step: int | None
@@ -62,7 +61,7 @@ def load_cats_checkpoint(
     ckpt_path: str | Path,
     map_location: str | torch.device = "cpu",
 ) -> LoadedCATS:
-    """Load a CATS / ScannerVAE / PairedVAE module checkpoint (eval mode) + provenance.
+    """Load a SIPE training-module checkpoint (eval mode) + provenance.
 
     The module is rebuilt from the hparams that LightningCLI saved (network as
     {class_path, init_args}) and loaded strictly. With `pretrained: true` timm first
@@ -70,9 +69,9 @@ def load_cats_checkpoint(
     """
     ckpt_path = Path(ckpt_path).resolve()
     raw = torch.load(ckpt_path, map_location="cpu", weights_only=True, mmap=True)
-    tag = raw.get("sipe_module")
-    if tag in _VAE_MODULES:
-        return _load_vae(ckpt_path, raw, map_location, tag)
+    module_class = checkpoint_module_class(raw)
+    if not issubclass(module_class, CATSModule):
+        return _load_module(ckpt_path, raw, map_location, module_class)
 
     module = CATSModule.load_from_checkpoint(ckpt_path, map_location=map_location)
     module.eval()
@@ -100,6 +99,7 @@ def load_cats_checkpoint(
     provenance = {
         "path": str(ckpt_path),
         "sha256": sha256(ckpt_path),
+        "module": class_path(module_class),
         "global_step": global_step,
         "curriculum_total_steps": curriculum.total_steps,
         "epoch": int(raw["epoch"]),
@@ -126,15 +126,38 @@ def load_cats_checkpoint(
     )
 
 
-_VAE_MODULES = {CHECKPOINT_TAG: ScannerVAEModule, PAIRED_VAE_TAG: PairedVAEModule}
+# Tags written before checkpoints stored the module's class path (2026-10-10).
+_LEGACY_TAGS = {
+    "scanner_vae": "sipe.training.scanner_vae_module.ScannerVAEModule",
+    "paired_vae": "sipe.training.paired_vae_module.PairedVAEModule",
+}
 
 
-def _load_vae(
-    ckpt_path: Path, raw: dict[str, Any], map_location: str | torch.device, tag: str
+def checkpoint_module_class(raw: dict[str, Any]) -> type[SIPEModule]:
+    """The training-module class that wrote a checkpoint.
+
+    Checkpoints store its import path under CHECKPOINT_KEY; older ones store a short
+    tag (_LEGACY_TAGS) or nothing (CATSModule, which predates the key).
+    """
+    path = raw.get(CHECKPOINT_KEY)
+    if path is None:
+        return CATSModule
+    path = _LEGACY_TAGS.get(path, path)
+    module_name, _, name = path.rpartition(".")
+    module_class = getattr(importlib.import_module(module_name), name)
+    if not issubclass(module_class, SIPEModule):
+        raise TypeError(f"{path} is not a SIPEModule.")
+    return module_class
+
+
+def _load_module(
+    ckpt_path: Path,
+    raw: dict[str, Any],
+    map_location: str | torch.device,
+    module_class: type[SIPEModule],
 ) -> LoadedCATS:
-    module = _VAE_MODULES[tag].load_from_checkpoint(
-        ckpt_path, map_location=map_location
-    )
+    """Non-curriculum modules (ScannerVAE, PairedVAE, ...)."""
+    module = module_class.load_from_checkpoint(ckpt_path, map_location=map_location)
     module.eval()
     network = module.network
     meta = network.encoder_meta
@@ -143,7 +166,7 @@ def _load_vae(
     provenance = {
         "path": str(ckpt_path),
         "sha256": sha256(ckpt_path),
-        "module": tag,
+        "module": class_path(module_class),
         "global_step": global_step,
         "epoch": int(raw["epoch"]),
         "network": raw["hyper_parameters"]["network"],

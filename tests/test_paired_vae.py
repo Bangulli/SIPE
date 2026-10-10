@@ -147,11 +147,11 @@ def test_paired_datamodule() -> None:
 
 @pytest.mark.skipif(not DATA_ROOT.is_dir(), reason="SCORPION tiles not available")
 def test_cli_fit_checkpoint_roundtrip(tmp_path: Path) -> None:
-    """A real 3-step `sipe-paired fit` writes a checkpoint the bench loader rebuilds."""
+    """A real 3-step `sipe fit` writes a checkpoint the bench loader rebuilds."""
     run_dir = tmp_path / "run"
     run_dir.mkdir()
     cmd = [
-        sys.executable, "-c", "from sipe.cli import main_paired; main_paired()", "fit",
+        sys.executable, "-m", "sipe.cli", "fit",
         "--config", str(ROOT / "configs" / "paired_vae.yaml"),
         f"--data.init_args.data_root={DATA_ROOT}",
         "--data.init_args.batch_size=2",
@@ -174,7 +174,9 @@ def test_cli_fit_checkpoint_roundtrip(tmp_path: Path) -> None:
     loaded = load_cats_checkpoint(ckpt)
     assert isinstance(loaded.module, PairedVAEModule)
     assert loaded.global_step == 3 and loaded.phase is None
-    assert loaded.provenance["module"] == "paired_vae"
+    assert loaded.provenance["module"] == (
+        "sipe.training.paired_vae_module.PairedVAEModule"
+    )
     images = torch.randn(2, 3, 224, 224)
     with torch.no_grad():
         z_gap = CATSFeatures(loaded.network, "z_gap")(images)

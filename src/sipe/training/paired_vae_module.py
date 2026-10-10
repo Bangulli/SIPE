@@ -30,22 +30,13 @@ from __future__ import annotations
 
 from typing import Any
 
-import lightning as L
 import numpy as np
 import torch
 import torch.nn.functional as F
-from torch.optim.lr_scheduler import CosineAnnealingLR
 
 from sipe.model.paired_vae import PairedVAE
-from sipe.training.scanner_vae_module import (
-    feature_recon_loss,
-    gaussian_kl,
-    linear_probe_accuracy,
-    ramp,
-)
-
-# Stored in checkpoints so sipe.bench.checkpoint picks the right module class.
-CHECKPOINT_TAG = "paired_vae"
+from sipe.training.base import FrozenBackboneModule
+from sipe.training.scanner_vae_module import feature_recon_loss, gaussian_kl, ramp
 
 
 def same_scanner_donor(
@@ -123,7 +114,7 @@ def cross_scanner_top1(
     return float(torch.stack(scores).mean()) if scores else float("nan")
 
 
-class PairedVAEModule(L.LightningModule):
+class PairedVAEModule(FrozenBackboneModule):
     def __init__(
         self,
         network: PairedVAE,
@@ -154,29 +145,12 @@ class PairedVAEModule(L.LightningModule):
         if freeze_backbone:
             network.freeze_backbone()
 
-    def train(self, mode: bool = True) -> PairedVAEModule:
-        # Lightning toggles train mode around validation; keep a frozen backbone in
-        # eval mode throughout (no-op for H0-mini, which has no dropout/drop-path).
-        super().train(mode)
-        if self.hparams.freeze_backbone:
-            self.network.backbone.eval()
-        return self
-
     def configure_optimizers(self) -> dict[str, Any]:
-        if self.trainer.max_steps <= 0:
-            raise ValueError("PairedVAEModule needs trainer.max_steps (cosine LR).")
         params = [p for p in self.parameters() if p.requires_grad]
-        optimizer = torch.optim.AdamW(
-            params, lr=self.hparams.lr, weight_decay=self.hparams.weight_decay
+        optimizer, scheduler = self.cosine_adamw(
+            params, self.hparams.lr, self.hparams.weight_decay
         )
-        scheduler = CosineAnnealingLR(optimizer, T_max=self.trainer.max_steps)
-        return {
-            "optimizer": optimizer,
-            "lr_scheduler": {"scheduler": scheduler, "interval": "step"},
-        }
-
-    def on_save_checkpoint(self, checkpoint: dict[str, Any]) -> None:
-        checkpoint["sipe_module"] = CHECKPOINT_TAG
+        return {"optimizer": optimizer, "lr_scheduler": scheduler}
 
     def training_step(self, batch: dict[str, Any], batch_idx: int) -> torch.Tensor:
         del batch_idx
@@ -210,16 +184,7 @@ class PairedVAEModule(L.LightningModule):
         for name in ("zgap", "backbone"):
             top1 = cross_scanner_top1(features[name], domains, locations, slide_index)
             self.log(f"val/retrieval_top1_{name}", top1)
-
-        if len(unique) < 2:
-            return  # e.g. limit_val_batches: no WSI-disjoint split possible
-        test_slides = set(unique[1::2])
-        test = torch.tensor([s in test_slides for s in slides], device=self.device)
-        for name, x in features.items():
-            accuracy = linear_probe_accuracy(
-                x[~test], domains[~test], x[test], domains[test], self.num_domains
-            )
-            self.log(f"val/probe_{name}_acc", accuracy)
+        self.log_wsi_probes(features, domains, slides)
 
     def _step(
         self,

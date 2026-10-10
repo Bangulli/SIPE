@@ -36,38 +36,40 @@ trainer:
         num_images: 4
         every_n_steps: 100
 model:
-  # ScannerVAE (not legacy CATS; run with `sipe-vae fit`): Fader-style VAE in frozen
-  # H0-mini token space. Decoder conditioned on a learned scanner embedding, KL on z,
-  # GRL MLP adversary on LayerNorm(GAP(mu)). No curriculum, no cycle, unpaired.
-  # Benchmarked representation: GAP(mu).
-  # Plan: /box/.claude/plans/ok-so-i-am-vectorized-thunder.md
-  network:
-    class_path: sipe.model.scanner_vae.ScannerVAE
-    init_args:
-      encoder: h0-mini
-      num_domains: 5
-      specified_dim: 64
-      unspecified_hidden_dim: 1024
-      reentangler_hidden_dim: 1024
-      init_logvar: -4.0
-      pixel_decoder: true # visualization only (trained on detached features)
-      pretrained: true
-      output_size: 224
-  num_domains: 5
-  lr: 3.0e-4 # cosine decay over trainer.max_steps
-  weight_decay: 0.01
-  # beta on KL (mean over tokens and dims, relative to the scale-free feature recon)
-  kl_weight: 0.1
-  kl_warmup_steps: 1000
-  # Adversary CE is divided by log(5); its weight ramps linearly from 0.
-  adversary_weight: 1.0
-  adversary_warmup_steps: 1000
-  adversary_hidden_dim: 512
-  # GRL safeguards: faster adversary, re-initialized every 500 steps.
-  adversary_lr_mult: 10.0
-  adversary_reset_steps: 500
-  pixel_weight: 1.0
-  freeze_backbone: true
+  class_path: sipe.training.scanner_vae_module.ScannerVAEModule
+  init_args:
+    # ScannerVAE (not legacy CATS; run with `sipe fit`): Fader-style VAE in frozen
+    # H0-mini token space. Decoder conditioned on a learned scanner embedding, KL on z,
+    # GRL MLP adversary on LayerNorm(GAP(mu)). No curriculum, no cycle, unpaired.
+    # Benchmarked representation: GAP(mu).
+    # Plan: /box/.claude/plans/ok-so-i-am-vectorized-thunder.md
+    network:
+      class_path: sipe.model.scanner_vae.ScannerVAE
+      init_args:
+        encoder: h0-mini
+        num_domains: 5
+        specified_dim: 64
+        unspecified_hidden_dim: 1024
+        reentangler_hidden_dim: 1024
+        init_logvar: -4.0
+        pixel_decoder: true # visualization only (trained on detached features)
+        pretrained: true
+        output_size: 224
+    num_domains: 5
+    lr: 3.0e-4 # cosine decay over trainer.max_steps
+    weight_decay: 0.01
+    # beta on KL (mean over tokens and dims, relative to the scale-free feature recon)
+    kl_weight: 0.1
+    kl_warmup_steps: 1000
+    # Adversary CE is divided by log(5); its weight ramps linearly from 0.
+    adversary_weight: 1.0
+    adversary_warmup_steps: 1000
+    adversary_hidden_dim: 512
+    # GRL safeguards: faster adversary, re-initialized every 500 steps.
+    adversary_lr_mult: 10.0
+    adversary_reset_steps: 500
+    pixel_weight: 1.0
+    freeze_backbone: true
 data:
   class_path: sipe.data.scorpion.SCORPIONDataModule
   init_args:

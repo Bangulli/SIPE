@@ -12,10 +12,8 @@ from sipe.bench.checkpoint import load_cats_checkpoint
 from sipe.bench.encoders import CATSFeatures
 from sipe.cli import RUN_DIR_ENV
 from sipe.model.scanner_vae import ScannerVAE
-from sipe.training.scanner_vae_module import (
-    ScannerVAEModule,
-    linear_probe_accuracy,
-)
+from sipe.training.base import linear_probe_accuracy
+from sipe.training.scanner_vae_module import ScannerVAEModule
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA_ROOT = ROOT / "data/processed/SCORPION_tiles_224px_0p5mpp"
@@ -114,7 +112,7 @@ def test_fader_mode_uses_manual_optimization(network: ScannerVAE) -> None:
 @pytest.mark.skipif(not DATA_ROOT.is_dir(), reason="SCORPION tiles not available")
 @pytest.mark.parametrize("config", ["scanner_vae.yaml", "scanner_vae_fader.yaml"])
 def test_cli_fit_checkpoint_roundtrip(tmp_path: Path, config: str) -> None:
-    """A real 3-step `sipe-vae fit` writes a checkpoint the bench loader rebuilds.
+    """A real 3-step `sipe fit` writes a checkpoint the bench loader rebuilds.
 
     Fader: the adversary's extra steps must not count as global steps (3 batches ->
     global_step 3, encoder Adam step 3, adversary Adam step 3 * adversary_steps).
@@ -122,7 +120,7 @@ def test_cli_fit_checkpoint_roundtrip(tmp_path: Path, config: str) -> None:
     run_dir = tmp_path / "run"
     run_dir.mkdir()
     cmd = [
-        sys.executable, "-c", "from sipe.cli import main_vae; main_vae()", "fit",
+        sys.executable, "-m", "sipe.cli", "fit",
         "--config", str(ROOT / "configs" / config),
         f"--data.init_args.data_root={DATA_ROOT}",
         "--data.init_args.batch_size=4",
@@ -150,7 +148,9 @@ def test_cli_fit_checkpoint_roundtrip(tmp_path: Path, config: str) -> None:
     loaded = load_cats_checkpoint(ckpt)
     assert isinstance(loaded.module, ScannerVAEModule)
     assert loaded.global_step == 3 and loaded.phase is None
-    assert loaded.provenance["module"] == "scanner_vae"
+    assert loaded.provenance["module"] == (
+        "sipe.training.scanner_vae_module.ScannerVAEModule"
+    )
     images = torch.randn(2, 3, 224, 224)
     with torch.no_grad():
         z_gap = CATSFeatures(loaded.network, "z_gap")(images)

@@ -37,63 +37,65 @@ trainer:
         num_images: 4
         every_n_steps: 100
 model:
-  network:
-    encoder: h-optimus-1
-    specified_dim: 64
-    unspecified_dim: 704
-    pretrained: true
-    output_size: 224
-  num_domains: 5
-  # Old GRL uses alpha=1. Curriculum adverse_alpha belongs to
-  # AdversarialClassifLoss, not to gradient reversal.
-  grl_alpha: 1.0
-  image_key: image
-  domain_key: domain
-  # Exact constants visible in the legacy loss code.
-  recon_phase_reconstruction_weight: 1.0
-  adverse_phase_reconstruction_weight: 1.0
-  cycle_phase_reconstruction_weight: 20.0
-  cycle_s_weight: 1.0
-  cycle_z_weight: 0.5
-  curriculum:
-    - name: recon
-      mode: recon
-      steps: 490 # 5 × 98
-      lr: 1.0e-3
-      restart_steps: 490 # old T_0 = 5 epochs
-      adverse_alpha: 1.0
-      adverse_norm: true
-      freeze_backbone: true
-      freeze_tangler: false
-    - name: cycle_main
-      mode: cycle
-      steps: 9800 # 100 × 98
-      lr: 1.0e-3
-      restart_steps: 2450 # 25 × 98
-      adverse_alpha:
-        - 0.1
-        - 0.2
-        - 0.3
-        - 0.4
-        - 0.5
-        - 0.6
-        - 0.7
-        - 0.8
-        - 0.9
-        - 1.0
-      adverse_alpha_interval_steps: 98
-      adverse_norm: true
-      freeze_backbone: true
-      freeze_tangler: false
-    - name: cycle_finetune
-      mode: cycle
-      steps: 1960 # 20 × 98
-      lr: 1.0e-4
-      restart_steps: 1960 # 20 × 98
-      adverse_alpha: 1.0
-      adverse_norm: true
-      freeze_backbone: true
-      freeze_tangler: false
+  class_path: sipe.training.cats_module.CATSModule
+  init_args:
+    network:
+      encoder: h-optimus-1
+      specified_dim: 64
+      unspecified_dim: 704
+      pretrained: true
+      output_size: 224
+    num_domains: 5
+    # Old GRL uses alpha=1. Curriculum adverse_alpha belongs to
+    # AdversarialClassifLoss, not to gradient reversal.
+    grl_alpha: 1.0
+    image_key: image
+    domain_key: domain
+    # Exact constants visible in the legacy loss code.
+    recon_phase_reconstruction_weight: 1.0
+    adverse_phase_reconstruction_weight: 1.0
+    cycle_phase_reconstruction_weight: 20.0
+    cycle_s_weight: 1.0
+    cycle_z_weight: 0.5
+    curriculum:
+      - name: recon
+        mode: recon
+        steps: 490 # 5 × 98
+        lr: 1.0e-3
+        restart_steps: 490 # old T_0 = 5 epochs
+        adverse_alpha: 1.0
+        adverse_norm: true
+        freeze_backbone: true
+        freeze_tangler: false
+      - name: cycle_main
+        mode: cycle
+        steps: 9800 # 100 × 98
+        lr: 1.0e-3
+        restart_steps: 2450 # 25 × 98
+        adverse_alpha:
+          - 0.1
+          - 0.2
+          - 0.3
+          - 0.4
+          - 0.5
+          - 0.6
+          - 0.7
+          - 0.8
+          - 0.9
+          - 1.0
+        adverse_alpha_interval_steps: 98
+        adverse_norm: true
+        freeze_backbone: true
+        freeze_tangler: false
+      - name: cycle_finetune
+        mode: cycle
+        steps: 1960 # 20 × 98
+        lr: 1.0e-4
+        restart_steps: 1960 # 20 × 98
+        adverse_alpha: 1.0
+        adverse_norm: true
+        freeze_backbone: true
+        freeze_tangler: false
 # One Lightning-managed AdamW. The module clears Adam state at curriculum
 # boundaries to mimic the old "new AdamW per phase" behavior.
 optimizer:

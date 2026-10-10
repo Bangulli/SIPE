@@ -152,6 +152,11 @@ Don't hard-code a config filename into tooling unless it is the canonical projec
 # Lightning rules
 
 - Configure through LightningCLI-compatible YAML, not custom argument parsing.
+- One entry point, `sipe fit`. The config picks the training module (`model.class_path`, a
+  `SIPEModule` subclass from `src/sipe/training/base.py`) and the datamodule
+  (`data.class_path`). A new method is a new module class plus a config, never a new CLI
+  entry. Run configs saved before 2026-10-10 have a flat `model:` section: wrap it in
+  `class_path`/`init_args` to replay them.
 - Don't bypass Lightning's optimizer/checkpoint lifecycle casually. Custom behavior kept for
   legacy fidelity (AdamW reset, phase-local scheduler, step-based curriculum) must be documented
   in a comment explaining why.

@@ -14,7 +14,7 @@ from lightning.pytorch.callbacks import ModelCheckpoint
 from lightning.pytorch.cli import LightningCLI, SaveConfigCallback
 from lightning.pytorch.loggers import WandbLogger
 
-from sipe.training.cats_module import CATSModule
+from sipe.training.base import SIPEModule
 
 # Set by the launching process so DDP children spawned by Lightning reuse its run dir.
 RUN_DIR_ENV = "SIPE_RUN_DIR"
@@ -87,7 +87,7 @@ class SIPECLI(LightningCLI):
         # The backbone fixes the input normalization: the datamodule reads mean/std
         # from the same encoder builder, so training and benchmarks cannot diverge.
         parser.link_arguments(
-            "model.network.init_args.encoder", "data.init_args.encoder"
+            "model.init_args.network.init_args.encoder", "data.init_args.encoder"
         )
 
     def before_instantiate_classes(self) -> None:
@@ -138,33 +138,21 @@ def _wandb_logger_configs(logger_cfg):
     ]
 
 
+# `sipe`: the training module is `model.class_path` in the config (any SIPEModule
+# subclass), the datamodule `data.class_path`.
+CLI_KWARGS = dict(
+    model_class=SIPEModule,
+    subclass_mode_model=True,
+    datamodule_class=L.LightningDataModule,
+    subclass_mode_data=True,
+    seed_everything_default=42,
+    save_config_callback=RunDirSaveConfigCallback,
+    save_config_kwargs={"overwrite": True, "save_to_log_dir": False},
+)
+
+
 def main() -> None:
-    _run(CATSModule)
-
-
-def main_vae() -> None:
-    """`sipe-vae`: same run-dir/W&B handling, ScannerVAEModule as the model."""
-    from sipe.training.scanner_vae_module import ScannerVAEModule
-
-    _run(ScannerVAEModule)
-
-
-def main_paired() -> None:
-    """`sipe-paired`: same run-dir/W&B handling, PairedVAEModule as the model."""
-    from sipe.training.paired_vae_module import PairedVAEModule
-
-    _run(PairedVAEModule)
-
-
-def _run(model_class: type[L.LightningModule]) -> None:
-    SIPECLI(
-        model_class=model_class,
-        datamodule_class=L.LightningDataModule,
-        subclass_mode_data=True,
-        seed_everything_default=42,
-        save_config_callback=RunDirSaveConfigCallback,
-        save_config_kwargs={"overwrite": True, "save_to_log_dir": False},
-    )
+    SIPECLI(**CLI_KWARGS)
 
 
 if __name__ == "__main__":

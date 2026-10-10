@@ -34,66 +34,68 @@ trainer:
       init_args:
         logging_interval: step
 model:
-  network:
-    encoder: h0-mini
-    specified_dim: 64
-    unspecified_dim: 704
-    pretrained: true
-    output_size: 224
-  num_domains: 5
-  reconstruction_weight: 20.0
-  adversarial_weight: 1.0
-  specified_domain_weight: 1.0
-  unspecified_domain_weight: 1.0
-  cycle_weight: 1.0
-  # The legacy trainer shows how the cycle is wired, but the actual latent
-  # distance is defined in SIPE_Loss_Adversarial_Cycle, not in the trainer.
-  # Keep this explicit so you can switch to mse if that old loss used MSE.
-  cycle_distance: l1
-  # GRL strength itself. Curriculum "adversarial_scale" below controls the
-  # loss strength, corresponding more closely to the old adverse_alpha.
-  grl_alpha: 1.0
-  freeze_backbone: true
-  image_key: image
-  domain_key: domain
-  curriculum:
-    # Old: recon, 5 epochs, lr=1e-3, restarts=5
-    # Here 1 old "epoch unit" is represented by 1000 optimizer steps purely as
-    # an example. Adjust the absolute counts for your compute budget.
-    - name: recon
-      mode: recon
-      steps: 5000
-      lr: 1.0e-3
-      restart_steps: 5000
-      freeze_backbone: true
-      freeze_tangler: false
-      reset_optimizer_state: true
-    # Old: cycle, 100 epochs, adverse_alpha ramps 0.1 -> 1.0 over ~9 epochs,
-    # lr=1e-3, restarts=25.
-    - name: cycle_main
-      mode: cycle
-      steps: 100000
-      lr: 1.0e-3
-      restart_steps: 25000
-      adversarial_scale_start: 0.1
-      adversarial_scale_end: 1.0
-      adversarial_ramp_steps: 9000
-      cycle_scale: 1.0
-      freeze_backbone: true
-      freeze_tangler: false
-      reset_optimizer_state: true
-    # Old: cycle, 20 epochs, lr=1e-4, restarts=20.
-    - name: cycle_finetune
-      mode: cycle
-      steps: 20000
-      lr: 1.0e-4
-      restart_steps: 20000
-      adversarial_scale_start: 1.0
-      adversarial_scale_end: 1.0
-      cycle_scale: 1.0
-      freeze_backbone: true
-      freeze_tangler: false
-      reset_optimizer_state: true
+  class_path: sipe.training.cats_module.CATSModule
+  init_args:
+    network:
+      encoder: h0-mini
+      specified_dim: 64
+      unspecified_dim: 704
+      pretrained: true
+      output_size: 224
+    num_domains: 5
+    reconstruction_weight: 20.0
+    adversarial_weight: 1.0
+    specified_domain_weight: 1.0
+    unspecified_domain_weight: 1.0
+    cycle_weight: 1.0
+    # The legacy trainer shows how the cycle is wired, but the actual latent
+    # distance is defined in SIPE_Loss_Adversarial_Cycle, not in the trainer.
+    # Keep this explicit so you can switch to mse if that old loss used MSE.
+    cycle_distance: l1
+    # GRL strength itself. Curriculum "adversarial_scale" below controls the
+    # loss strength, corresponding more closely to the old adverse_alpha.
+    grl_alpha: 1.0
+    freeze_backbone: true
+    image_key: image
+    domain_key: domain
+    curriculum:
+      # Old: recon, 5 epochs, lr=1e-3, restarts=5
+      # Here 1 old "epoch unit" is represented by 1000 optimizer steps purely as
+      # an example. Adjust the absolute counts for your compute budget.
+      - name: recon
+        mode: recon
+        steps: 5000
+        lr: 1.0e-3
+        restart_steps: 5000
+        freeze_backbone: true
+        freeze_tangler: false
+        reset_optimizer_state: true
+      # Old: cycle, 100 epochs, adverse_alpha ramps 0.1 -> 1.0 over ~9 epochs,
+      # lr=1e-3, restarts=25.
+      - name: cycle_main
+        mode: cycle
+        steps: 100000
+        lr: 1.0e-3
+        restart_steps: 25000
+        adversarial_scale_start: 0.1
+        adversarial_scale_end: 1.0
+        adversarial_ramp_steps: 9000
+        cycle_scale: 1.0
+        freeze_backbone: true
+        freeze_tangler: false
+        reset_optimizer_state: true
+      # Old: cycle, 20 epochs, lr=1e-4, restarts=20.
+      - name: cycle_finetune
+        mode: cycle
+        steps: 20000
+        lr: 1.0e-4
+        restart_steps: 20000
+        adversarial_scale_start: 1.0
+        adversarial_scale_end: 1.0
+        cycle_scale: 1.0
+        freeze_backbone: true
+        freeze_tangler: false
+        reset_optimizer_state: true
 # Keep the optimizer itself in LightningCLI. The curriculum changes its LR and
 # optionally clears AdamW state at phase boundaries; do not also configure a
 # Lightning LR scheduler when using restart_steps above.

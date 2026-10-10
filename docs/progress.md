@@ -60,7 +60,7 @@ from its z. The gain is a SCORPION-specific alignment, not scanner removal.
    - Pooled GRL adversaries; LayerNorm before the GRL fixed a |z| blow-up.
    - Result: PLISM 0.751. The GRL adversaries sit at chance, but a fresh probe still gets
      92% (backbone 96%). **The GRL was fooled.**
-3. **ScannerVAE** (`uv run sipe-vae fit`; `src/sipe/model/scanner_vae.py`,
+3. **ScannerVAE** (`uv run sipe fit --config configs/scanner_vae*.yaml`; `src/sipe/model/scanner_vae.py`,
    `src/sipe/training/scanner_vae_module.py`; commits `5a77728`, `ff26970`). Design:
    - Fader / Mathieu-style VAE on frozen H0-mini tokens: per-token Gaussian z, identity
      init, and a decoder conditioned on a learned scanner embedding.
@@ -89,7 +89,7 @@ from its z. The gain is a SCORPION-specific alignment, not scanner removal.
    - The β=1 run ran on `5a77728` with the uncommitted Fader diff (GRL mode); that code is
      the same as what was committed in `ff26970`.
 
-4. **PairedVAE**, stage 1 toward Mathieu et al. (`uv run sipe-paired fit --config
+4. **PairedVAE**, stage 1 toward Mathieu et al. (`uv run sipe fit --config
    configs/paired_vae.yaml`; `src/sipe/model/paired_vae.py`,
    `src/sipe/training/paired_vae_module.py`, `PairedSCORPIONDataModule`). Implemented
    2026-10-10, not trained yet. Design:

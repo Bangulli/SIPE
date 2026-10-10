@@ -27,17 +27,13 @@ from __future__ import annotations
 import math
 from typing import Any
 
-import lightning as L
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.optim.lr_scheduler import CosineAnnealingLR
 
 from sipe.model.scanner_vae import ScannerVAE
+from sipe.training.base import FrozenBackboneModule
 from sipe.training.grl import GradientReversal
-
-# Stored in checkpoints so sipe.bench.checkpoint picks the right module class.
-CHECKPOINT_TAG = "scanner_vae"
 
 
 def feature_recon_loss(prediction: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
@@ -58,29 +54,7 @@ def ramp(step: int, warmup_steps: int) -> float:
     return min(1.0, step / warmup_steps) if warmup_steps > 0 else 1.0
 
 
-@torch.enable_grad()
-def linear_probe_accuracy(
-    train_x: torch.Tensor,
-    train_y: torch.Tensor,
-    test_x: torch.Tensor,
-    test_y: torch.Tensor,
-    num_classes: int,
-    steps: int = 1000,
-) -> float:
-    """Fresh standardized softmax regression (full-batch Adam), test accuracy."""
-    mean, std = train_x.mean(0), train_x.std(0).clamp_min(1e-6)
-    train_x, test_x = (train_x - mean) / std, (test_x - mean) / std
-    probe = nn.Linear(train_x.shape[1], num_classes).to(train_x.device)
-    optimizer = torch.optim.Adam(probe.parameters(), lr=1e-2, weight_decay=1e-4)
-    for _ in range(steps):
-        optimizer.zero_grad(set_to_none=True)
-        F.cross_entropy(probe(train_x), train_y).backward()
-        optimizer.step()
-    with torch.no_grad():
-        return float((probe(test_x).argmax(-1) == test_y).float().mean())
-
-
-class ScannerVAEModule(L.LightningModule):
+class ScannerVAEModule(FrozenBackboneModule):
     def __init__(
         self,
         network: ScannerVAE,
@@ -123,14 +97,6 @@ class ScannerVAEModule(L.LightningModule):
         if freeze_backbone:
             network.freeze_backbone()
 
-    def train(self, mode: bool = True) -> ScannerVAEModule:
-        # Lightning toggles train mode around validation; keep a frozen backbone in
-        # eval mode throughout (no-op for H0-mini, which has no dropout/drop-path).
-        super().train(mode)
-        if self.hparams.freeze_backbone:
-            self.network.backbone.eval()
-        return self
-
     def configure_optimizers(self) -> Any:
         adversary = list(self.adversary.parameters())
         adversary_ids = {id(p) for p in adversary}
@@ -140,32 +106,24 @@ class ScannerVAEModule(L.LightningModule):
             if p.requires_grad and id(p) not in adversary_ids
         ]
         hp = self.hparams
-        if self.trainer.max_steps <= 0:
-            raise ValueError("ScannerVAEModule needs trainer.max_steps (cosine LR).")
         if hp.adversary_mode == "fader":
-            main_opt = torch.optim.AdamW(main, lr=hp.lr, weight_decay=hp.weight_decay)
+            main_opt, scheduler = self.cosine_adamw(main, hp.lr, hp.weight_decay)
             # Constant LR for the adversary: it must keep up until the end.
             adversary_opt = torch.optim.AdamW(
                 adversary,
                 lr=hp.lr * hp.adversary_lr_mult,
                 weight_decay=hp.weight_decay,
             )
-            scheduler = CosineAnnealingLR(main_opt, T_max=self.trainer.max_steps)
-            return [main_opt, adversary_opt], [
-                {"scheduler": scheduler, "interval": "step"}
-            ]
-        optimizer = torch.optim.AdamW(
+            return [main_opt, adversary_opt], [scheduler]
+        optimizer, scheduler = self.cosine_adamw(
             [
                 {"params": main, "lr": hp.lr},
                 {"params": adversary, "lr": hp.lr * hp.adversary_lr_mult},
             ],
-            weight_decay=hp.weight_decay,
+            hp.lr,
+            hp.weight_decay,
         )
-        scheduler = CosineAnnealingLR(optimizer, T_max=self.trainer.max_steps)
-        return {
-            "optimizer": optimizer,
-            "lr_scheduler": {"scheduler": scheduler, "interval": "step"},
-        }
+        return {"optimizer": optimizer, "lr_scheduler": scheduler}
 
     def on_train_batch_start(self, batch: Any, batch_idx: int) -> None:
         del batch, batch_idx
@@ -187,9 +145,6 @@ class ScannerVAEModule(L.LightningModule):
         if self.hparams.adversary_mode == "fader":
             return optimizers[1]
         return optimizers  # grl: one optimizer, adversary = its second group
-
-    def on_save_checkpoint(self, checkpoint: dict[str, Any]) -> None:
-        checkpoint["sipe_module"] = CHECKPOINT_TAG
 
     def training_step(self, batch: dict[str, Any], batch_idx: int) -> torch.Tensor:
         del batch_idx
@@ -245,19 +200,14 @@ class ScannerVAEModule(L.LightningModule):
         outputs, self._val_outputs = self._val_outputs, []
         if not outputs:
             return
-        slides = [s for o in outputs for s in o["slides"]]
-        unique = sorted(set(slides))
-        if len(unique) < 2:
-            return  # e.g. limit_val_batches: no WSI-disjoint split possible
-        test_slides = set(unique[1::2])
-        test = torch.tensor([s in test_slides for s in slides], device=self.device)
-        domains = torch.cat([o["domains"] for o in outputs])
-        for name in ("zgap", "backbone"):
-            x = torch.cat([o[name] for o in outputs])
-            accuracy = linear_probe_accuracy(
-                x[~test], domains[~test], x[test], domains[test], self.num_domains
-            )
-            self.log(f"val/probe_{name}_acc", accuracy)
+        self.log_wsi_probes(
+            {
+                name: torch.cat([o[name] for o in outputs])
+                for name in ("zgap", "backbone")
+            },
+            torch.cat([o["domains"] for o in outputs]),
+            [s for o in outputs for s in o["slides"]],
+        )
 
     def _step(
         self, batch: dict[str, Any], stage: str
