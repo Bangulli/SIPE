@@ -1,0 +1,91 @@
+seed_everything: 42
+matmul_precision: high  # TF32 for fp32 matmuls (A100); torch default is "highest"
+trainer:
+  accelerator: gpu
+  devices: 1
+  precision: 16-mixed
+  max_epochs: -1
+  max_steps: 6000
+  check_val_every_n_epoch: null
+  val_check_interval: 100
+  log_every_n_steps: 25
+  logger:
+    class_path: lightning.pytorch.loggers.WandbLogger
+    init_args:
+      project: cats
+      group: SCORPION
+      job_type: scanner-vae-fader
+      tags:
+        - SCORPION
+        - scanner-vae
+        - fader
+      save_dir: ./wandb
+      log_model: false
+  callbacks:
+    - class_path: lightning.pytorch.callbacks.ModelCheckpoint
+      init_args:
+        # Only last.ckpt (overwritten at each validation): val/loss changes meaning
+        # between curriculum phases, so "best" by val/loss is not meaningful.
+        save_top_k: 0
+        save_last: true
+        save_weights_only: false
+    - class_path: lightning.pytorch.callbacks.LearningRateMonitor
+      init_args:
+        logging_interval: step
+    - class_path: sipe.training.callbacks.ReconstructionLogger
+      init_args:
+        num_images: 4
+        every_n_steps: 100
+model:
+  # ScannerVAE (not legacy CATS; run with `sipe-vae fit`): Fader-style VAE in frozen
+  # H0-mini token space. Decoder conditioned on a learned scanner embedding, KL on z,
+  # MLP adversary on LayerNorm(GAP(mu)). No curriculum, no cycle, unpaired.
+  # This config: Fader-style alternating adversary instead of the GRL; everything
+  # else as configs/scanner_vae.yaml (run qvc6voso), so the adversary is the only change.
+  # Benchmarked representation: GAP(mu).
+  # Plan: /box/.claude/plans/ok-so-i-am-vectorized-thunder.md
+  network:
+    class_path: sipe.model.scanner_vae.ScannerVAE
+    init_args:
+      encoder: h0-mini
+      num_domains: 5
+      specified_dim: 64
+      unspecified_hidden_dim: 1024
+      reentangler_hidden_dim: 1024
+      init_logvar: -4.0
+      pixel_decoder: true # visualization only (trained on detached features)
+      pretrained: true
+      output_size: 224
+  num_domains: 5
+  lr: 3.0e-4 # cosine decay over trainer.max_steps
+  weight_decay: 0.01
+  # beta on KL (mean over tokens and dims, relative to the scale-free feature recon)
+  kl_weight: 0.1
+  kl_warmup_steps: 1000
+  # Fader: per batch, one encoder step that pushes the adversary's prediction toward
+  # uniform (confusion CE / log 5, minimum 1), then `adversary_steps` adversary CE steps
+  # on the detached GAP(mu). The encoder term's weight ramps linearly from 0.
+  adversary_mode: fader
+  adversary_steps: 5
+  adversary_weight: 1.0
+  adversary_warmup_steps: 1000
+  adversary_hidden_dim: 512
+  # The extra adversary steps replace the GRL safeguards: same LR as the encoder
+  # (constant, no cosine), no re-initialization.
+  adversary_lr_mult: 1.0
+  adversary_reset_steps: null
+  pixel_weight: 1.0
+  freeze_backbone: true
+data:
+  class_path: sipe.data.scorpion.SCORPIONDataModule
+  init_args:
+    data_root: data/processed/SCORPION_tiles_224px_0p5mpp
+    batch_size: 512
+    num_workers: 8
+    image_size: 224
+    domain_column: scanner
+    group_column: slide_id
+    val_fraction: 0.1
+    test_fraction: 0.1
+    pin_memory: true
+    persistent_workers: true

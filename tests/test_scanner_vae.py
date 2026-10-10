@@ -51,7 +51,7 @@ def test_step_backward_reaches_all_parts(network: ScannerVAE) -> None:
     )
     module.train()
     assert not network.backbone.training  # frozen backbone stays in eval mode
-    loss = module._step(_batch(), stage="train")
+    loss, _, _ = module._step(_batch(), stage="train")
     loss.backward()
     # Zero-initialized output layers (identity start): the first step only reaches
     # mu.fc2 and the FiLM projection, not mu.fc1 or the scanner embedding behind them.
@@ -103,24 +103,37 @@ def test_linear_probe_accuracy() -> None:
     assert linear_probe_accuracy(x[:500], y[:500], x[500:], y[500:], 5) < 0.4
 
 
+def test_fader_mode_uses_manual_optimization(network: ScannerVAE) -> None:
+    assert ScannerVAEModule(network=network).automatic_optimization
+    fader = ScannerVAEModule(network=network, adversary_mode="fader")
+    assert not fader.automatic_optimization
+    with pytest.raises(ValueError, match="adversary_mode"):
+        ScannerVAEModule(network=network, adversary_mode="gan")
+
+
 @pytest.mark.skipif(not DATA_ROOT.is_dir(), reason="SCORPION tiles not available")
-def test_cli_fit_checkpoint_roundtrip(tmp_path: Path) -> None:
-    """A real 2-step `sipe-vae fit` writes a checkpoint the bench loader rebuilds."""
+@pytest.mark.parametrize("config", ["scanner_vae.yaml", "scanner_vae_fader.yaml"])
+def test_cli_fit_checkpoint_roundtrip(tmp_path: Path, config: str) -> None:
+    """A real 3-step `sipe-vae fit` writes a checkpoint the bench loader rebuilds.
+
+    Fader: the adversary's extra steps must not count as global steps (3 batches ->
+    global_step 3, encoder Adam step 3, adversary Adam step 3 * adversary_steps).
+    """
     run_dir = tmp_path / "run"
     run_dir.mkdir()
     cmd = [
         sys.executable, "-c", "from sipe.cli import main_vae; main_vae()", "fit",
-        "--config", str(ROOT / "configs/scanner_vae.yaml"),
+        "--config", str(ROOT / "configs" / config),
         f"--data.init_args.data_root={DATA_ROOT}",
         "--data.init_args.batch_size=4",
         "--data.init_args.num_workers=0",
         "--data.init_args.persistent_workers=false",
         "--trainer.accelerator=cpu",
         "--trainer.precision=32-true",
-        "--trainer.max_steps=2",
-        "--trainer.limit_train_batches=2",
+        "--trainer.max_steps=3",
+        "--trainer.limit_train_batches=3",
         "--trainer.limit_val_batches=2",  # "1" parses as 1.0 = 100%
-        "--trainer.val_check_interval=2",
+        "--trainer.val_check_interval=3",
         "--trainer.logger=false",
         "--trainer.callbacks=[]",
     ]  # fmt: skip
@@ -128,9 +141,15 @@ def test_cli_fit_checkpoint_roundtrip(tmp_path: Path) -> None:
     subprocess.run(cmd, cwd=tmp_path, env=env, check=True)
 
     (ckpt,) = (run_dir / "checkpoints").glob("*.ckpt")
+    raw = torch.load(ckpt, map_location="cpu", weights_only=True)
+    if config == "scanner_vae_fader.yaml":
+        main_state, adversary_state = raw["optimizer_states"]
+        k = raw["hyper_parameters"]["adversary_steps"]
+        assert all(int(v["step"]) == 3 for v in main_state["state"].values())
+        assert all(int(v["step"]) == 3 * k for v in adversary_state["state"].values())
     loaded = load_cats_checkpoint(ckpt)
     assert isinstance(loaded.module, ScannerVAEModule)
-    assert loaded.global_step == 2 and loaded.phase is None
+    assert loaded.global_step == 3 and loaded.phase is None
     assert loaded.provenance["module"] == "scanner_vae"
     images = torch.randn(2, 3, 224, 224)
     with torch.no_grad():
