@@ -436,3 +436,171 @@ class SCORPIONDataModule(L.LightningDataModule):
 
     def predict_dataloader(self) -> DataLoader:
         return self.test_dataloader()
+
+
+class PairedSCORPIONDataset(Dataset):
+    """One item = one tissue location (``pair_id``) seen by several scanners.
+
+    Returns a list of ``views`` tile dicts (``SCORPIONTileDataset`` items) from
+    distinct scanners: a random subset when ``random_views`` (training), otherwise a
+    deterministic rotation (all scanners when ``views`` is None). All views of an
+    item get the *same* random augmentation (shared torch RNG seed), so they differ
+    only by scanner; torchvision's v1 transforms draw from the torch RNG.
+    """
+
+    def __init__(
+        self,
+        base: SCORPIONTileDataset,
+        *,
+        views: int | None = 2,
+        random_views: bool = True,
+    ) -> None:
+        super().__init__()
+        if views is not None and views < 2:
+            raise ValueError("views must be >= 2 (or None for all scanners).")
+        self.base = base
+        self.views = views
+        self.random_views = random_views
+        metadata = base.metadata
+        domains = metadata[base.domain_column].map(base.domain_to_index)
+        self.locations: list[list[int]] = []
+        for rows in metadata.groupby("_pair_id", sort=True).indices.values():
+            rows = sorted(rows.tolist(), key=lambda r: domains.iloc[r])
+            if len(rows) >= (views or 2):
+                self.locations.append(rows)
+        if not self.locations:
+            raise RuntimeError("No location has enough scanner views.")
+
+    def __len__(self) -> int:
+        return len(self.locations)
+
+    def __getitem__(self, idx: int) -> list[dict[str, Any]]:
+        rows = self.locations[idx]
+        n = len(rows)
+        k = self.views or n
+        if self.random_views:
+            chosen = [rows[i] for i in torch.randperm(n)[:k].tolist()]
+        else:
+            chosen = [rows[(idx + i) % n] for i in range(k)]
+        seed = int(torch.randint(0, 2**31 - 1, (1,)))
+        items = []
+        for row in chosen:
+            with torch.random.fork_rng(devices=[]):
+                torch.manual_seed(seed)
+                items.append(self.base[row])
+        return items
+
+
+def collate_views(batch: list[list[dict[str, Any]]]) -> dict[str, Any]:
+    """Flatten locations × views into one batch; ``location`` groups the views.
+
+    Views of a location are contiguous: image i belongs to location
+    ``location[i]``.
+    """
+    flat = [item for items in batch for item in items]
+    return {
+        "image": torch.stack([item["image"] for item in flat]),
+        "domain": torch.stack([item["domain"] for item in flat]),
+        "index": torch.stack([item["index"] for item in flat]),
+        "location": torch.tensor(
+            [loc for loc, items in enumerate(batch) for _ in items], dtype=torch.long
+        ),
+        "pair_id": [item["pair_id"] for item in flat],
+        "domain_name": [item["domain_name"] for item in flat],
+        "filename": [item["filename"] for item in flat],
+    }
+
+
+class PairedSCORPIONDataModule(SCORPIONDataModule):
+    """SCORPION batches of locations × scanner views (same splits as the parent).
+
+    ``batch_size`` counts locations, so a training batch holds
+    ``batch_size * views`` images. Validation/test use every scanner of each location
+    (``val_views``: None = all), i.e. every tile of the split exactly once, with
+    ``val_batch_size`` locations per batch (default: about as many images as a
+    training batch).
+    """
+
+    def __init__(
+        self,
+        data_root: str | Path,
+        *,
+        views: int = 2,
+        val_views: int | None = None,
+        val_batch_size: int | None = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(data_root, **kwargs)
+        self.views = int(views)
+        self.val_views = val_views
+        self.val_batch_size = val_batch_size
+        self.train_pairs: PairedSCORPIONDataset | None = None
+        self.val_pairs: PairedSCORPIONDataset | None = None
+        self.test_pairs: PairedSCORPIONDataset | None = None
+
+    def setup(self, stage: str | None = None) -> None:
+        super().setup(stage)
+        if self.train_pairs is not None:
+            return
+        self.train_pairs = PairedSCORPIONDataset(
+            self.train_dataset, views=self.views, random_views=True
+        )
+        if len(self.val_metadata):
+            self.val_pairs = PairedSCORPIONDataset(
+                self.val_dataset, views=self.val_views, random_views=False
+            )
+        if len(self.test_metadata):
+            self.test_pairs = PairedSCORPIONDataset(
+                self.test_dataset, views=self.val_views, random_views=False
+            )
+
+    def _paired_loader(
+        self,
+        dataset: PairedSCORPIONDataset | None,
+        *,
+        batch_size: int,
+        shuffle: bool,
+        drop_last: bool,
+    ) -> DataLoader:
+        if dataset is None:
+            raise RuntimeError("setup() has not been called or the split is empty.")
+        return DataLoader(
+            dataset,
+            batch_size=batch_size,
+            shuffle=shuffle,
+            num_workers=self.num_workers,
+            pin_memory=self.pin_memory,
+            persistent_workers=self.persistent_workers and self.num_workers > 0,
+            drop_last=drop_last,
+            collate_fn=collate_views,
+        )
+
+    def _eval_batch_size(self) -> int:
+        if self.val_batch_size is not None:
+            return int(self.val_batch_size)
+        views = self.val_views or self.num_domains
+        return max(1, self.batch_size * self.views // views)
+
+    def train_dataloader(self) -> DataLoader:
+        return self._paired_loader(
+            self.train_pairs,
+            batch_size=self.batch_size,
+            shuffle=True,
+            drop_last=self.drop_last,
+        )
+
+    def val_dataloader(self) -> DataLoader:
+        return self._paired_loader(
+            self.val_pairs,
+            batch_size=self._eval_batch_size(),
+            shuffle=False,
+            drop_last=False,
+        )
+
+    def test_dataloader(self) -> DataLoader:
+        return self._paired_loader(
+            self.test_pairs,
+            batch_size=self._eval_batch_size(),
+            shuffle=False,
+            drop_last=False,
+        )

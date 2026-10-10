@@ -89,6 +89,24 @@ from its z. The gain is a SCORPION-specific alignment, not scanner removal.
    - The β=1 run ran on `5a77728` with the uncommitted Fader diff (GRL mode); that code is
      the same as what was committed in `ff26970`.
 
+4. **PairedVAE**, stage 1 toward Mathieu et al. (`uv run sipe-paired fit --config
+   configs/paired_vae.yaml`; `src/sipe/model/paired_vae.py`,
+   `src/sipe/training/paired_vae_module.py`, `PairedSCORPIONDataModule`). Implemented
+   2026-10-10, not trained yet. Design:
+   - s is encoded from the image (MLP on GAP); z is a per-token VAE latent. No adversary.
+   - Batches: 256 locations × 2 scanners, with the same augmentation on both views.
+   - Losses:
+     - Mathieu's same-scanner swap reconstruction (s from another tile of the same scanner);
+     - cross-scanner translation `Dec(s_donor(b), z_a) ≈ x_b` on 4×4-pooled features,
+       because P1000 tiles sit about 1 token (~7 µm) off the other scanners;
+     - batch-normalized GAP(μ) pair alignment;
+     - KL (β 0.1).
+   - Validation:
+     - fresh probes on z, backbone and s;
+     - PLISM-style cross-scanner retrieval top-1 on val, as in the SCORPION proxy
+       (backbone about 0.89).
+   - Stage 2 (next): replace the translation with a class-conditional GAN in embedding space.
+
 ## 4. Open points / next steps
 
 - Check the final Fader numbers. If the probe gap improves, run the SCORPION proxy and

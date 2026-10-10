@@ -1,4 +1,4 @@
-"""Rebuild a trained CATS / ScannerVAE model from a self-contained checkpoint."""
+"""Rebuild a trained CATS / ScannerVAE / PairedVAE model from a checkpoint."""
 
 from __future__ import annotations
 
@@ -13,6 +13,8 @@ import torch
 from sipe.model.arch import CATS
 from sipe.training.cats_module import CATSModule
 from sipe.training.curriculum import CurriculumPhase
+from sipe.training.paired_vae_module import CHECKPOINT_TAG as PAIRED_VAE_TAG
+from sipe.training.paired_vae_module import PairedVAEModule
 from sipe.training.scanner_vae_module import CHECKPOINT_TAG, ScannerVAEModule
 
 log = logging.getLogger(__name__)
@@ -20,13 +22,13 @@ log = logging.getLogger(__name__)
 
 @dataclass
 class LoadedCATS:
-    module: CATSModule | ScannerVAEModule
+    module: CATSModule | ScannerVAEModule | PairedVAEModule
     network: CATS | Any
     mean: tuple[float, ...]
     std: tuple[float, ...]
     image_size: int
     global_step: int
-    # Curriculum position (CATSModule only; None for ScannerVAEModule).
+    # Curriculum position (CATSModule only; None for the VAE modules).
     phase_index: int | None
     phase: CurriculumPhase | None
     local_step: int | None
@@ -60,7 +62,7 @@ def load_cats_checkpoint(
     ckpt_path: str | Path,
     map_location: str | torch.device = "cpu",
 ) -> LoadedCATS:
-    """Load a CATSModule / ScannerVAEModule checkpoint (eval mode) + provenance.
+    """Load a CATS / ScannerVAE / PairedVAE module checkpoint (eval mode) + provenance.
 
     The module is rebuilt from the hparams that LightningCLI saved (network as
     {class_path, init_args}) and loaded strictly. With `pretrained: true` timm first
@@ -68,8 +70,9 @@ def load_cats_checkpoint(
     """
     ckpt_path = Path(ckpt_path).resolve()
     raw = torch.load(ckpt_path, map_location="cpu", weights_only=True, mmap=True)
-    if raw.get("sipe_module") == CHECKPOINT_TAG:
-        return _load_scanner_vae(ckpt_path, raw, map_location)
+    tag = raw.get("sipe_module")
+    if tag in _VAE_MODULES:
+        return _load_vae(ckpt_path, raw, map_location, tag)
 
     module = CATSModule.load_from_checkpoint(ckpt_path, map_location=map_location)
     module.eval()
@@ -123,10 +126,15 @@ def load_cats_checkpoint(
     )
 
 
-def _load_scanner_vae(
-    ckpt_path: Path, raw: dict[str, Any], map_location: str | torch.device
+_VAE_MODULES = {CHECKPOINT_TAG: ScannerVAEModule, PAIRED_VAE_TAG: PairedVAEModule}
+
+
+def _load_vae(
+    ckpt_path: Path, raw: dict[str, Any], map_location: str | torch.device, tag: str
 ) -> LoadedCATS:
-    module = ScannerVAEModule.load_from_checkpoint(ckpt_path, map_location=map_location)
+    module = _VAE_MODULES[tag].load_from_checkpoint(
+        ckpt_path, map_location=map_location
+    )
     module.eval()
     network = module.network
     meta = network.encoder_meta
@@ -135,7 +143,7 @@ def _load_scanner_vae(
     provenance = {
         "path": str(ckpt_path),
         "sha256": sha256(ckpt_path),
-        "module": CHECKPOINT_TAG,
+        "module": tag,
         "global_step": global_step,
         "epoch": int(raw["epoch"]),
         "network": raw["hyper_parameters"]["network"],

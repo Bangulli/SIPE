@@ -149,6 +149,13 @@ def main_vae() -> None:
     _run(ScannerVAEModule)
 
 
+def main_paired() -> None:
+    """`sipe-paired`: same run-dir/W&B handling, PairedVAEModule as the model."""
+    from sipe.training.paired_vae_module import PairedVAEModule
+
+    _run(PairedVAEModule)
+
+
 def _run(model_class: type[L.LightningModule]) -> None:
     SIPECLI(
         model_class=model_class,

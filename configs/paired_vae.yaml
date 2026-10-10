@@ -1,0 +1,87 @@
+seed_everything: 42
+matmul_precision: high  # TF32 for fp32 matmuls (A100); torch default is "highest"
+trainer:
+  accelerator: gpu
+  devices: 1
+  precision: 16-mixed
+  max_epochs: -1
+  max_steps: 6000
+  check_val_every_n_epoch: null
+  val_check_interval: 100
+  log_every_n_steps: 25
+  logger:
+    class_path: lightning.pytorch.loggers.WandbLogger
+    init_args:
+      project: cats
+      group: SCORPION
+      job_type: paired-vae
+      tags:
+        - SCORPION
+        - paired-vae
+      save_dir: ./wandb
+      log_model: false
+  callbacks:
+    - class_path: lightning.pytorch.callbacks.ModelCheckpoint
+      init_args:
+        # Only last.ckpt (overwritten at each validation): val/loss changes meaning
+        # between curriculum phases, so "best" by val/loss is not meaningful.
+        save_top_k: 0
+        save_last: true
+        save_weights_only: false
+    - class_path: lightning.pytorch.callbacks.LearningRateMonitor
+      init_args:
+        logging_interval: step
+    - class_path: sipe.training.callbacks.ReconstructionLogger
+      init_args:
+        num_images: 4
+        every_n_steps: 100
+model:
+  # PairedVAE (not legacy CATS; run with `sipe-paired fit`): Mathieu et al. 2016-style
+  # VAE in frozen H0-mini token space, with s *encoded* from the image (MLP on GAP)
+  # and z a per-token VAE latent. Paired stand-in for Mathieu's GAN; no adversary.
+  # Batches: 256 locations x 2 scanners = 512 images, same augmentation per location.
+  # Losses: same-scanner swap recon + cross-scanner translation (4x4-pooled targets,
+  # P1000 is ~1 token off) + GAP(mu) pair alignment + KL. See paired_vae_module.py.
+  # Benchmarked representation: GAP(mu).
+  network:
+    class_path: sipe.model.paired_vae.PairedVAE
+    init_args:
+      encoder: h0-mini
+      specified_dim: 64
+      specified_hidden_dim: 256
+      unspecified_hidden_dim: 1024
+      reentangler_hidden_dim: 1024
+      init_logvar: -4.0
+      pixel_decoder: true # visualization only (trained on detached features)
+      pretrained: true
+      output_size: 224
+  num_domains: 5
+  lr: 3.0e-4 # cosine decay over trainer.max_steps
+  weight_decay: 0.01
+  # beta and warm-up as configs/scanner_vae.yaml (run qvc6voso), for comparison.
+  kl_weight: 0.1
+  kl_warmup_steps: 1000
+  recon_weight: 1.0
+  translation_weight: 1.0
+  translation_pool: 4 # 16x16 tokens -> 4x4 cells before the translation loss
+  # Pair alignment of GAP(mu), batch-variance normalized (random pairs ~2).
+  align_weight: 1.0
+  align_warmup_steps: 1000
+  pixel_weight: 1.0
+  freeze_backbone: true
+data:
+  class_path: sipe.data.scorpion.PairedSCORPIONDataModule
+  init_args:
+    data_root: data/processed/SCORPION_tiles_224px_0p5mpp
+    batch_size: 256 # locations; x views = 512 images per step
+    views: 2 # random distinct scanners per location
+    val_views: null # validation: all 5 scanners, i.e. every val tile once
+    val_batch_size: 100 # locations (500 images)
+    num_workers: 8
+    image_size: 224
+    domain_column: scanner
+    group_column: slide_id
+    val_fraction: 0.1
+    test_fraction: 0.1
+    pin_memory: true
+    persistent_workers: true

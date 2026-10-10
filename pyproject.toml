@@ -97,3 +97,4 @@ testpaths = ["tests"]
 [project.scripts]
 sipe = "sipe.cli:main"
 sipe-vae = "sipe.cli:main_vae"
+sipe-paired = "sipe.cli:main_paired"
