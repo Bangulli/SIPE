@@ -41,10 +41,17 @@ columns come from earlier comparisons. **No method beats raw H0-mini GAP on PLIS
 |---|---|---|
 | backbone GAP | 0.802 | 0.956 |
 | legacy-step CATS z_gap (`ce50`) | 0.668 | 0.908 |
-| CATSv2 z_gap (`9lctrbqp`) | **0.844** | 0.917 |
+| CATSv2 z_gap (`9lctrbqp`) | 0.844 | 0.917 |
+| PairedVAE z_gap (`ysltwjoj`) | **0.962** | **0.850** |
 
 CATSv2 beats GAP on SCORPION but loses on PLISM, and a fresh probe still reads the scanner
 from its z. The gain is a SCORPION-specific alignment, not scanner removal.
+
+PairedVAE (`runs/bench/2026-10-10_14-52-05_claude-box_807c_scorpion_paired_vae_ysltwjoj`):
+top-1 0.962 (top-5 0.993), and it has the lowest scanner probe so far (logreg 0.850, MLP 0.831 vs
+0.956 / 0.939 for GAP). Content is kept: region probe 0.985 vs 0.975 for GAP. Its `s`
+reads the scanner (logreg 0.966) but carries little location (region probe 0.36, retrieval
+0.003). The alignment loss trains on SCORPION pairs, so PLISM decides.
 
 ## 3. Attempts and what we learned
 
@@ -95,7 +102,7 @@ from its z. The gain is a SCORPION-specific alignment, not scanner removal.
 4. **PairedVAE**, stage 1 toward Mathieu et al. (`uv run sipe fit --config
    configs/paired_vae.yaml`; `src/sipe/model/paired_vae.py`,
    `src/sipe/training/paired_vae_module.py`, `PairedSCORPIONDataModule`). Implemented
-   2026-10-10, not trained yet. Design:
+   2026-10-10. Design:
    - s is encoded from the image (MLP on GAP); z is a per-token VAE latent. No adversary.
    - Batches: 256 locations × 2 scanners, with the same augmentation on both views.
    - Losses:
@@ -109,6 +116,30 @@ from its z. The gain is a SCORPION-specific alignment, not scanner removal.
      - PLISM-style cross-scanner retrieval top-1 on val, as in the SCORPION proxy
        (backbone about 0.89).
    - Stage 2: replace the translation with a class-conditional GAN in embedding space (item 5).
+   - Run `ysltwjoj` (`runs/2026-10-10_15-18-38_lxbelshark_20c2`, commit `f48c72a`, clean;
+     `configs/paired_vae.yaml` defaults: 6,000 steps, frozen H0-mini, 256 pairs/batch,
+     16-mixed, lr 3e-4). **Finished** (6,000 steps; table read at step 3,899, final
+     mean of last 10 vals: probe z / backbone 0.689 / 0.802, s 0.93, retrieval 0.977 /
+     0.887, recon 0.047, KL 1.64):
+
+     | metric (val) | step 99 | step 3,899 | mean of vals 3,000–3,899 |
+     |---|---|---|---|
+     | probe z / backbone | 0.79 / 0.79 | 0.69 / 0.81 | 0.695 / 0.801 |
+     | probe s | 0.73 | 0.93 | 0.93 |
+     | retrieval top-1 z / backbone | 0.951 / 0.887 | 0.977 / 0.887 | 0.977 / 0.887 |
+     | pair cos z / backbone | 0.94 / 0.92 | 0.98 / 0.92 | |
+     | translation / align (backbone align 0.299) | 0.252 / 0.220 | 0.238 / 0.239 | |
+     | feature recon / KL / σ / \|z\| | 0.019 / 2.64 / 0.08 / 0.81 | 0.048 / 1.66 / 0.23 / 0.83 | |
+
+     - Best removal so far: probe gap ~0.11 (vs 0.06 GRL, 0.08 Fader), still drifting down
+       slowly; s carries the scanner (0.93), as intended. All 768 units active, no collapse.
+     - Retrieval z 0.977 vs backbone 0.887 on val (WSI-disjoint from train). Caveat: the
+       alignment loss trains exactly this pairing, so PLISM is the real test.
+     - Feature recon rose 0.019 → 0.047 and is flat since step ~1,500 (GRL β0.1 ends at 0.051).
+     - Metrics were flat after step ~4,000.
+     - SCORPION proxy (held-out test split, section 2): top-1 0.962 vs 0.802 GAP; scanner
+       probe 0.850 vs 0.956.
+     - Verdict: **best so far on SCORPION**. Next: PLISM.
 
 5. **MathieuGAN**, stage 2 toward Mathieu et al. (`uv run sipe fit --config
    configs/mathieu_gan.yaml`; `src/sipe/training/mathieu_gan_module.py`). Implemented
@@ -145,9 +176,10 @@ from its z. The gain is a SCORPION-specific alignment, not scanner removal.
 
 ## 4. Open points / next steps
 
-- Launch PairedVAE (`uv run sipe fit --config configs/paired_vae.yaml`), then check it
-  against the backbone: probe gap, `val/retrieval_top1_zgap` vs `_backbone`, and `s` probe
-  (should be high).
+- PairedVAE `ysltwjoj`: finished. SCORPION proxy 0.962 top-1 (GAP 0.802). Run PLISM:
+  `bench/run python -m sipe.bench.plism --ckpt
+  runs/2026-10-10_15-18-38_lxbelshark_20c2/checkpoints/last.ckpt --tag paired_vae_ysltwjoj`
+  (GAP 0.810 inter-scanner top-1 to beat; CATSv2 also won the proxy and lost on PLISM).
 - Launch MathieuGAN (`uv run sipe fit --config configs/mathieu_gan.yaml`) and compare with
   PairedVAE on the same val metrics; watch `train/d_{real,fake}_acc` for D domination or
   collapse and `val/fake_target_acc` vs `val/fake_source_acc`. If the second GPU is
