@@ -25,6 +25,7 @@ Fast screening of CATS checkpoints before the full PLISM/HEST benchmarks.
 from __future__ import annotations
 
 import argparse
+import inspect
 import itertools
 import json
 import logging
@@ -203,12 +204,15 @@ def main(argv: list[str] | None = None) -> Path:
         args.representations = [r for r in args.representations if r != "s"]
     features = {r: CATSFeatures(network, r) for r in args.representations}
 
-    # Same data config (root, split seed/fractions) as the training run.
+    # Same data config (root, split seed/fractions) as the training run. Subclasses
+    # such as PairedSCORPIONDataModule keep the parent's splits; their extra arguments
+    # (views, ...) only change batching, so keep what the plain datamodule accepts.
     raw = torch.load(ckpt, map_location="cpu", weights_only=False, mmap=True)
+    accepted = inspect.signature(SCORPIONDataModule.__init__).parameters
     dm_hparams = {
         k: v
         for k, v in raw["datamodule_hyper_parameters"].items()
-        if not k.startswith("_")
+        if not k.startswith("_") and k in accepted
     }
     del raw
     dm_hparams.update(
