@@ -114,6 +114,29 @@ def cross_scanner_top1(
     return float(torch.stack(scores).mean()) if scores else float("nan")
 
 
+def log_paired_validation(
+    module: FrozenBackboneModule, outputs: list[dict[str, Any]]
+) -> None:
+    """Cross-scanner retrieval top-1 on GAP(mu) and backbone GAP, and fresh WSI-split
+    scanner probes on GAP(mu), backbone GAP and s, from the collected val outputs
+    (keys zgap, backbone, s, domains, pair_ids)."""
+    domains = torch.cat([o["domains"] for o in outputs])
+    pair_ids = [p for o in outputs for p in o["pair_ids"]]
+    location_of = {p: i for i, p in enumerate(sorted(set(pair_ids)))}
+    locations = torch.tensor([location_of[p] for p in pair_ids], device=module.device)
+    features = {
+        name: torch.cat([o[name] for o in outputs])
+        for name in ("zgap", "backbone", "s")
+    }
+    slides = [p.split("-")[0] for p in pair_ids]
+    unique = sorted(set(slides))
+    slide_index = torch.tensor([unique.index(s) for s in slides], device=module.device)
+    for name in ("zgap", "backbone"):
+        top1 = cross_scanner_top1(features[name], domains, locations, slide_index)
+        module.log(f"val/retrieval_top1_{name}", top1)
+    module.log_wsi_probes(features, domains, slides)
+
+
 class PairedVAEModule(FrozenBackboneModule):
     def __init__(
         self,
@@ -166,25 +189,8 @@ class PairedVAEModule(FrozenBackboneModule):
 
     def on_validation_epoch_end(self) -> None:
         outputs, self._val_outputs = self._val_outputs, []
-        if not outputs:
-            return
-        domains = torch.cat([o["domains"] for o in outputs])
-        pair_ids = [p for o in outputs for p in o["pair_ids"]]
-        location_of = {p: i for i, p in enumerate(sorted(set(pair_ids)))}
-        locations = torch.tensor([location_of[p] for p in pair_ids], device=self.device)
-        features = {
-            name: torch.cat([o[name] for o in outputs])
-            for name in ("zgap", "backbone", "s")
-        }
-        slides = [p.split("-")[0] for p in pair_ids]
-        unique = sorted(set(slides))
-        slide_index = torch.tensor(
-            [unique.index(s) for s in slides], device=self.device
-        )
-        for name in ("zgap", "backbone"):
-            top1 = cross_scanner_top1(features[name], domains, locations, slide_index)
-            self.log(f"val/retrieval_top1_{name}", top1)
-        self.log_wsi_probes(features, domains, slides)
+        if outputs:
+            log_paired_validation(self, outputs)
 
     def _step(
         self,

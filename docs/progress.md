@@ -108,15 +108,51 @@ from its z. The gain is a SCORPION-specific alignment, not scanner removal.
      - fresh probes on z, backbone and s;
      - PLISM-style cross-scanner retrieval top-1 on val, as in the SCORPION proxy
        (backbone about 0.89).
-   - Stage 2 (next): replace the translation with a class-conditional GAN in embedding space.
+   - Stage 2: replace the translation with a class-conditional GAN in embedding space (item 5).
+
+5. **MathieuGAN**, stage 2 toward Mathieu et al. (`uv run sipe fit --config
+   configs/mathieu_gan.yaml`; `src/sipe/training/mathieu_gan_module.py`). Implemented
+   2026-10-10, not trained yet (only a 300-step smoke run in the box). Design:
+   - Same network as PairedVAE (`PairedVAE`). Training is **unpaired** (scanner labels
+     only); paired batches are kept so validation matches PairedVAE.
+   - Losses: same-scanner swap reconstruction + KL (β 0.1) + class-conditional GAN.
+     Fake = `Dec(s(x_other), z_i)` with x_other from another scanner *and* another
+     location (never i's pair partner), labeled with x_other's scanner; real = backbone
+     tokens with their own scanner.
+   - D: projection discriminator with spectral norm on the 16×16 token grid (1×1 conv,
+     two stride-2 3×3 convs, mean pool), hinge loss; Adam(0.5, 0.999), same cosine LR
+     decay as the generator (Fader lesson). Manual optimization: 1 G step (= 1 global
+     step) then 1 fp32 D step. Adversarial weight 1.0, warm-up 1,000 steps.
+   - No adversary on z, no translation or alignment loss in training.
+   - Validation: everything PairedVAE logs (probes on z/backbone/s, retrieval top-1,
+     paired translation loss as evaluation only), plus D accuracies and
+     `val/fake_{target,source}_acc`: a probe trained on real backbone GAP reads the
+     scanner of GAP(fake). Target should rise, source should fall.
+   - Known limitation (also in Mathieu): the decoder can overwrite a scanner signature
+     left in z, so a fooled D doesn't prove z is scanner-free. Read the z probe.
+   - Box smoke run (`runs/2026-10-10_13-23-13_claude-box_103a`, W&B offline `7zo0kmfr`;
+     300 steps, adversarial warm-up 50 instead of 1,000, 8 val batches only, so absolute
+     numbers are not comparable with full runs). Finished; mechanics OK, too short to judge:
+     - D dominates in training (real/fake acc ~0.95–1.0, d_loss 0.05–0.5).
+     - The GAN costs a lot of reconstruction: feature recon 0.025 before the GAN starts, then
+       0.6 at its peak, 0.12 at step 300 (stage-0 runs end at ~0.05).
+     - Fakes don't look like the target scanner yet: `fake_target_acc` 0.18 → 0.22 (chance
+       0.2), while `fake_source_acc` 0.37 → 0.20. The decoder moves features off the real
+       distribution rather than toward the target scanner.
+     - Probe z 0.69 vs backbone 0.73; retrieval z 0.860 vs backbone 0.865; s probe 0.52.
+     - Verdict: works mechanically. Watch whether recon recovers and `fake_target_acc` rises.
+       Adversarial weight 1.0 may be too high; 0.1 is the first knob to try.
 
 ## 4. Open points / next steps
 
 - Launch PairedVAE (`uv run sipe fit --config configs/paired_vae.yaml`), then check it
   against the backbone: probe gap, `val/retrieval_top1_zgap` vs `_backbone`, and `s` probe
   (should be high).
-- Stage 2: Mathieu's class-conditional GAN in embedding space, unpaired, as a new module
-  class and config.
+- Launch MathieuGAN (`uv run sipe fit --config configs/mathieu_gan.yaml`) and compare with
+  PairedVAE on the same val metrics; watch `train/d_{real,fake}_acc` for D domination or
+  collapse and `val/fake_target_acc` vs `val/fake_source_acc`. If the second GPU is
+  free, run `--model.init_args.adversarial_weight=0.1` in parallel (smoke run: recon
+  suffers at 1.0).
 - If adversaries on z come back: the Fader knobs not tried are a larger
   `adversary_weight` (3–5), fewer `adversary_steps`, and decaying the adversary's LR with
   the encoder's (the end of the Fader run was dominated by the adversary).
