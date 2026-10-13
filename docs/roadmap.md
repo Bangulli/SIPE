@@ -2,11 +2,17 @@
 > the plan for this branch (`valentin/acquisition-shrinkage`). Status and results live in
 > `docs/progress.md`; numbers there are generated from run files, numbers here are not.
 >
-> **Already superseded on 2026-10-13** (see `docs/progress.md`):
+> **Updates since 2026-10-13** (details and numbers in `docs/progress.md`; the body below
+> is unchanged except for the dated "Update" notes in sections 3, 5 and 12):
 > - The new soft-shrinkage selection rule has a SCORPION test row (λ=0.5,
 >   `runs/bench/2026-10-13_17-45-08_lxbelshark_db10_scorpion_softshrink_h0mini_gap_gain95`).
->   PLISM/HEST for the eraser are still pending: they need a `backbone_gap` + eraser extractor in
->   `sipe.bench`.
+>   The post-hoc PLISM/HEST extractor exists (`--posthoc`, `sipe.bench.posthoc`); the full
+>   PLISM/HEST runs of the λ=0.5 eraser are pending, so D0 is still open.
+> - Experiment 1 is done (`runs/bench/2026-10-13_20-09-24_claude-box_c190_scorpion_content_dep_gap`): clear, held-out content dependence of the acquisition
+>   residuals, mostly in covariance *shape*. D1 is proposed as "clear, stable" → Experiment 3
+>   first, pending confirmation and two checks (see the update under Decision D1).
+> - The anchor table in section 0 is from before these runs; the current tables are the
+>   generated ones in `docs/progress.md`.
 > - The soft-shrinkage deltas are slide-to-mean scanner deltas. On SCORPION every slide has the
 >   same tile set on every scanner, so they equal the mean of tile-pair deltas (slide-level
 >   pairing, see Experiment 2C).
@@ -129,6 +135,29 @@ The consensus is **an empirical target**, not guaranteed to be the scanner-free 
 
 ### Decision D1
 
+> **Update 2026-10-13: Experiment 1 result** (`runs/bench/2026-10-13_20-09-24_claude-box_c190_scorpion_content_dep_gap`, `content` table in
+> `docs/progress.md`). Implementation: `sipe.eval.content_dependence`; train-WSI grouped CV
+> + val, test not read; tile pairs and region means, with and without P1000; K = 2, 4, 8.
+> - Steps 1–5 are covered. Held-out residual likelihood favors the content-conditioned model
+>   in every setting, K and fold; the shuffled-label control is ≈ 0; the gain grows with K.
+> - Added control: a **scale-only** model (cluster scalar × global covariance) recovers only a
+>   small part of the gain (≈ 0 at region level). The dependence is mostly in the *shape*
+>   of the nuisance covariance, which a single global B cannot represent.
+> - Registration: dropping P1000 or pooling to regions keeps the effect, so it is not
+>   explained by the P1000 offset. No per-region registration score was available.
+> - Concentration: at tile level a small cluster (~3% of tiles) carries high residual energy
+>   mostly *outside* the eraser's nuisance directions; the other clusters differ mostly in
+>   energy.
+> - **Proposed D1: clear, stable content dependence → Experiment 3 first, Experiment 4 as the
+>   competing family.** Two checks before fitting G2, both cheap:
+>   1. inspect the small high-energy tile cluster (tissue vs background/folds/artefact; if
+>      artefact, report it and decide whether to exclude such tiles rather than model them);
+>   2. single-view gating: the diagnostic clusters the paired consensus, which inference
+>      does not have. Measure how well p(k | x) from one view recovers the consensus cluster
+>      on val, before relying on cluster-dependent N_k at inference.
+> - Caveats: the residual model is zero-mean (content-dependent scanner offsets count as
+>   shape); one clustering seed; val has 5 WSIs.
+
 - **Clear, stable content dependence:** prioritize Experiment 3 (mixture/conditional covariance); keep the quadratic model as a competing non-generative family.
 - **Weak or unstable evidence:** run the inexpensive linear controls (Experiment 2) and the low-rank quadratic test (Experiment 4), but postpone a neural $B(c)$ model.
 - **Mostly registration-driven differences:** improve the observation/pairing protocol; do **not** train a covariance network to predict artifacts.
@@ -205,6 +234,13 @@ $$
 **Do not use the true paired consensus for gating at test time.** The mixture responsibilities must come from the *single input* $x$. Clustering training consensus vectors followed by moment estimation is a convenient **plug-in approximation**, not a full maximum-likelihood fit of the latent generative model.
 
 ### Essential ablation (isolates why the model helps)
+
+> **Update 2026-10-13 (from Experiment 1):** add **G2-scale**, $N_k = s_k N_0$, between G1 and
+> G2. Experiment 1 found that most of the held-out gain needs cluster-specific *shape*, so
+> G2 should beat G2-scale if the map is to benefit from it. In the 32-d residual subspace
+> the CV-selected shrinkage toward the global covariance was 0 at tile level (all K) and 0–0.25 at
+> region level; full 768-d $N_k$ still need the regularization below. Gating must be
+> single-view (see the check under Decision D1).
 
 | Variant | Content model | Nuisance model | Hypothesis tested |
 |---|---|---|---|
@@ -391,7 +427,10 @@ For a **4-page paper**, aim for one central new estimator, the previous soft-shr
 
 - [ ] Final soft-shrinkage operator, selected $\lambda$, and SCORPION / PLISM / HEST outputs
 - [ ] Stable per-region paired consensus/residual data representation, with split checks
-- [ ] Content-dependence diagnostic including shuffled-content control
+  (built in memory by `sipe.eval.content_dependence.paired_views`, checked for complete
+  scanner views; not saved as a file yet)
+- [x] Content-dependence diagnostic including shuffled-content control (2026-10-13,
+  `sipe.eval.content_dependence`; D1 proposed, see section 3)
 - [ ] Global consensus covariance model and direct affine fit
 - [ ] Gaussian mixture G0/G1/G2 comparison with regularized covariances and single-view gating
 - [ ] Analytic quadratic Q1/Q2 baseline and linear-fallback sanity test

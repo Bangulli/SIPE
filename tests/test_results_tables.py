@@ -96,3 +96,23 @@ def test_last_val_mean_uses_last_n():
     history = [{"val/a": float(i)} for i in range(20)] + [{"train/b": 1.0}]
     assert rt.last_val_mean(history, "val/a", n=10) == sum(range(10, 20)) / 10
     assert rt.last_val_mean(history, "val/missing") is None
+
+
+def test_content_table_reads_summary(tmp_path):
+    run = bench_dir(tmp_path, "s_content", "scorpion_content_dependence")
+    row = {
+        "setting": "tile_all", "K": 4, "alpha_star": 0.25, "cv_diff": 0.1011,
+        "cv_diff_sd": 0.0092, "cv_folds_pos": 5, "cv_diff_shuffled": -0.0032,
+        "cv_diff_scale": 0.05, "val_diff": 0.1133, "val_ci_lo": 0.0785,
+        "val_ci_hi": 0.1469, "val_wsi_pos": 5, "val_n_wsi": 5,
+        "val_diff_shuffled": -0.0082, "val_diff_scale": 0.06,
+        "val_energy_mse_ratio": 0.6469, "val_energy_mse_ratio_shuffled": 0.9929,
+        "heterogeneity_fit": 0.2417, "heterogeneity_val": 0.2433,
+    }  # fmt: skip
+    import pandas as pd
+
+    pd.DataFrame([row]).to_csv(run / "summary.csv", index=False)
+    table = rt.content_table(tmp_path, {})
+    line = next(x for x in table.splitlines() if "tile_all" in x)
+    assert "| 0.101 ± 0.009 |" in line and "0.113 [0.079, 0.147]" in line
+    assert "| 5/5 |" in line and "0.647 (0.993)" in line

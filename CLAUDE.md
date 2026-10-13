@@ -110,6 +110,9 @@ W&B), and each row must name the run dir it came from.
   `class_path` + `init_args` + `state_dict` (any `nn.Module` [B, 768] -> [B, D']); optional
   `encoder` (default h0-mini) and `pooling` (only `gap`). The fit dir's `git.txt` goes into
   the bench provenance.
+- Experiment 1 (content-dependence diagnostic, no map): `uv run python -m
+  sipe.eval.content_dependence --tag <tag> --features-from <feature cache>`; reads train/val
+  only, writes `summary.csv`, `likelihood.csv`, `cluster_stats.csv` (table block `content`).
 - New estimators (roadmap Experiments 1–5): fit on cached features, save the fitted operator
   and a config/provenance in a `runs/bench/...` dir (`sipe.bench.provenance`), and expose the
   same SCORPION-proxy metrics as the sweep, so `results_tables` can parse them. Settle a shared

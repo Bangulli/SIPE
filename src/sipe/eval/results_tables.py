@@ -5,6 +5,8 @@ Sources, all under runs/ (gitignored, so every row names the dir it came from):
   - HEST: runs/bench/*/results/*/dataset_results.json
   - SCORPION proxy: runs/bench/*/summary.csv (sipe.eval.scorpion_retrieval)
   - soft-shrinkage sweep: runs/bench/*/summary_test.csv + selected.json
+  - content dependence (Experiment 1): runs/bench/*/summary.csv
+    (sipe.eval.content_dependence)
   - training: runs/<run>/wandb/*run-*/*.wandb (local W&B history; no API key needed)
 
 progress.md holds generated blocks:
@@ -357,6 +359,57 @@ def softshrink_table(root: Path, opts: dict[str, list[str]]) -> str:
     )
 
 
+# --- content dependence (Experiment 1) -----------------------------------------
+
+
+def content_table(root: Path, opts: dict[str, list[str]]) -> str:
+    header = [
+        "setting", "K", "α*", "CV Δll", "CV folds > 0", "CV shuffled", "CV scale-only",
+        "val Δll [WSI 95% CI]", "val WSIs > 0", "val shuffled", "val scale-only",
+        "val energy MSE ratio (shuffled)", "heterog. fit / val", "bench run dir",
+        "SIPE commit",
+    ]  # fmt: skip
+    rows = []
+    for run in _bench_runs(
+        root, "scorpion_content_dependence", opts.get("exclude", [])
+    ):
+        source = [f"`{_rel(run.dir)}`", run.source_cells()[2]]
+        summary = run.dir / "summary.csv"
+        if not summary.exists():
+            rows.append(["no results", *["–"] * (len(header) - 3), *source])
+            continue
+        for _, r in pd.read_csv(summary).iterrows():
+            rows.append(
+                [
+                    str(r["setting"]),
+                    str(r["K"]),
+                    f"{r['alpha_star']:g}",
+                    f"{r['cv_diff']:.3f} ± {r['cv_diff_sd']:.3f}",
+                    f"{r['cv_folds_pos']}",
+                    _fmt(r["cv_diff_shuffled"]),
+                    _fmt(r.get("cv_diff_scale")),
+                    f"{r['val_diff']:.3f} [{r['val_ci_lo']:.3f}, {r['val_ci_hi']:.3f}]",
+                    f"{r['val_wsi_pos']}/{r['val_n_wsi']}",
+                    _fmt(r["val_diff_shuffled"]),
+                    _fmt(r.get("val_diff_scale")),
+                    f"{r['val_energy_mse_ratio']:.3f}"
+                    f" ({r['val_energy_mse_ratio_shuffled']:.3f})",
+                    f"{r['heterogeneity_fit']:.3f} / {r['heterogeneity_val']:.3f}",
+                    *source,
+                ]
+            )
+    return (
+        _table(header, rows)
+        + "\n\nHeld-out mean log-likelihood difference, content-conditioned minus"
+        " global residual model (nats/dim, > 0 favors content; `summary.csv`). CV ="
+        " grouped folds over train WSIs (± sd over folds); val = fit on train. α* ="
+        " shrinkage toward the global covariance, chosen by CV. Shuffled = cluster"
+        " labels permuted in train; scale-only = cluster-specific scalar × global"
+        " covariance. Energy MSE ratio < 1: cluster means predict held-out residual"
+        " energy better than the global mean."
+    )
+
+
 # --- training runs (local W&B history) -----------------------------------------
 
 
@@ -467,6 +520,7 @@ TABLES = {
     "hest": hest_table,
     "scorpion": scorpion_table,
     "softshrink": softshrink_table,
+    "content": content_table,
     "training": training_table,
 }
 
