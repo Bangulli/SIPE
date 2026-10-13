@@ -1,29 +1,14 @@
 # Progress summary (as of 2026-10-13)
 
-This file tracks what has been tried on SCORPION, what each attempt gave, and what comes
-next. Setup details are in `docs/benchmarks.md` (PLISM/HEST),
-`docs/parity-audit.md` (data sanity tests) and `docs/baselines.md`.
+Status of the acquisition-shrinkage roadmap (`docs/roadmap.md`). The CATS / scanner-removal
+phase is archived in `docs/archive/progress-cats-scanner-removal.md` (branch
+`valentin/scorpion`, commit `9ed9a51`). Setup: `docs/benchmarks.md` (PLISM/HEST),
+`docs/parity-audit.md` (data sanity tests), `CLAUDE.md` (contract, cached features).
 
-## 1. Infrastructure
+## 1. Results (generated)
 
-| commit | what |
-|---|---|
-| `3bfc343`, `774b0f7` | Lightning/LightningCLI port of CATS to SCORPION (5 scanners, WSI-grouped splits, data sanity tests). |
-| `2e1938e`, `b04664e` | Each fit writes `runs/<stamp>_<host>_<rand>/` (config, git info, W&B link). |
-| `4dfde46` | Encoder builder: backbone and its timm transform from one source. **All earlier runs normalized with ImageNet mean/std instead of the H0-mini stats.** |
-| `6ccb1e3` | Checkpoints are self-contained (`load_from_checkpoint` works); only `last.ckpt` is kept. |
-| `92bfa94`, `bffab23` | `bench/` env and `sipe.bench.{plism,hest}`: official PLISM and HEST code on forks (`../plism-benchmark`, `../HEST`, branch `sipe`). Provenance is recorded for every bench run. |
-| `82b61c5`, `4fd9c05` | Backbone tokens via `forward_features` (required for H-optimus-1); H-optimus-1 config. The H-optimus-1 config has only been smoke-tested (recon phase), not trained. |
-| `fe1c930` | SCORPION proxy `sipe.eval.scorpion_retrieval`: cross-scanner retrieval of the same region on the held-out split, plus post-hoc scanner probes (logreg/MLP). |
-| `5a77728` | A SCORPION region probe was added to the proxy. |
-| `5405d71` | `sipe.eval.soft_shrinkage_sweep`: post-hoc soft-shrinkage scanner eraser from vfm-geom-xai (vendored in `sipe.baselines.soft_delta_legacy`, `P = A (A + λB)^-1`, slide-to-mean scanner deltas), fit on the train split, λ swept on val, `--poolings gap cls`. |
-
-| (this commit) | `sipe.eval.results_tables`: the section 2 tables are generated from the result files under `runs/` (and local `.wandb` history), each row with its run dir. Refresh with `uv run python -m sipe.eval.results_tables --write`; `--check` fails if they are stale. |
-
-Benchmarked representation: GAP over the 16×16 patch grid of the scanner-free latent (`z_gap`).
-Reference: GAP of the backbone patch tokens (`backbone_gap`).
-
-## 2. Results
+Tables below are refreshed by `uv run python -m sipe.eval.results_tables --write`; never edit
+inside a block. They keep the CATS-phase rows as anchors (raw H0-mini GAP, PairedVAE).
 
 ### PLISM (official code, 91 slides, 8,139 tiles/slide), top-1 accuracy
 
@@ -45,31 +30,6 @@ Top-1 accuracy, mean over slide pairs (PLISM `results.csv`).
 
 <!-- /results:plism -->
 
-`h0_mini` = H0-mini CLS, `sipe_h0_mini` = original SIPE (earlier comparisons, outputs of
-`../plism-benchmark`, not under `runs/`).
-
-Bench runs: `runs/bench/2026-10-08_10-18-32_lxbelshark_6ee6_cats_s2bqyu2g_z_gap` (legacy-step CATS)
-and `runs/bench/2026-10-08_20-42-51_lxbelshark_de75_cats_9lctrbqp_z_gap` (CATSv2). The other
-columns come from earlier comparisons (H0-mini GAP: `../plism-benchmark/output/metrics/8139_tiles/h0_mini_gap`,
-2026-10-07). H0-mini GAP was re-run with the current tooling
-(`sipe.bench.plism --representation backbone_gap`,
-`runs/bench/2026-10-13_10-02-08_lxbelshark_053f_h0_mini_gap_ref`, SIPE `06257ff`; dirty only in
-`docs/progress.md`). It reproduces the old row: inter-scanner 0.811 (0.810 before),
-the other rows are identical, and the mean per-pair difference is 0.000 on every row.
-So both GAP rows and PairedVAE share the same preprocessing. PairedVAE: `runs/bench/2026-10-10_17-32-32_lxbelshark_95c5_paired_vae_ysltwjoj`
-(SIPE `06257ff` clean, checkpoint `last.ckpt` step 6,000).
-
-**PairedVAE is the first method to beat raw H0-mini GAP on PLISM, on every row.** Paired
-comparison per slide pair against GAP (same numbers against the old and the re-run GAP) (top-1, mean difference / share of pairs improved):
-inter-scanner +0.028 / 88% (273 pairs), inter-staining +0.034 / 90% (546),
-scanner + staining +0.042 / 89% (3,276), all +0.040 / 89% (4,095). Every scanner gains on
-average (P the most: +0.072, GAP's weakest scanner at 0.655). It also gains on
-inter-staining, which it never trained on. One failure: the **HR** stain loses −0.179 on
-inter-scanner pairs (e.g. AT2↔P 0.33 → 0.07, GT450↔S360 0.41 → 0.10; slide-pair cosine
-drops from ~0.89 to ~0.66–0.71), while HRH and every other stain gain. HR is already hard for
-GAP; the latent seems to break on it (out-of-distribution stain for SCORPION?).
-Caveat: one PairedVAE seed.
-
 ### HEST (official code, ridge on PCA-256, Pearson over 50 genes)
 
 <!-- results:hest exclude=*smoke* -->
@@ -86,15 +46,7 @@ Pearson mean (std over folds), HEST `dataset_results.json`; average only when al
 
 <!-- /results:hest -->
 
-Runs (all tasks, both finished): `runs/bench/2026-10-13_11-03-53_lxbelshark_8f0f_h0_mini_gap_ref`
-(SIPE `5da426e`, clean) and `runs/bench/2026-10-13_13-20-25_lxbelshark_2cf4_paired_vae_ysltwjoj`
-(`5da426e`, dirty only in `docs/progress.md`). Their IDC values equal the earlier IDC-only runs
-(`..._df55_h0_mini_gap_ref`, `..._b34d_paired_vae_ysltwjoj`).
-
-**HEST: PairedVAE does no harm.** The average is identical (0.3638 vs 0.3641), and every task
-is within its fold std. The largest drop is CCRCC −0.019 (std ~0.04).
-
-### SCORPION proxy (held-out split)
+### SCORPION proxy (held-out test split)
 
 <!-- results:scorpion exclude=*smoke* -->
 <!-- generated by `uv run python -m sipe.eval.results_tables --write`; do not edit -->
@@ -118,15 +70,6 @@ Held-out test split; probes trained on val (`summary.csv`).
 
 <!-- /results:scorpion -->
 
-CATSv2 beats GAP on SCORPION but loses on PLISM, and a fresh probe still reads the scanner
-from its z. The gain is a SCORPION-specific alignment, not scanner removal.
-
-PairedVAE (`runs/bench/2026-10-10_14-52-05_claude-box_807c_scorpion_paired_vae_ysltwjoj`):
-top-1 0.962 (top-5 0.993), and it has the lowest scanner probe so far (logreg 0.850, MLP 0.831 vs
-0.956 / 0.939 for GAP). Content is kept: region probe 0.985 vs 0.975 for GAP. Its `s`
-reads the scanner (logreg 0.966) but carries little location (region probe 0.36, retrieval
-0.003). The alignment loss trains on SCORPION pairs, so PLISM decides.
-
 ### Soft-shrinkage eraser sweep (SCORPION proxy, test)
 
 <!-- results:softshrink -->
@@ -143,399 +86,40 @@ Test split, proxy protocol (`summary_test.csv`); λ selected on val, rule in the
 
 <!-- /results:softshrink -->
 
-Run `runs/bench/2026-10-13_15-44-35_lxbelshark_d6f7_scorpion_softshrink_h0mini_gap` (SIPE
-`5405d71` clean; GAP pooling, fp16 autocast features; eraser fit on train, λ grid 0–1000 on
-val). **Finished** (GAP only; CLS not run).
+## 2. Roadmap status
 
-- λ=0 reproduces the `backbone_gap` proxy row (top-1 0.802, logreg 0.956, MLP 0.939; region
-  0.974 vs 0.975), so the features and protocol match.
-- Val sweep (`sweep_val.csv`): top-1 saturates early (0.887 raw → 0.966 at λ=0.1, 0.975 at
-  λ=1, 0.977 from λ=10 to 1000). Paired cosine peaks at λ=3 (0.952; 0.919 raw). The scanner
-  probes fall later: logreg 0.926 at λ=1, 0.728 at λ=3, 0.297 at λ=10, 0.199 at λ=100 (chance
-  0.2). The MLP falls faster at small λ (0.830 at λ=0.1) but plateaus at 0.40–0.43 from λ=10
-  on. The region probe is 0.978 raw and 0.983–0.985 for every λ>0, so the guard is never close.
-- This run selected λ=100 by best val top-1 (`selected.json`). **That rule is dropped** (user,
-  2026-10-13): the eraser is meant to *mitigate scanner-induced distances*, not to erase the
-  scanner, and λ=100 is close to a hard projection. Most of the distance reduction happens by
-  λ≈0.3–1 while the linear probe still reads the scanner (~0.93). New rule (uncommitted on `605eca3`, flag
-  `--select-gain-frac`, default 0.95): the smallest λ reaching 95% of the best val top-1 gain;
-  scanner probes are diagnostics only. On this sweep it picks λ=1. The test row for λ=100 above
-  stays as a record.
-- Re-run with the new rule (`runs/bench/2026-10-13_17-45-08_lxbelshark_db10_scorpion_softshrink_h0mini_gap_gain95`,
-  SIPE `59e49ee`, dirty only in `docs/progress.md`; same features via `--features-from` the run
-  above; grid 0, 0.05–1 dense, 2, 3, 10, 100, 1000). **Finished.** Selected λ=0.5 (`selected.json`:
-  val top-1 0.973 vs best 0.977 and raw 0.887; region guard not violated; not at the grid edge).
-  - Val sweep (`sweep_val.csv`): λ=0.05 already gives top-1 0.959, i.e. ~80% of the gain at
-    relative change 0.09. The logreg probe stays at 0.93–0.94 up to λ=0.7 (0.944 raw); the
-    MLP falls steadily (0.944 → 0.609 at λ=0.5).
-  - Test at λ=0.5 (section 2 table): top-1 0.959 vs PairedVAE 0.962 and GAP 0.802, region
-    probe 0.985, relative change 0.17 (`summary_test.csv`).
-  - Caveat on the probes: val and test probes use different protocols. The val sweep trains
-    them on ≤20,000 train-split tiles; the test row uses the proxy protocol (trained on val).
-    At λ=0.5 the logreg is 0.941 on val but 0.684 on test. Not checked whether this is only
-    the smaller probe training set; compare probe numbers within one protocol only.
-  - Verdict: a mild eraser (λ=0.5) gets nearly all of PairedVAE's SCORPION retrieval gain.
-    PLISM/HEST decide.
-- Test at λ=100 (old rule): top-1 0.966 (PairedVAE 0.962, GAP 0.802), scanner probe logreg
-  0.265 / MLP 0.363, region probe 0.984, mean relative feature change 0.27
-  (`summary_test.csv`).
-- Paired baseline (slide-level deltas): the bar for PairedVAE, not for unpaired methods.
-  PLISM/HEST decide (not wired yet).
+| step (roadmap) | status | evidence (run dir) | decision |
+|---|---|---|---|
+| Exp 0: soft shrinkage, new λ rule, SCORPION test | done: λ=0.5 | `runs/bench/2026-10-13_17-45-08_lxbelshark_db10_scorpion_softshrink_h0mini_gap_gain95` | – |
+| Exp 0: PLISM / HEST for the eraser | blocked: needs the post-hoc extractor in `sipe.bench` | – | D0 pending |
+| Exp 1: content-dependence diagnostic | not started | – | D1 pending |
+| Exp 2: consensus covariance (2A), affine regression (2B), pairing-scale control (2C) | not started | – | D2 pending |
+| Exp 3: Gaussian mixture G0/G1/G2 | not started | – | D3 pending |
+| Exp 4: quadratic correction Q1/Q2 | not started | – | D4 pending |
+| Exp 5/6: conditional covariance / constrained VAE | gated by D3/D4 | – | – |
 
-### Training runs (val)
+Notes carried over from the CATS phase (details and run dirs in the archive):
+- Soft shrinkage at λ=0.5 nearly matches PairedVAE on the SCORPION proxy (see the
+  softshrink and scorpion tables). Val and test scanner probes use different training sets
+  (train vs val), so compare probe numbers within one protocol only.
+- PairedVAE's scanner removal comes from its pair-alignment loss (translation-only ablation
+  `runs/2026-10-13_19-12-17_lxbelshark_5465`). Its val retrieval gain over the backbone
+  appears almost before training, so SCORPION val retrieval alone says little.
 
-<!-- results:training min_steps=1000 exclude=*claude-box* -->
-<!-- generated by `uv run python -m sipe.eval.results_tables --write`; do not edit -->
+## 3. Open points / next steps
 
-| run dir | W&B | module | commit | step | probe_zgap_acc | probe_backbone_acc | probe_s_acc | retrieval_top1_zgap | retrieval_top1_backbone | feature_recon_loss | kl |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| `runs/2026-10-08_18-52-15_lxbelshark_fcc6` | yzb8u4qb | CATSv2 | fe1c930 | 2024/6000 | – | – | – | – | – | 175.318 | – |
-| `runs/2026-10-08_19-26-30_lxbelshark_a7bf` | 9lctrbqp | CATSv2 | d0c7a1a | 6000/6000 | – | – | – | – | – | 0.034 | – |
-| `runs/2026-10-09_23-37-17_lxbelshark_f08b` | qvc6voso | ScannerVAE | 5a77728 | 6000/6000 | 0.743 | 0.802 | – | – | – | 0.052 | 2.054 |
-| `runs/2026-10-10_12-05-05_lxbelshark_9597` | o375g4md | ScannerVAE | 5a77728* | 6000/6000 | 0.781 | 0.802 | – | – | – | 0.244 | 0.525 |
-| `runs/2026-10-10_13-16-50_lxbelshark_ca85` | da7vqx1r | ScannerVAE | ff26970 | 6000/6000 | 0.724 | 0.802 | – | – | – | 0.094 | 3.591 |
-| `runs/2026-10-10_15-18-38_lxbelshark_20c2` | ysltwjoj | PairedVAEModule | f48c72a | 6000/6000 | 0.689 | 0.802 | 0.933 | 0.977 | 0.887 | 0.047 | 1.644 |
-| `runs/2026-10-13_11-54-38_lxbelshark_36b0` | h65a5z5x | MathieuGANModule | 5da426e* | 6000/6000 | 0.783 | 0.802 | 0.832 | 0.921 | 0.887 | 0.195 | 2.225 |
-| `runs/2026-10-13_15-02-26_lxbelshark_6774` | sr40r1h1 | DistMatchVAEModule | d61bf26 | 6000/6000 | 0.796 | 0.802 | 0.891 | 0.953 | 0.887 | 0.027 | 1.235 |
-| `runs/2026-10-13_15-03-37_lxbelshark_a78f` | g7fkiwbp | DistMatchVAEModule | d61bf26 | 6000/6000 | 0.815 | 0.802 | 0.922 | 0.928 | 0.887 | 0.037 | 1.349 |
-| `runs/2026-10-13_19-12-17_lxbelshark_5465` | 8271lf26 | PairedVAEModule | ca9b819 | 6000/6000 | 0.797 | 0.802 | 0.933 | 0.952 | 0.887 | 0.045 | 1.309 |
-
-Mean of the last 10 validations of `val/<col>`, read from the local `.wandb` file; step = last logged `trainer/global_step` / `max_steps`.
-
-<!-- /results:training -->
-
-## 3. Attempts and what we learned
-
-Tables typed in this section before 2026-10-13 are kept as history; the generated tables in
-section 2 are the reference.
-
-
-1. **Legacy-step CATS** (`configs/cats_legacy_steps.yaml`; run
-   `runs/2026-10-07_14-11-04_lxbelshark_ce50`; 12,250 steps: recon → adverse → cycle;
-   frozen H0-mini, bs 512, 16-mixed). Below GAP everywhere and close to the original
-   author's SIPE result, so the weakness is the method, not the port. Diagnosis:
-   - z is a randomly initialized ReLU projection learned through a weak pixel decoder;
-   - the linear per-token GRL adversary sits at chance while pooled z still encodes the scanner;
-   - the cycle mostly teaches robustness to decoder blur.
-2. **CATSv2** (`configs/cats_v2_unpaired.yaml`; commits `fe1c930`, `d0c7a1a`; W&B `9lctrbqp`).
-   - Reconstruction in feature space, z initialized as identity on the backbone tokens.
-   - Pooled GRL adversaries; LayerNorm before the GRL fixed a |z| blow-up.
-   - Result: PLISM 0.751. The GRL adversaries sit at chance, but a fresh probe still gets
-     92% (backbone 96%). **The GRL was fooled.**
-3. **ScannerVAE** (`uv run sipe fit --config configs/scanner_vae*.yaml`; `src/sipe/model/scanner_vae.py`,
-   `src/sipe/training/scanner_vae_module.py`; commits `5a77728`, `ff26970`). Design:
-   - Fader / Mathieu-style VAE on frozen H0-mini tokens: per-token Gaussian z, identity
-     init, and a decoder conditioned on a learned scanner embedding.
-   - KL with β warm-up; an adversary on LayerNorm(GAP(μ)). No cycle, no curriculum.
-   - Every validation trains a fresh linear probe on WSI-disjoint halves of val. It logs
-     `val/probe_zgap_acc` next to `val/probe_backbone_acc` (about 0.80 on this small split).
-     This is the removal signal; the adversary's accuracy alone is not.
-
-   All runs: 6,000 steps, frozen H0-mini, bs 512, 16-mixed. Results (val, last available step):
-
-   | run | config | probe z / backbone | feature recon | KL | σ | adversary acc |
-   |---|---|---|---|---|---|---|
-   | `qvc6voso` (`runs/2026-10-09_23-37-17_lxbelshark_f08b`) | GRL, β 0.1 | 0.74 / 0.80 | 0.051 | 2.04 | 0.24 | 0.23 |
-   | `o375g4md` (`runs/2026-10-10_12-05-05_lxbelshark_9597`) | GRL, β 1 | 0.78 / 0.80 | 0.244 | 0.52 | 0.86 | 0.25 |
-   | `da7vqx1r` (`runs/2026-10-10_13-16-50_lxbelshark_ca85`) | Fader, β 0.1, 5 adversary steps | 0.72 / 0.80 (mean of last 10 vals 0.72; min 0.69 at step 2000) | 0.095 | 3.7 | 0.23 | 0.60 |
-
-   - β 0.1 GRL: stable, but the KL barely compresses and the GRL is fooled again.
-   - β 1: reconstruction is 5× worse and σ is near the prior, yet the scanner is still
-     readable. A stronger bottleneck removes content, not scanner. **Dead end.**
-   - Fader (finished, 6,000 steps): **no real gain over GRL.**
-     - Probe gap 0.08 (z 0.72 vs backbone 0.80) vs 0.06 for GRL, within the ±0.03 noise
-       between validations.
-     - The adversary is honest and wins at the end. While the encoder's cosine LR decays
-       (the adversary's LR is constant), its training fit accuracy rises from 0.54 to 0.78,
-       val adversary accuracy from 0.42 to 0.60, and confusion from 1.24 to 1.84.
-       Meanwhile recon worsens (0.080 → 0.095), KL rises (3.0 → 3.7) and |z| grows.
-     - Conclusion: in a fair game, an adversary on z can't remove the scanner at this
-       weight. No SCORPION proxy or PLISM run.
-   - The β=1 run ran on `5a77728` with the uncommitted Fader diff (GRL mode); that code is
-     the same as what was committed in `ff26970`.
-
-4. **PairedVAE**, stage 1 toward Mathieu et al. (`uv run sipe fit --config
-   configs/paired_vae.yaml`; `src/sipe/model/paired_vae.py`,
-   `src/sipe/training/paired_vae_module.py`, `PairedSCORPIONDataModule`). Implemented
-   2026-10-10. Design:
-   - s is encoded from the image (MLP on GAP); z is a per-token VAE latent. No adversary.
-   - Batches: 256 locations × 2 scanners, with the same augmentation on both views.
-   - Losses:
-     - Mathieu's same-scanner swap reconstruction (s from another tile of the same scanner);
-     - cross-scanner translation `Dec(s_donor(b), z_a) ≈ x_b` on 4×4-pooled features,
-       because P1000 tiles sit about 1 token (~7 µm) off the other scanners;
-     - batch-normalized GAP(μ) pair alignment;
-     - KL (β 0.1).
-   - Validation:
-     - fresh probes on z, backbone and s;
-     - PLISM-style cross-scanner retrieval top-1 on val, as in the SCORPION proxy
-       (backbone about 0.89).
-   - Stage 2: replace the translation with a class-conditional GAN in embedding space (item 5).
-   - Run `ysltwjoj` (`runs/2026-10-10_15-18-38_lxbelshark_20c2`, commit `f48c72a`, clean;
-     `configs/paired_vae.yaml` defaults: 6,000 steps, frozen H0-mini, 256 pairs/batch,
-     16-mixed, lr 3e-4). **Finished** (6,000 steps; table read at step 3,899, final
-     mean of last 10 vals: probe z / backbone 0.689 / 0.802, s 0.93, retrieval 0.977 /
-     0.887, recon 0.047, KL 1.64):
-
-     | metric (val) | step 99 | step 3,899 | mean of vals 3,000–3,899 |
-     |---|---|---|---|
-     | probe z / backbone | 0.79 / 0.79 | 0.69 / 0.81 | 0.695 / 0.801 |
-     | probe s | 0.73 | 0.93 | 0.93 |
-     | retrieval top-1 z / backbone | 0.951 / 0.887 | 0.977 / 0.887 | 0.977 / 0.887 |
-     | pair cos z / backbone | 0.94 / 0.92 | 0.98 / 0.92 | |
-     | translation / align (backbone align 0.299) | 0.252 / 0.220 | 0.238 / 0.239 | |
-     | feature recon / KL / σ / \|z\| | 0.019 / 2.64 / 0.08 / 0.81 | 0.048 / 1.66 / 0.23 / 0.83 | |
-
-     - Best removal so far: probe gap ~0.11 (vs 0.06 GRL, 0.08 Fader), still drifting down
-       slowly; s carries the scanner (0.93), as intended. All 768 units active, no collapse.
-     - Retrieval z 0.977 vs backbone 0.887 on val (WSI-disjoint from train). Caveat: the
-       alignment loss trains exactly this pairing, so PLISM is the real test.
-     - Feature recon rose 0.019 → 0.047 and is flat since step ~1,500 (GRL β0.1 ends at 0.051).
-     - Metrics were flat after step ~4,000.
-     - SCORPION proxy (held-out test split, section 2): top-1 0.962 vs 0.802 GAP; scanner
-       probe 0.850 vs 0.956.
-     - PLISM (section 2): inter-scanner 0.839 vs 0.810 GAP, all 0.267 vs 0.227; gains on
-       ~89% of slide pairs; fails on the HR stain.
-     - Verdict: **best so far on SCORPION and PLISM**; first method to beat GAP on PLISM.
-   - **Ablation, translation only** (`configs/paired_vae_translation_only.yaml`, `align_weight: 0`,
-     else as `ysltwjoj`): run `8271lf26` (`runs/2026-10-13_19-12-17_lxbelshark_5465`, commit
-     `ca9b819`, clean). **Finished** (6,000 steps). Last-10-val means, `ysltwjoj` in brackets
-     (section 2 table and `wandb_history`/`last_val_mean` on both run dirs):
-     - probe z 0.797 (0.689), backbone 0.802: **no removal without the alignment**;
-     - retrieval top-1 z 0.952 (0.977), backbone 0.887;
-     - translation loss 0.234 (0.237): the translation is learned equally well;
-     - align loss 0.326 (0.241), backbone 0.299: z pairs end slightly *less* aligned than
-       the backbone;
-     - probe s 0.933 (0.933); feature recon 0.045 (0.047).
-     - Retrieval z is already 0.948 at step 99 (`ysltwjoj` 0.951, DistMatchVAE `sr40r1h1`
-       0.914), so a large part of the val retrieval gain over the backbone appears before
-       any real training. Not checked what causes it (e.g. the encoder's normalization).
-     - Verdict: **the alignment loss carries PairedVAE's scanner removal**; translation alone
-       gives the same val numbers as the unpaired DistMatchVAE `sr40r1h1` (probe z 0.796,
-       retrieval 0.953). PLISM not run for the ablation.
-
-5. **MathieuGAN**, stage 2 toward Mathieu et al. (`uv run sipe fit --config
-   configs/mathieu_gan.yaml`; `src/sipe/training/mathieu_gan_module.py`). Implemented
-   2026-10-10; full run `h65a5z5x` 2026-10-13 (results at the end of this item). Design:
-   - Same network as PairedVAE (`PairedVAE`). Training is **unpaired** (scanner labels
-     only); paired batches are kept so validation matches PairedVAE.
-   - Losses: same-scanner swap reconstruction + KL (β 0.1) + class-conditional GAN.
-     Fake = `Dec(s(x_other), z_i)` with x_other from another scanner *and* another
-     location (never i's pair partner), labeled with x_other's scanner; real = backbone
-     tokens with their own scanner.
-   - D: projection discriminator with spectral norm on the 16×16 token grid (1×1 conv,
-     two stride-2 3×3 convs, mean pool), hinge loss; Adam(0.5, 0.999), same cosine LR
-     decay as the generator (Fader lesson). Manual optimization: 1 G step (= 1 global
-     step) then 1 fp32 D step. Adversarial weight 1.0, warm-up 1,000 steps.
-   - No adversary on z, no translation or alignment loss in training.
-   - Validation: everything PairedVAE logs (probes on z/backbone/s, retrieval top-1,
-     paired translation loss as evaluation only), plus D accuracies and
-     `val/fake_{target,source}_acc`: a probe trained on real backbone GAP reads the
-     scanner of GAP(fake). Target should rise, source should fall.
-   - Known limitation (also in Mathieu): the decoder can overwrite a scanner signature
-     left in z, so a fooled D doesn't prove z is scanner-free. Read the z probe.
-   - Box smoke run (`runs/2026-10-10_13-23-13_claude-box_103a`, W&B offline `7zo0kmfr`;
-     300 steps, adversarial warm-up 50 instead of 1,000, 8 val batches only, so absolute
-     numbers are not comparable with full runs). Finished; mechanics OK, too short to judge:
-     - D dominates in training (real/fake acc ~0.95–1.0, d_loss 0.05–0.5).
-     - The GAN costs a lot of reconstruction: feature recon 0.025 before the GAN starts, then
-       0.6 at its peak, 0.12 at step 300 (stage-0 runs end at ~0.05).
-     - Fakes don't look like the target scanner yet: `fake_target_acc` 0.18 → 0.22 (chance
-       0.2), while `fake_source_acc` 0.37 → 0.20. The decoder moves features off the real
-       distribution rather than toward the target scanner.
-     - Probe z 0.69 vs backbone 0.73; retrieval z 0.860 vs backbone 0.865; s probe 0.52.
-     - Verdict: works mechanically. Watch whether recon recovers and `fake_target_acc` rises.
-       Adversarial weight 1.0 may be too high; 0.1 is the first knob to try.
-   - Full run `h65a5z5x` (`runs/2026-10-13_11-54-38_lxbelshark_36b0`, commit `5da426e`, dirty
-     only in `docs/progress.md`; `configs/mathieu_gan.yaml` defaults: adversarial weight 1.0,
-     warm-up 1,000, D LR decay on, 6,000 steps, frozen H0-mini, 16-mixed). **Finished.**
-     Mean of the last 10 validations, PairedVAE `ysltwjoj` in brackets:
-
-     | metric (val) | step 99 | step 5,999 | last-10 mean | PairedVAE |
-     |---|---|---|---|---|
-     | probe z / backbone | 0.79 / 0.80 | 0.78 / 0.80 | 0.783 / 0.802 | 0.689 / 0.802 |
-     | probe s | 0.66 | 0.83 | 0.83 | 0.93 |
-     | retrieval top-1 z / backbone | 0.896 / 0.887 | 0.921 / 0.887 | 0.921 / 0.887 | 0.977 / 0.887 |
-     | feature recon / KL | 0.098 / 2.66 | 0.197 / 2.23 | 0.195 / 2.23 | 0.047 / 1.64 |
-     | translation (eval only) | 0.41 | 0.44 | 0.44 | 0.24 (trained) |
-     | fake target / source acc (chance 0.2) | 0.18 / 0.24 | 0.34 / 0.25 | 0.37 / 0.25 | |
-     | D real / fake acc (val) | 0.99 / 0.89 | 0.26 / 0.74 | 0.30 / 0.71 | |
-
-     - Almost no removal: probe gap 0.02 (PairedVAE 0.11, GRL 0.06), within noise.
-     - The GAN does move fakes toward the target scanner (fake_target 0.18 → ~0.37), but
-       z keeps the scanner, so the decoder rewrites the scanner signature on top of z
-       (the known limitation above).
-     - Reconstruction gets worse throughout (0.07 at step 499 → 0.197, still rising); no
-       recovery after the warm-up.
-     - D does not dominate: training D accuracies fall from ~0.90/0.86 to ~0.79/0.77 as the
-       LRs decay.
-     - Small retrieval gain on val (0.921 vs 0.887), well below PairedVAE.
-     - Verdict: **unpaired GAN alone does not remove the scanner from z**; worse than
-       PairedVAE on every val metric.
-     - PLISM (`runs/bench/2026-10-13_19-02-32_lxbelshark_dcf2_mathieu_gan_h65a5z5x`, section 2):
-       inter-scanner 0.792 vs GAP 0.811, all 0.225 vs 0.227; below GAP. HEST not run.
-
-6. **DistMatchVAE**: unpaired scanner removal by distribution matching (`uv run sipe fit
-   --config configs/dist_match_vae.yaml`; `src/sipe/training/dist_match_vae_module.py`,
-   `UnpairedTrainSCORPIONDataModule`). Implemented 2026-10-13. Goal (user, 2026-10-13): a
-   method that needs **no paired data**. PairedVAE stays the paired upper reference.
-   - Why: every unpaired attempt so far relied on a learned adversary that the
-     encoder or decoder could satisfy without z losing the scanner (GRL fooled, Fader
-     adversary wins, MathieuGAN decoder overwrites). Fixed statistics can't be fooled.
-   - Same network as PairedVAE. Losses: same-scanner swap recon + KL (β 0.1) +
-     matching on g = GAP(μ), standardized per dimension over the batch (statistics not
-     detached, so shrinking z doesn't help):
-     - MMD² between every pair of scanners (unbiased; mean of RBF kernels at
-       0.25–4 × the median squared distance);
-     - per-scanner mean (‖mean_a‖²/D) and covariance (‖Cov_a − Cov‖²_F/D²) matching:
-       what a linear probe reads.
-     - Weights 1.0 each, warm-up 1,000 steps. No adversary, no pairs, no translation.
-   - Data: training batches are 512 **shuffled tiles** (no location key), so each scanner
-     in a batch sees random, mostly different locations. Paired batches would leak
-     pairing into MMD, since both views of a location share tissue. Validation stays
-     paired (all 5 scanners per location) and logs the PairedVAE metrics. On those
-     batches every scanner sees the same tissue, so `val/mmd`, `val/mean_loss` and
-     `val/cov_loss` measure the scanner effect alone. `*_backbone` versions give the scale.
-   - Assumption: every scanner sees the same tissue distribution. True for SCORPION by
-     construction; it breaks on data where tissue differs by scanner.
-   - Box smoke run (`runs/2026-10-13_12-27-13_claude-box_bc5a`, W&B offline `klr6rd9h`;
-     300 steps, warm-ups 50 instead of 1,000, 8 val batches only, so the val probes are
-     noisy and not comparable with full runs). Finished; mechanics OK:
-
-     | val (paired batches) | step 99 | step 299 | backbone |
-     |---|---|---|---|
-     | MMD / mean / cov term | 0.0200 / 0.0377 / 0.0075 | 0.0194 / 0.0372 / 0.0073 | 0.0317 / 0.0536 / 0.0084 |
-     | probe z (backbone) | 0.79 (0.71) | 0.80 (0.71) | |
-     | retrieval top-1 z (backbone) | 0.921 (0.865) | 0.927 (0.865) | |
-     | feature recon / KL / \|z\| | 0.012 / 1.67 / 0.73 | 0.015 / 1.56 / 0.71 | |
-
-     - On val, z shows less scanner difference than the backbone (MMD −39%, mean −31%,
-       cov −13%), but the terms are flat after step 99.
-     - Training batches: MMD drops to ~0.001 (backbone ~0.02). The mean and cov terms sit
-       at their **sampling-noise floor**: for 512 i.i.d. 768-d samples over 5 scanners the
-       floor is 0.0078 for each; train reads 0.008–0.009 and 0.010. So with
-       ~100 random tiles per scanner, the per-batch moment estimates can't see the
-       remaining scanner difference. Fixes if the full run stalls: running (EMA)
-       per-scanner statistics across batches, or larger matching weights.
-     - Probe z ≥ probe backbone here is a warning sign but uses 8 val batches only; the
-       full run's probes (whole val split) decide.
-     - Reconstruction is fine (0.015; PairedVAE ends at 0.047). All 768 units active.
-   - Full runs (both **finished**, 6,000/6,000 steps, commit `d61bf26` clean,
-     `configs/dist_match_vae.yaml` defaults otherwise): `sr40r1h1`
-     (`runs/2026-10-13_15-02-26_lxbelshark_6774`, matching weights 1) and `g7fkiwbp`
-     (`runs/2026-10-13_15-03-37_lxbelshark_a78f`, mmd/mean/cov weights 10). Values below are
-     last-10-val means read with `sipe.eval.results_tables` (training table, section 2):
-     - Probe z / backbone: 0.796 / 0.802 (w1), 0.815 / 0.802 (w10). **No removal**: a fresh
-       probe reads the scanner from z as well as from the backbone.
-     - The matched statistics do drop on paired val: MMD 0.013 (w1) / 0.008 (w10) vs
-       0.024 backbone; mean term 0.030 / 0.017 vs 0.042; cov term 0.007 / 0.007 vs 0.008.
-       So z matches the batch statistics better without becoming less linearly separable.
-     - Retrieval top-1 z 0.953 (w1) / 0.928 (w10) vs backbone 0.887 (PairedVAE 0.977).
-       Recon 0.027 / 0.037; all units active.
-     - Trajectory (val every 100 steps, read from the `.wandb` files of the two run dirs):
-       probe z stays at backbone level from the first validation on (step 99: 0.814 / 0.801
-       w1, 0.808 / 0.801 w10; step 5,999: 0.796 / 0.806 w1, 0.819 / 0.806 w10). Val MMD and
-       mean terms reach their final level by step ~700 (w1 MMD 0.0136, w10 0.0072) and stay
-       flat.
-     - Why it stalls: on **training** batches the matching is already at the sampling-noise
-       floor by step 624. Train mean term 0.0087 (w1) / 0.0079 (w10) vs the floor 0.0078
-       (item 6 smoke) and 0.033 for the backbone; train MMD 0.0003–0.0016 vs 0.018 backbone.
-       With ~100 random tiles per scanner per batch, content variance hides the remaining
-       scanner offset. The paired val batches control content, so they still see it (val
-       mean term 0.030 w1 vs 0.0425 backbone). Training has no signal left after ~600 steps.
-     - w10 is not better: probe z 0.819 vs 0.796, retrieval 0.928 vs 0.953, recon 0.037 vs
-       0.027 (last-10 means, section 2). The extra weight is spent matching noise.
-     - Verdict: distribution matching on standardized GAP(μ) over random-tile batches **does
-       not remove the scanner** on the val probe. Not benchmarked (proxy/PLISM): no point given
-       the probe.
-
-## 4. Open points / next steps
-
-- **Soft-shrinkage baseline (vfm-geom-xai).** GAP sweep done
-  (`runs/bench/2026-10-13_15-44-35_lxbelshark_d6f7_scorpion_softshrink_h0mini_gap`); λ rule
-  changed to "smallest λ at ≥95% of the val top-1 gain" (goal: mitigate scanner distances, not
-  remove the scanner). Next:
-  - ~~Read the re-run~~ done: λ=0.5 selected, test top-1 0.959 (section 3 above,
-    `..._db10_scorpion_softshrink_h0mini_gap_gain95`).
-  - PLISM/HEST: needs a `backbone_gap` + eraser extractor in `sipe.bench` (load the
-    `eraser_gap_lam<λ>.pt` of the selected run). This is the real comparison with PairedVAE.
-  - CLS pooling from the saved features: `--features-from <run dir> --poolings cls`.
-  It is a **paired** baseline: its deltas (per-slide scanner means minus the slide mean) need
-  every slide under several scanners, i.e. slide-level pairs (on SCORPION equal to the mean of
-  tile-pair deltas). Compare it with PairedVAE, not with the unpaired candidates.
-- **Goal (user, 2026-10-13): a method that needs no paired data.** PairedVAE is the paired
-  reference to approach; DistMatchVAE (item 6) is the current unpaired candidate.
-- **Is the GAN route toward an unpaired PairedVAE worth pursuing?** (discussed with the user
-  2026-10-13; the user is also weighing a different research question). Idea: keep PairedVAE
-  and replace its paired losses with a GAN, to get a method that needs no paired data.
-  MathieuGAN (item 5) was the first try. Assessment: a long shot, but not dead; the negative
-  evidence is one untuned run plus a structural loophole nobody has tried to close.
-  - Why pessimistic:
-    - D judges only the decoder output, never z. If z keeps the scanner, the decoder writes
-      the target scanner on top of it. Observed in `h65a5z5x`: fakes move toward the target
-      (fake_target_acc ~0.37, item 5) while the z probe stays at backbone level (section 2).
-    - The GAN replaces only PairedVAE's translation loss. Nothing unpaired replaces the pair
-      alignment of GAP(μ), which trains retrieval pairing directly. If alignment carries
-      PairedVAE's gain, this route is capped.
-  - What could change the view, cheapest first:
-    1. **DONE: alignment does the work** (`8271lf26`, item 4: probe z 0.797 vs 0.689 with
-       alignment). **Ablate PairedVAE: translation only, no alignment** (`configs/paired_vae_translation_only.yaml`
-       = `configs/paired_vae.yaml` with `align_weight: 0`, else identical to `ysltwjoj`; the
-       module changed since `f48c72a` only by the `log_paired_validation` refactor).
-       `uv run sipe fit --config configs/paired_vae_translation_only.yaml`.
-       If translation alone keeps most of the gain, a GAN replacing it is worth pursuing; if
-       alignment does the work, the route is capped.
-    2. **PLISM on the unpaired runs.** The goal is beating GAP on PLISM, not the val probe.
-       Both unpaired methods gain a little on val retrieval without visible removal (section 2
-       training table: `retrieval_top1_zgap` for `runs/2026-10-13_11-54-38_lxbelshark_36b0`
-       and `runs/2026-10-13_15-02-26_lxbelshark_6774` vs `retrieval_top1_backbone`). Tags
-       `mathieu_gan_h65a5z5x`, `dist_match_vae_sr40r1h1`, `dist_match_vae_g7fkiwbp`:
-       `bench/run python -m sipe.bench.plism --ckpt runs/<run>/checkpoints/last.ckpt --tag <tag>`.
-       - MathieuGAN **done** (`runs/bench/2026-10-13_19-02-32_lxbelshark_dcf2_mathieu_gan_h65a5z5x`,
-         SIPE `e0b8cd2`; section 2 PLISM table): inter-scanner 0.792 vs GAP 0.811, all 0.225
-         vs 0.227. **Below GAP**: the val retrieval gain does not transfer.
-       - DistMatchVAE `sr40r1h1` (`runs/bench/2026-10-13_20-17-04_lxbelshark_244b_dist_match_vae_sr40r1h1`,
-         SIPE `ca9b819`): **in progress** (features being extracted, no metrics yet).
-         `g7fkiwbp` queued after it.
-    3. **Not worth it given 1** (a GAN can at best replace the translation). **Close the decoder loophole** (only if 1 keeps the gain): re-encode each fake and
-       require `z(fake) ≈ z_i` and `s(fake) ≈ s(other)`. This latent cycle is the standard
-       fix in unpaired translation (MUNIT, DRIT, StarGAN-v2): the decoder can't fake the
-       scanner unless the encoder agrees. A lower adversarial weight (0.1) is a cheap knob,
-       not expected to help much.
-  - **Status 2026-10-13:** 1 says alignment does the work; 2 is negative for MathieuGAN,
-    DistMatchVAE pending. Unless DistMatchVAE beats GAP on PLISM, drop the route: an
-    unpaired method would need an unpaired substitute for the *alignment*, not for the
-    translation.
-  - Decision rule: if 1 shows alignment does the work and 2 shows nothing for the unpaired
-    runs, drop this route.
-  - Note: MathieuGAN was written from memory of Mathieu et al. 2016 (arXiv 1611.03383), not
-    checked against the paper text or any reference code (deliberate deviations: token space,
-    VAE z, projection D + hinge, fakes from another scanner and location).
-- PairedVAE `ysltwjoj`: done; beats GAP on PLISM, no harm on HEST.
-  PLISM inter-scanner 0.839 vs 0.810, all 0.267 vs 0.227. To make the claim solid:
-  - ~~re-run the GAP baseline with the current tooling~~ done: it reproduces 0.810/0.811;
-  - a second seed of PairedVAE (gain +0.03 inter-scanner vs ±? seed noise);
-  - look into the HR stain failure;
-  - ~~HEST "does no harm" check~~ done: average 0.364 for both, all 10 tasks within std.
-- DistMatchVAE `sr40r1h1` (weights 1) and `g7fkiwbp` (weights 10): finished, **no removal**
-  on the val probe (z at backbone level). Diagnosis (item 6): the train matching terms sit at
-  the per-batch sampling-noise floor from step ~600, so there is no gradient signal left.
-  Unpaired options (each slide seen by one scanner only; no slide-level matching):
-  - running (EMA) per-scanner statistics across batches, to lower the noise floor;
-  - larger batches per scanner for the matching terms (same aim).
-  Not an option for the unpaired goal: matching per-slide scanner means. A slide with
-  means under several scanners *is* paired data at slide level (the same physical slide
-  scanned by every scanner; on SCORPION the tile sets are identical, so the difference of
-  slide means equals the mean of tile-pair differences). That is the supervision of the
-  soft-shrinkage eraser, which is therefore a paired baseline.
-- Results tables in section 2 are generated (`sipe.eval.results_tables --write`). Rows still
-  hand-typed elsewhere (section 3, prose) predate it.
-- MathieuGAN `h65a5z5x`: finished, weak on val (probe gap 0.02, recon 0.195) and below GAP on
-  PLISM (inter-scanner 0.792 vs 0.811). HEST not needed. Route on hold (see the GAN-route point).
-- If adversaries on z come back: the Fader knobs not tried are a larger
-  `adversary_weight` (3–5), fewer `adversary_steps`, and decaying the adversary's LR with
-  the encoder's (the end of the Fader run was dominated by the adversary).
-- Not started: H-optimus-1 training (memory at bs 512 untested; `unspecified_dim` choice
-  open), and baselines beyond raw GAP.
-- Each run (and the H0-mini GAP baseline) has one seed, so small differences
-  (about ±0.03 on the val probe) are within noise.
+- **Post-hoc extractor for PLISM/HEST** (blocks D0 and every later estimator): a
+  `backbone_gap` + saved-operator representation in `sipe.bench`, loading a fitted map from a
+  run dir, generic enough for the eraser and the roadmap estimators.
+- Then run the eraser (λ=0.5,
+  `runs/bench/2026-10-13_17-45-08_lxbelshark_db10_scorpion_softshrink_h0mini_gap_gain95/eraser_gap_lam0.5.pt`)
+  on full PLISM and HEST.
+- Experiment 1 on the cached features (`runs/bench/2026-10-13_15-44-35_lxbelshark_d6f7_scorpion_softshrink_h0mini_gap`):
+  per-region consensus/residuals, small WSI-split clustering, held-out residual likelihood vs a
+  global model, shuffled-content control, P1000 / registration sensitivity.
+- In flight from the CATS phase: DistMatchVAE PLISM runs (`dist_match_vae_sr40r1h1` running at
+  `runs/bench/2026-10-13_20-17-04_lxbelshark_244b_dist_match_vae_sr40r1h1`, `g7fkiwbp` queued).
+  They close the unpaired question; record them here (the table picks them up) and in one
+  line of the archive.
+- Seeds: every number has one seed so far; the roadmap asks for fit/train-seed variation for
+  any shortlisted method.

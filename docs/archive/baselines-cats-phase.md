@@ -1,4 +1,4 @@
-# Phase 5 — Baselines
+# Baselines (CATS phase, archived 2026-10-13; superseded by docs/roadmap.md)
 
 ## Rules
 
