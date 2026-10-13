@@ -55,25 +55,27 @@ Caveat: one PairedVAE seed.
 
 ### HEST (official code, ridge on PCA-256, Pearson over 50 genes)
 
-| task | H0-mini GAP | PairedVAE z_gap (`ysltwjoj`) |
-|---|---|---|
-| CCRCC | 0.267 (0.045) | in progress |
-| COAD | 0.256 (0.025) | |
-| HCC | 0.074 (0.020) | |
-| IDC | 0.578 (0.078) | 0.577 (0.078) (IDC-only run) |
-| LUNG | 0.535 (0.051) | |
-| LYMPH_IDC | 0.267 (0.033) | |
-| PAAD | 0.497 (0.044) | |
-| PRAD | 0.371 (0.032) | |
-| READ | 0.202 (0.049) | |
-| SKCM | 0.594 (0.067) | |
-| **average** | **0.364** | |
+| task | H0-mini GAP | PairedVAE z_gap (`ysltwjoj`) | Δ |
+|---|---|---|---|
+| CCRCC | 0.267 (0.045) | 0.248 (0.041) | −0.019 |
+| COAD | 0.256 (0.025) | 0.261 (0.023) | +0.005 |
+| HCC | 0.074 (0.020) | 0.075 (0.024) | +0.001 |
+| IDC | 0.578 (0.078) | 0.577 (0.078) | −0.001 |
+| LUNG | 0.535 (0.051) | 0.543 (0.039) | +0.008 |
+| LYMPH_IDC | 0.267 (0.033) | 0.266 (0.035) | −0.001 |
+| PAAD | 0.497 (0.044) | 0.501 (0.052) | +0.005 |
+| PRAD | 0.371 (0.032) | 0.372 (0.032) | +0.000 |
+| READ | 0.202 (0.049) | 0.196 (0.061) | −0.006 |
+| SKCM | 0.594 (0.067) | 0.600 (0.056) | +0.006 |
+| **average** | **0.364** | **0.364** | −0.000 |
 
-GAP, all tasks: `runs/bench/2026-10-13_11-03-53_lxbelshark_8f0f_h0_mini_gap_ref` (finished; its
-IDC equals the IDC-only run `..._df55_h0_mini_gap_ref`). PairedVAE IDC only:
-`runs/bench/2026-10-13_10-12-16_lxbelshark_b34d_paired_vae_ysltwjoj`; no cost on IDC. PairedVAE
-all tasks: `runs/bench/2026-10-13_13-20-25_lxbelshark_2cf4_paired_vae_ysltwjoj`, **in progress**
-(read at CCRCC). SIPE `06257ff`/`5da426e`, dirty only in `docs/progress.md`.
+Runs (all tasks, both finished): `runs/bench/2026-10-13_11-03-53_lxbelshark_8f0f_h0_mini_gap_ref`
+(SIPE `5da426e`, clean) and `runs/bench/2026-10-13_13-20-25_lxbelshark_2cf4_paired_vae_ysltwjoj`
+(`5da426e`, dirty only in `docs/progress.md`). Their IDC values equal the earlier IDC-only runs
+(`..._df55_h0_mini_gap_ref`, `..._b34d_paired_vae_ysltwjoj`).
+
+**HEST: PairedVAE does no harm.** The average is identical (0.3638 vs 0.3641), and every task
+is within its fold std. The largest drop is CCRCC −0.019 (std ~0.04).
 
 ### SCORPION proxy (held-out split)
 
@@ -290,22 +292,22 @@ reads the scanner (logreg 0.966) but carries little location (region probe 0.36,
 
 ## 4. Open points / next steps
 
-- PairedVAE `ysltwjoj`: done. PLISM beats GAP on all rows (inter-scanner 0.839 vs 0.810,
-  all 0.267 vs 0.227). To make the claim solid:
+- **Goal (user, 2026-10-13): a method that needs no paired data.** PairedVAE is the paired
+  reference to approach; DistMatchVAE (item 6) is the current unpaired candidate.
+- PairedVAE `ysltwjoj`: done; beats GAP on PLISM, no harm on HEST.
+  PLISM inter-scanner 0.839 vs 0.810, all 0.267 vs 0.227. To make the claim solid:
   - ~~re-run the GAP baseline with the current tooling~~ done: it reproduces 0.810/0.811;
   - a second seed of PairedVAE (gain +0.03 inter-scanner vs ±? seed noise);
   - look into the HR stain failure;
-  - HEST "does no harm" check: IDC is on par (0.577 vs 0.578). GAP on all tasks is running;
-    then run `bench/run python -m sipe.bench.hest --ckpt
-    runs/2026-10-10_15-18-38_lxbelshark_20c2/checkpoints/last.ckpt --tag paired_vae_ysltwjoj
-    --datasets '*'` (needs `8a28a6a` for `'*'`).
+  - ~~HEST "does no harm" check~~ done: average 0.364 for both, all 10 tasks within std.
 - DistMatchVAE: launch `uv run sipe fit --config configs/dist_match_vae.yaml` on the host
   (smoke run OK, but the moment terms hit their noise floor on 512-tile batches). In
   parallel, a stronger run: `--model.init_args.mmd_weight=10 --model.init_args.mean_weight=10
   --model.init_args.cov_weight=10`.
   Compare with PairedVAE on the val probe (z vs backbone) and retrieval. Watch
   `val/mmd` vs `val/mmd_backbone`, recon, active units and |z| for collapse.
-- MathieuGAN `h65a5z5x`: finished, weak on val (probe gap 0.02, recon 0.195). PLISM/HEST:
+- MathieuGAN `h65a5z5x`: finished, weak on val (probe gap 0.02, recon 0.195). PLISM/HEST
+  only as a negative control, if a GPU is idle:
   `bench/run python -m sipe.bench.plism --ckpt
   runs/2026-10-13_11-54-38_lxbelshark_36b0/checkpoints/last.ckpt --tag mathieu_gan_h65a5z5x`
   and the same with `sipe.bench.hest ... --datasets '*'`. An `adversarial_weight=0.1` run
