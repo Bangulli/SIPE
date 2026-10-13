@@ -22,7 +22,8 @@ inside a block. They keep the CATS-phase rows as anchors (raw H0-mini GAP, Paire
 | paired_vae_ysltwjoj | z_gap | 0.839 | 0.293 | 0.215 | 0.267 | `runs/bench/2026-10-10_17-32-32_lxbelshark_95c5_paired_vae_ysltwjoj` | ysltwjoj | 06257ff |
 | h0_mini_gap_ref | backbone_gap | 0.811 | 0.259 | 0.173 | 0.227 | `runs/bench/2026-10-13_10-02-08_lxbelshark_053f_h0_mini_gap_ref` | – | 06257ff* |
 | mathieu_gan_h65a5z5x | z_gap | 0.792 | 0.254 | 0.172 | 0.225 | `runs/bench/2026-10-13_19-02-32_lxbelshark_dcf2_mathieu_gan_h65a5z5x` | h65a5z5x | e0b8cd2 |
-| dist_match_vae_sr40r1h1 | z_gap | no results | – | – | – | `runs/bench/2026-10-13_20-17-04_lxbelshark_244b_dist_match_vae_sr40r1h1` | sr40r1h1 | ca9b819 |
+| dist_match_vae_sr40r1h1 | z_gap | 0.855 | 0.277 | 0.196 | 0.251 | `runs/bench/2026-10-13_20-17-04_lxbelshark_244b_dist_match_vae_sr40r1h1` | sr40r1h1 | ca9b819 |
+| dist_match_vae_g7fkiwbp | z_gap | no results | – | – | – | `runs/bench/2026-10-13_21-11-53_lxbelshark_7015_dist_match_vae_g7fkiwbp` | g7fkiwbp | 1faa102 |
 | h0_mini | – | 0.600 | 0.120 | 0.055 | 0.100 | `../plism-benchmark/output/metrics/8139_tiles/h0_mini` | – | – |
 | sipe_h0_mini | – | 0.666 | 0.237 | 0.158 | 0.203 | `../plism-benchmark/output/metrics/8139_tiles/sipe_h0_mini` | – | – |
 
@@ -91,7 +92,7 @@ Test split, proxy protocol (`summary_test.csv`); λ selected on val, rule in the
 | step (roadmap) | status | evidence (run dir) | decision |
 |---|---|---|---|
 | Exp 0: soft shrinkage, new λ rule, SCORPION test | done: λ=0.5 | `runs/bench/2026-10-13_17-45-08_lxbelshark_db10_scorpion_softshrink_h0mini_gap_gain95` | – |
-| Exp 0: PLISM / HEST for the eraser | blocked: needs the post-hoc extractor in `sipe.bench` | – | D0 pending |
+| Exp 0: PLISM / HEST for the eraser | extractor ready (`--posthoc`, smoke runs `runs/bench/2026-10-13_19-35-33_claude-box_490c_smoke_posthoc_softshrink` and `runs/bench/2026-10-13_19-43-55_claude-box_5683_smoke_posthoc_softshrink` ran end to end; numbers not reportable); full runs not started | – | D0 pending |
 | Exp 1: content-dependence diagnostic | not started | – | D1 pending |
 | Exp 2: consensus covariance (2A), affine regression (2B), pairing-scale control (2C) | not started | – | D2 pending |
 | Exp 3: Gaussian mixture G0/G1/G2 | not started | – | D3 pending |
@@ -108,18 +109,20 @@ Notes carried over from the CATS phase (details and run dirs in the archive):
 
 ## 3. Open points / next steps
 
-- **Post-hoc extractor for PLISM/HEST** (blocks D0 and every later estimator): a
-  `backbone_gap` + saved-operator representation in `sipe.bench`, loading a fitted map from a
-  run dir, generic enough for the eraser and the roadmap estimators.
-- Then run the eraser (λ=0.5,
+- Run the eraser (λ=0.5,
   `runs/bench/2026-10-13_17-45-08_lxbelshark_db10_scorpion_softshrink_h0mini_gap_gain95/eraser_gap_lam0.5.pt`)
-  on full PLISM and HEST.
+  on full PLISM and HEST with `--posthoc` (extractor done: `sipe.bench.posthoc`; on SCORPION
+  val tiles it reproduces the cached GAP exactly and the vendored eraser output to 3e-7
+  relative error). Then take D0.
 - Experiment 1 on the cached features (`runs/bench/2026-10-13_15-44-35_lxbelshark_d6f7_scorpion_softshrink_h0mini_gap`):
   per-region consensus/residuals, small WSI-split clustering, held-out residual likelihood vs a
   global model, shuffled-content control, P1000 / registration sensitivity.
-- In flight from the CATS phase: DistMatchVAE PLISM runs (`dist_match_vae_sr40r1h1` running at
-  `runs/bench/2026-10-13_20-17-04_lxbelshark_244b_dist_match_vae_sr40r1h1`, `g7fkiwbp` queued).
-  They close the unpaired question; record them here (the table picks them up) and in one
-  line of the archive.
+- In flight from the CATS phase: DistMatchVAE PLISM runs. `sr40r1h1` is done
+  (`runs/bench/2026-10-13_20-17-04_lxbelshark_244b_dist_match_vae_sr40r1h1`): PLISM top-1 is above
+  the GAP reference `h0_mini_gap_ref` in every row of the PLISM table (inter-scanner 0.855 vs
+  0.811, all 0.251 vs 0.227; one seed). That goes against the archived conclusion that
+  unpaired methods did not beat GAP on PLISM. `g7fkiwbp` is running
+  (`runs/bench/2026-10-13_21-11-53_lxbelshark_7015_dist_match_vae_g7fkiwbp`). Once it finishes,
+  write the one archive line and revisit that conclusion.
 - Seeds: every number has one seed so far; the roadmap asks for fit/train-seed variation for
   any shortlisted method.

@@ -51,8 +51,12 @@ W&B), and each row must name the run dir it came from.
 
 - CATS port and feature-space models (ScannerVAE, PairedVAE, MathieuGAN, DistMatchVAE):
   branch `valentin/scorpion`, results in `docs/archive/progress-cats-scanner-removal.md`.
-  Outcome: unpaired methods did not remove the scanner or beat GAP on PLISM; PairedVAE beats
-  GAP on PLISM, and its removal comes from the pair-alignment loss.
+  Outcome: unpaired methods did not remove the scanner (probe at the noise floor).
+  CATS and MathieuGAN stay below GAP on PLISM, but the unpaired
+  DistMatchVAE `sr40r1h1` beats GAP in every PLISM row (one seed;
+  `runs/bench/2026-10-13_20-17-04_lxbelshark_244b_dist_match_vae_sr40r1h1`; `g7fkiwbp` pending,
+  see `docs/progress.md`). PairedVAE beats GAP on PLISM, and its removal comes from the
+  pair-alignment loss.
 - Implementation reference for that code (legacy behavior, curriculum, intentional
   differences, architecture): `docs/cats-reference.md`. Read it before changing anything under
   `src/sipe/training/`, `src/sipe/model/` or the CATS configs.
@@ -99,9 +103,13 @@ W&B), and each row must name the run dir it came from.
   - Outputs: `runs/bench/<stamp>_<host>_<rand>_scorpion_<tag>/` with `eraser_<pool>_lam<λ>.pt`.
 - `--poolings`: `gap` = mean of the patch tokens without prefix tokens (= `backbone_gap`);
   `cls` = token 0. Report which pooling a number uses.
-- PLISM/HEST for post-hoc estimators are **not wired yet**: they need a `backbone_gap` +
-  saved-operator extractor in `sipe.bench`. Build it once, generically (load any fitted map
-  `f(x)` from a run dir), so every new estimator reuses it.
+- PLISM/HEST for post-hoc estimators: `--posthoc <map file>` instead of `--ckpt` in
+  `sipe.bench.plism` / `sipe.bench.hest` (representation `posthoc_gap` = frozen backbone GAP,
+  then the map in float32; `sipe.bench.posthoc`). Map file = one `torch.save` dict in the fit
+  run dir: either `P` + `bias` (affine, `bias + (x - bias) P^T`, as the eraser files) or
+  `class_path` + `init_args` + `state_dict` (any `nn.Module` [B, 768] -> [B, D']); optional
+  `encoder` (default h0-mini) and `pooling` (only `gap`). The fit dir's `git.txt` goes into
+  the bench provenance.
 - New estimators (roadmap Experiments 1–5): fit on cached features, save the fitted operator
   and a config/provenance in a `runs/bench/...` dir (`sipe.bench.provenance`), and expose the
   same SCORPION-proxy metrics as the sweep, so `results_tables` can parse them. Settle a shared

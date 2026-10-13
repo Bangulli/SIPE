@@ -62,3 +62,26 @@ def test_hest_resolve_datasets_skips_hidden_entries(tmp_path):
     (tmp_path / ".gitattributes").touch()
     assert resolve_datasets(tmp_path, ["*"]) == ["IDC", "PAAD"]
     assert resolve_datasets(tmp_path, ["LUNG"]) == ["LUNG"]
+
+
+def test_plism_posthoc_factory(tmp_path):
+    pytest.importorskip("plismbench")
+    from plismbench.models import init_extractor
+
+    path = tmp_path / "eraser_gap_lam0.5.pt"
+    torch.save(
+        {"P": torch.eye(768), "bias": torch.zeros(768), "pooling": "gap",
+         "encoder": "h0-mini"},
+        path,
+    )  # fmt: skip
+    extractor = init_extractor(
+        "sipe.bench.plism:posthoc_extractor",
+        device=-1,
+        extractor_kwargs={
+            "posthoc": str(path), "mixed_precision": False, "pretrained": False,
+        },
+    )  # fmt: skip
+    assert extractor.output_dim == 768
+    tiles = [np.random.randint(0, 256, (224, 224, 3), dtype=np.uint8) for _ in range(2)]
+    features = extractor(torch.stack([extractor.transform(t) for t in tiles]))
+    assert features.shape == (2, 768) and features.dtype == np.float32

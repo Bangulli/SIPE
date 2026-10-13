@@ -4,6 +4,8 @@ Bench env only:
 
     bench/run python -m sipe.bench.hest --ckpt runs/<run>/checkpoints/last.ckpt \\
         --tag cats_<run> --datasets '*'
+    bench/run python -m sipe.bench.hest --posthoc runs/bench/<fit run>/<map>.pt \\
+        --tag <tag> --datasets '*'   # backbone GAP + fitted map (sipe.bench.posthoc)
 
 All settings are passed as kwargs (no config file: `benchmark` lets a config file
 override kwargs). Defaults otherwise follow HEST's `BenchmarkConfig`.
@@ -21,6 +23,8 @@ from loguru import logger
 
 from sipe.bench.checkpoint import load_cats_checkpoint
 from sipe.bench.encoders import REPRESENTATIONS, CATSFeatures, hest_transform
+from sipe.bench.posthoc import REPRESENTATION as POSTHOC_REPRESENTATION
+from sipe.bench.posthoc import load_posthoc
 from sipe.bench.provenance import SIPE_ROOT, new_bench_run_dir, write_run_info
 
 DEFAULT_BENCH_DATA = SIPE_ROOT.parent / "HEST" / "data" / "bench_data"
@@ -36,7 +40,7 @@ class HESTEncoder(nn.Module):
 
     def __init__(
         self,
-        features: CATSFeatures,
+        features: nn.Module,
         eval_transforms,
         precision: torch.dtype = torch.float16,
     ) -> None:
@@ -63,9 +67,20 @@ def resolve_datasets(bench_data_root: Path, datasets: list[str]) -> list[str]:
 
 def main(argv: list[str] | None = None) -> Path:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--ckpt", type=Path, required=True)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--ckpt", type=Path)
+    source.add_argument(
+        "--posthoc",
+        type=Path,
+        help="Fitted map file on backbone GAP (sipe.bench.posthoc), not a checkpoint.",
+    )
     parser.add_argument("--tag", required=True)
-    parser.add_argument("--representation", default="z_gap", choices=REPRESENTATIONS)
+    parser.add_argument(
+        "--representation",
+        default="z_gap",
+        choices=REPRESENTATIONS,
+        help="With --ckpt only (--posthoc is always posthoc_gap).",
+    )
     parser.add_argument(
         "--datasets", nargs="+", default=["IDC"], help="HEST tasks, or '*' for all."
     )
@@ -80,13 +95,22 @@ def main(argv: list[str] | None = None) -> Path:
     )
     args = parser.parse_args(argv)
 
-    ckpt = args.ckpt.resolve()
     datasets = resolve_datasets(args.bench_data_root, args.datasets)
-    loaded = load_cats_checkpoint(ckpt)
-    features = CATSFeatures(loaded.network, args.representation)
-    encoder = HESTEncoder(
-        features, hest_transform(loaded.network), PRECISIONS[args.precision]
-    )
+    precision = f"autocast {args.precision}"
+    if args.posthoc is not None:
+        args.posthoc = args.posthoc.resolve()
+        args.representation = POSTHOC_REPRESENTATION
+        posthoc = load_posthoc(args.posthoc)
+        features, transform = posthoc.features, posthoc.eval_transform
+        source, mean, std = posthoc.provenance, posthoc.meta.mean, posthoc.meta.std
+        precision += "; map in float32"
+    else:
+        args.ckpt = args.ckpt.resolve()
+        loaded = load_cats_checkpoint(args.ckpt)
+        features = CATSFeatures(loaded.network, args.representation)
+        transform = hest_transform(loaded.network)
+        source, mean, std = loaded.provenance, loaded.mean, loaded.std
+    encoder = HESTEncoder(features, transform, PRECISIONS[args.precision])
 
     run_dir = new_bench_run_dir(args.tag)
     bench_kwargs = {
@@ -105,20 +129,19 @@ def main(argv: list[str] | None = None) -> Path:
     config = {
         "benchmark": "hest",
         **{k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items()},
-        "ckpt": str(ckpt),
         "benchmark_kwargs": bench_kwargs,
     }
     write_run_info(
         run_dir,
         config=config,
-        checkpoint=loaded.provenance,
+        checkpoint=source,
         features={
             "representation": args.representation,
             "output_dim": features.output_dim,
             "transform": repr(encoder.eval_transforms),
-            "mean": loaded.mean,
-            "std": loaded.std,
-            "precision": f"autocast {args.precision}",
+            "mean": mean,
+            "std": std,
+            "precision": precision,
         },
     )
     logger.info(f"Bench run dir: {run_dir}")

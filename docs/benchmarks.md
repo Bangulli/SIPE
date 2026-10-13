@@ -24,6 +24,22 @@ Branch `sipe` holds two small opt-in patches:
 
 Model code stays in SIPE (`src/sipe/bench/`).
 
+## Benchmark a post-hoc estimator
+
+A map fitted on cached SCORPION features (soft-shrinkage eraser, roadmap estimators) is
+benchmarked with `--posthoc <map file>` in place of `--ckpt`. The representation is
+`posthoc_gap`: frozen H0-mini (timm/HF weights) GAP over the patch tokens, exactly as the
+SCORPION feature cache, then the map in float32 (the backbone keeps the benchmark's
+autocast). File format: `sipe.bench.posthoc` docstring / `CLAUDE.md`.
+
+```bash
+bench/run python -m sipe.bench.plism --posthoc runs/bench/<fit run>/<map>.pt --tag <tag>
+bench/run python -m sipe.bench.hest  --posthoc runs/bench/<fit run>/<map>.pt --tag <tag> --datasets '*'
+```
+
+`provenance.json` → `checkpoint` then holds the map file (sha256, kind, scalar fields such
+as `lambda`) and the fit run dir with its `git.txt`.
+
 ## Benchmark a checkpoint
 
 The checkpoint must be self-contained, i.e. written at or after `6ccb1e3`. The

@@ -4,6 +4,8 @@ Bench env only:
 
     bench/run python -m sipe.bench.plism \\
         --ckpt runs/<run>/checkpoints/last.ckpt --tag cats_<run>
+    bench/run python -m sipe.bench.plism \\
+        --posthoc runs/bench/<fit run>/<map>.pt --tag <tag>   # sipe.bench.posthoc
 
 Extraction goes through the fork hook (`init_extractor("module:factory")`), so
 plismbench runs its own dataloader, `process_imgs` and `save_features`; metrics come
@@ -27,9 +29,12 @@ from plismbench.models.utils import DEFAULT_DEVICE, prepare_module
 
 from sipe.bench.checkpoint import load_cats_checkpoint
 from sipe.bench.encoders import REPRESENTATIONS, CATSFeatures, plism_transform
+from sipe.bench.posthoc import REPRESENTATION as POSTHOC_REPRESENTATION
+from sipe.bench.posthoc import load_posthoc
 from sipe.bench.provenance import SIPE_ROOT, new_bench_run_dir, write_run_info
 
 FACTORY = "sipe.bench.plism:cats_extractor"
+POSTHOC_FACTORY = "sipe.bench.plism:posthoc_extractor"
 DEFAULT_DOWNLOAD_DIR = SIPE_ROOT.parent / "plism-benchmark" / "data" / "plism"
 
 
@@ -74,6 +79,46 @@ def cats_extractor(
     )
 
 
+class PosthocExtractor(Extractor):
+    """Backbone GAP + a fitted post-hoc map (sipe.bench.posthoc) as an Extractor."""
+
+    def __init__(
+        self,
+        posthoc: str | Path,
+        device: int | list[int] | None = DEFAULT_DEVICE,
+        mixed_precision: bool = True,
+        pretrained: bool = True,
+    ) -> None:
+        super().__init__()
+        loaded = load_posthoc(posthoc, pretrained=pretrained)
+        self.output_dim = loaded.features.output_dim
+        self.mixed_precision = mixed_precision
+        self.transform = plism_transform(loaded.meta)
+        self.feature_extractor, self.device = prepare_module(
+            loaded.features, device, self.mixed_precision
+        )
+        if self.device is None:
+            self.feature_extractor = self.feature_extractor.module
+
+    def __call__(self, images: torch.Tensor) -> np.ndarray:
+        return self.feature_extractor(images.to(self.device)).cpu().numpy()
+
+
+def posthoc_extractor(
+    device: int | list[int] | None,
+    posthoc: str,
+    mixed_precision: bool = True,
+    pretrained: bool = True,
+) -> Extractor:
+    """Factory for the fork hook (post-hoc estimators)."""
+    return PosthocExtractor(
+        posthoc=posthoc,
+        device=device,
+        mixed_precision=mixed_precision,
+        pretrained=pretrained,
+    )
+
+
 def _patch_num_slides(n_slides: int) -> None:
     """Smoke runs only: plismbench asserts all 91 slides in extraction and pairing."""
     logger.warning(f"SMOKE: plismbench NUM_SLIDES patched 91 -> {n_slides}.")
@@ -83,9 +128,20 @@ def _patch_num_slides(n_slides: int) -> None:
 
 def main(argv: list[str] | None = None) -> Path:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--ckpt", type=Path, required=True)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--ckpt", type=Path)
+    source.add_argument(
+        "--posthoc",
+        type=Path,
+        help="Fitted map file on backbone GAP (sipe.bench.posthoc), not a checkpoint.",
+    )
     parser.add_argument("--tag", required=True)
-    parser.add_argument("--representation", default="z_gap", choices=REPRESENTATIONS)
+    parser.add_argument(
+        "--representation",
+        default="z_gap",
+        choices=REPRESENTATIONS,
+        help="With --ckpt only (--posthoc is always posthoc_gap).",
+    )
     parser.add_argument(
         "--n-tiles",
         type=int,
@@ -112,7 +168,6 @@ def main(argv: list[str] | None = None) -> Path:
     )
     args = parser.parse_args(argv)
 
-    ckpt = args.ckpt.resolve()
     download_dir = args.download_dir.resolve()
     n_slides = len(list(download_dir.glob("*.tif.h5")))
     if args.smoke:
@@ -121,19 +176,29 @@ def main(argv: list[str] | None = None) -> Path:
     run_dir = new_bench_run_dir(args.tag)
     features_root = run_dir / "features"
     metrics_root = run_dir / "metrics"
-    extractor_kwargs = {
-        "ckpt": str(ckpt),
-        "representation": args.representation,
-        "mixed_precision": args.mixed_precision,
-    }
+    if args.posthoc is not None:
+        factory = POSTHOC_FACTORY
+        args.posthoc = args.posthoc.resolve()
+        args.representation = POSTHOC_REPRESENTATION
+        extractor_kwargs = {
+            "posthoc": str(args.posthoc),
+            "mixed_precision": args.mixed_precision,
+        }
+    else:
+        factory = FACTORY
+        args.ckpt = args.ckpt.resolve()
+        extractor_kwargs = {
+            "ckpt": str(args.ckpt),
+            "representation": args.representation,
+            "mixed_precision": args.mixed_precision,
+        }
     config = {
         "benchmark": "plism",
         **{k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items()},
-        "ckpt": str(ckpt),
         "download_dir": str(download_dir),
         "n_slides": n_slides,
         "extract": {
-            "feature_extractor_name": FACTORY,
+            "feature_extractor_name": factory,
             "extractor_kwargs": extractor_kwargs,
             "export_dir": str(features_root / args.tag),
             "batch_size": args.batch_size,
@@ -148,28 +213,37 @@ def main(argv: list[str] | None = None) -> Path:
             "device": args.metrics_device,
         },
     }
-    # Loads the checkpoint once more than extraction does; cheap next to 91 slides.
-    loaded = load_cats_checkpoint(ckpt)
+    precision = "autocast (PrecisionModule)" if args.mixed_precision else "float32"
+    # Loads the model once more than extraction does; cheap next to 91 slides.
+    if args.posthoc is not None:
+        posthoc = load_posthoc(args.posthoc)
+        source, output_dim = posthoc.provenance, posthoc.features.output_dim
+        mean, std = posthoc.meta.mean, posthoc.meta.std
+        precision += "; map in float32"
+        del posthoc
+    else:
+        loaded = load_cats_checkpoint(args.ckpt)
+        source = loaded.provenance
+        output_dim = CATSFeatures(loaded.network, args.representation).output_dim
+        mean, std = loaded.mean, loaded.std
+        del loaded
     write_run_info(
         run_dir,
         config=config,
-        checkpoint=loaded.provenance,
+        checkpoint=source,
         features={
             "representation": args.representation,
-            "output_dim": CATSFeatures(loaded.network, args.representation).output_dim,
+            "output_dim": output_dim,
             "transform": "ToTensor + Normalize (plismbench H0Mini style)",
-            "mean": loaded.mean,
-            "std": loaded.std,
-            "precision": "autocast (PrecisionModule)"
-            if args.mixed_precision
-            else "float32",
+            "mean": mean,
+            "std": std,
+            "precision": precision,
         },
     )
-    del loaded
     logger.info(f"Bench run dir: {run_dir}")
 
     run_extract(
-        feature_extractor_name=FACTORY,
+        feature_extractor_name=factory,
         batch_size=args.batch_size,
         device=args.device,
         export_dir=features_root / args.tag,
