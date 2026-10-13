@@ -132,7 +132,6 @@ reads the scanner (logreg 0.966) but carries little location (region probe 0.36,
 
 | tag | pooling | λ | top-1 | top-5 | scanner probe logreg | scanner probe MLP | region probe | note | bench run dir | SIPE commit |
 |---|---|---|---|---|---|---|---|---|---|---|
-| softshrink_h0mini_gap_gain95 | – | – | – | – | – | – | – | no test yet (0 val λ rows) | `runs/bench/2026-10-13_15-39-21_claude-box_33e2_scorpion_softshrink_h0mini_gap_gain95` | 605eca3* |
 | softshrink_h0mini_gap | gap | 0 | 0.802 | 0.919 | 0.956 | 0.939 | 0.974 | raw | `runs/bench/2026-10-13_15-44-35_lxbelshark_d6f7_scorpion_softshrink_h0mini_gap` | 5405d71 |
 | softshrink_h0mini_gap | gap | 100 | 0.966 | 0.993 | 0.265 | 0.363 | 0.984 | best val top-1 | `runs/bench/2026-10-13_15-44-35_lxbelshark_d6f7_scorpion_softshrink_h0mini_gap` | 5405d71 |
 
@@ -157,8 +156,8 @@ val). **Finished** (GAP only; CLS not run).
   λ≈0.3–1 while the linear probe still reads the scanner (~0.93). New rule (uncommitted on `605eca3`, flag
   `--select-gain-frac`, default 0.95): the smallest λ reaching 95% of the best val top-1 gain;
   scanner probes are diagnostics only. On this sweep it picks λ=1. The test row for λ=100 above
-  stays as a record. Re-run with the new rule on the same features: **in progress** (tag
-  `softshrink_h0mini_gap_gain95`).
+  stays as a record. Re-run with the new rule and a denser grid around λ 0.1–1 on the same features: **not
+  run yet** (user runs it on the host).
 - Test at λ=100 (old rule): top-1 0.966 (PairedVAE 0.962, GAP 0.802), scanner probe logreg
   0.265 / MLP 0.363, region probe 0.984, mean relative feature change 0.27
   (`summary_test.csv`).
@@ -419,7 +418,7 @@ section 2 are the reference.
   (`runs/bench/2026-10-13_15-44-35_lxbelshark_d6f7_scorpion_softshrink_h0mini_gap`); λ rule
   changed to "smallest λ at ≥95% of the val top-1 gain" (goal: mitigate scanner distances, not
   remove the scanner). Next:
-  - Read the re-run (`softshrink_h0mini_gap_gain95`, same features) and its test row at λ=1.
+  - Read the re-run (new rule, denser grid around λ 0.1–1, same features) and its test row.
   - PLISM/HEST: needs a `backbone_gap` + eraser extractor in `sipe.bench` (load the
     `eraser_gap_lam<λ>.pt` of the selected run). This is the real comparison with PairedVAE.
   - CLS pooling from the saved features: `--features-from <run dir> --poolings cls`.
