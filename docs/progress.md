@@ -36,6 +36,7 @@ Reference: GAP of the backbone patch tokens (`backbone_gap`).
 | cats_9lctrbqp_z_gap | z_gap | 0.751 | 0.255 | 0.165 | 0.216 | `runs/bench/2026-10-08_20-42-51_lxbelshark_de75_cats_9lctrbqp_z_gap` | 9lctrbqp | d0c7a1a |
 | paired_vae_ysltwjoj | z_gap | 0.839 | 0.293 | 0.215 | 0.267 | `runs/bench/2026-10-10_17-32-32_lxbelshark_95c5_paired_vae_ysltwjoj` | ysltwjoj | 06257ff |
 | h0_mini_gap_ref | backbone_gap | 0.811 | 0.259 | 0.173 | 0.227 | `runs/bench/2026-10-13_10-02-08_lxbelshark_053f_h0_mini_gap_ref` | – | 06257ff* |
+| mathieu_gan_h65a5z5x | z_gap | no results | – | – | – | `runs/bench/2026-10-13_19-02-32_lxbelshark_dcf2_mathieu_gan_h65a5z5x` | h65a5z5x | e0b8cd2 |
 | h0_mini | – | 0.600 | 0.120 | 0.055 | 0.100 | `../plism-benchmark/output/metrics/8139_tiles/h0_mini` | – | – |
 | sipe_h0_mini | – | 0.666 | 0.237 | 0.158 | 0.203 | `../plism-benchmark/output/metrics/8139_tiles/sipe_h0_mini` | – | – |
 
@@ -158,8 +159,22 @@ val). **Finished** (GAP only; CLS not run).
   λ≈0.3–1 while the linear probe still reads the scanner (~0.93). New rule (uncommitted on `605eca3`, flag
   `--select-gain-frac`, default 0.95): the smallest λ reaching 95% of the best val top-1 gain;
   scanner probes are diagnostics only. On this sweep it picks λ=1. The test row for λ=100 above
-  stays as a record. Re-run with the new rule and a denser grid around λ 0.1–1 on the same features: **not
-  run yet** (user runs it on the host).
+  stays as a record.
+- Re-run with the new rule (`runs/bench/2026-10-13_17-45-08_lxbelshark_db10_scorpion_softshrink_h0mini_gap_gain95`,
+  SIPE `59e49ee`, dirty only in `docs/progress.md`; same features via `--features-from` the run
+  above; grid 0, 0.05–1 dense, 2, 3, 10, 100, 1000). **Finished.** Selected λ=0.5 (`selected.json`:
+  val top-1 0.973 vs best 0.977 and raw 0.887; region guard not violated; not at the grid edge).
+  - Val sweep (`sweep_val.csv`): λ=0.05 already gives top-1 0.959, i.e. ~80% of the gain at
+    relative change 0.09. The logreg probe stays at 0.93–0.94 up to λ=0.7 (0.944 raw); the
+    MLP falls steadily (0.944 → 0.609 at λ=0.5).
+  - Test at λ=0.5 (section 2 table): top-1 0.959 vs PairedVAE 0.962 and GAP 0.802, region
+    probe 0.985, relative change 0.17 (`summary_test.csv`).
+  - Caveat on the probes: val and test probes use different protocols. The val sweep trains
+    them on ≤20,000 train-split tiles; the test row uses the proxy protocol (trained on val).
+    At λ=0.5 the logreg is 0.941 on val but 0.684 on test. Not checked whether this is only
+    the smaller probe training set; compare probe numbers within one protocol only.
+  - Verdict: a mild eraser (λ=0.5) gets nearly all of PairedVAE's SCORPION retrieval gain.
+    PLISM/HEST decide.
 - Test at λ=100 (old rule): top-1 0.966 (PairedVAE 0.962, GAP 0.802), scanner probe logreg
   0.265 / MLP 0.363, region probe 0.984, mean relative feature change 0.27
   (`summary_test.csv`).
@@ -420,7 +435,8 @@ section 2 are the reference.
   (`runs/bench/2026-10-13_15-44-35_lxbelshark_d6f7_scorpion_softshrink_h0mini_gap`); λ rule
   changed to "smallest λ at ≥95% of the val top-1 gain" (goal: mitigate scanner distances, not
   remove the scanner). Next:
-  - Read the re-run (new rule, denser grid around λ 0.1–1, same features) and its test row.
+  - ~~Read the re-run~~ done: λ=0.5 selected, test top-1 0.959 (section 3 above,
+    `..._db10_scorpion_softshrink_h0mini_gap_gain95`).
   - PLISM/HEST: needs a `backbone_gap` + eraser extractor in `sipe.bench` (load the
     `eraser_gap_lam<λ>.pt` of the selected run). This is the real comparison with PairedVAE.
   - CLS pooling from the saved features: `--features-from <run dir> --poolings cls`.
@@ -441,6 +457,8 @@ section 2 are the reference.
     MathieuGAN `h65a5z5x`, DistMatchVAE `sr40r1h1` and `g7fkiwbp` (commands in the reply of
     2026-10-13; tags `mathieu_gan_h65a5z5x`, `dist_match_vae_sr40r1h1`,
     `dist_match_vae_g7fkiwbp`).
+    MathieuGAN PLISM launched (`runs/bench/2026-10-13_19-02-32_lxbelshark_dcf2_mathieu_gan_h65a5z5x`,
+    SIPE `e0b8cd2`): **in progress**, no results file yet at the last check.
   - If the ablation keeps the gain: add a latent cycle to MathieuGAN (re-encode the fake,
     `z(fake) ≈ z_i`, `s(fake) ≈ s(other)`) so the decoder can't overwrite the scanner.
 - PairedVAE `ysltwjoj`: done; beats GAP on PLISM, no harm on HEST.
