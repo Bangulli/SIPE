@@ -93,6 +93,9 @@ select = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# CLI fit roundtrips take minutes each on CPU; run them with `-m slow` or `-m ""`.
+addopts = "-m 'not slow'"
+markers = ["slow: end-to-end `sipe fit` roundtrips (minutes each on CPU)"]
 
 [project.scripts]
 sipe = "sipe.cli:main"

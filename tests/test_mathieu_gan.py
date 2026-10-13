@@ -90,6 +90,7 @@ def test_generator_step_trains_generator_not_discriminator(
     module.zero_grad(set_to_none=True)
 
 
+@pytest.mark.slow
 @pytest.mark.skipif(not DATA_ROOT.is_dir(), reason="SCORPION tiles not available")
 def test_cli_fit_checkpoint_roundtrip(tmp_path: Path) -> None:
     """A real 3-step `sipe fit` (manual optimization, D steps not counted) writes a

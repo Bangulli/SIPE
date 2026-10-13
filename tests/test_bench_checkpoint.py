@@ -95,6 +95,7 @@ def test_plism_transform_uses_encoder_stats():
     torch.testing.assert_close(out[:, 0, 0], expected)
 
 
+@pytest.mark.slow
 @pytest.mark.skipif(not DATA_ROOT.is_dir(), reason="SCORPION tiles not available")
 def test_cli_fit_checkpoint_roundtrip(tmp_path):
     """A real 2-step SIPECLI fit writes a checkpoint the loader rebuilds."""

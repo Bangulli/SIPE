@@ -145,6 +145,7 @@ def test_paired_datamodule() -> None:
     assert torch.equal(val["domain"][:5], torch.arange(5))
 
 
+@pytest.mark.slow
 @pytest.mark.skipif(not DATA_ROOT.is_dir(), reason="SCORPION tiles not available")
 def test_cli_fit_checkpoint_roundtrip(tmp_path: Path) -> None:
     """A real 3-step `sipe fit` writes a checkpoint the bench loader rebuilds."""

@@ -109,6 +109,7 @@ def test_fader_mode_uses_manual_optimization(network: ScannerVAE) -> None:
         ScannerVAEModule(network=network, adversary_mode="gan")
 
 
+@pytest.mark.slow
 @pytest.mark.skipif(not DATA_ROOT.is_dir(), reason="SCORPION tiles not available")
 @pytest.mark.parametrize("config", ["scanner_vae.yaml", "scanner_vae_fader.yaml"])
 def test_cli_fit_checkpoint_roundtrip(tmp_path: Path, config: str) -> None:
