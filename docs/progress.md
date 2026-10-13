@@ -445,22 +445,44 @@ section 2 are the reference.
   tile-pair deltas). Compare it with PairedVAE, not with the unpaired candidates.
 - **Goal (user, 2026-10-13): a method that needs no paired data.** PairedVAE is the paired
   reference to approach; DistMatchVAE (item 6) is the current unpaired candidate.
-- **Is the GAN route toward an unpaired PairedVAE worth pursuing?** (planned 2026-10-13, not
-  launched). Two cheap checks before deciding:
-  - PairedVAE ablation, translation only (`configs/paired_vae_translation_only.yaml`:
-    `configs/paired_vae.yaml` with `align_weight: 0`, else identical to `ysltwjoj`; the
-    module changed since `f48c72a` only by the `log_paired_validation` refactor). If most of
-    PairedVAE's gain survives without the alignment, a GAN replacing the translation can in
-    principle reach it; if not, the GAN route is capped.
-    `uv run sipe fit --config configs/paired_vae_translation_only.yaml`
-  - PLISM on the unpaired runs (both have a small val retrieval gain without probe removal):
-    MathieuGAN `h65a5z5x`, DistMatchVAE `sr40r1h1` and `g7fkiwbp` (commands in the reply of
-    2026-10-13; tags `mathieu_gan_h65a5z5x`, `dist_match_vae_sr40r1h1`,
-    `dist_match_vae_g7fkiwbp`).
-    MathieuGAN PLISM launched (`runs/bench/2026-10-13_19-02-32_lxbelshark_dcf2_mathieu_gan_h65a5z5x`,
-    SIPE `e0b8cd2`): **in progress**, no results file yet at the last check.
-  - If the ablation keeps the gain: add a latent cycle to MathieuGAN (re-encode the fake,
-    `z(fake) ≈ z_i`, `s(fake) ≈ s(other)`) so the decoder can't overwrite the scanner.
+- **Is the GAN route toward an unpaired PairedVAE worth pursuing?** (discussed with the user
+  2026-10-13; the user is also weighing a different research question). Idea: keep PairedVAE
+  and replace its paired losses with a GAN, to get a method that needs no paired data.
+  MathieuGAN (item 5) was the first try. Assessment: a long shot, but not dead; the negative
+  evidence is one untuned run plus a structural loophole nobody has tried to close.
+  - Why pessimistic:
+    - D judges only the decoder output, never z. If z keeps the scanner, the decoder writes
+      the target scanner on top of it. Observed in `h65a5z5x`: fakes move toward the target
+      (fake_target_acc ~0.37, item 5) while the z probe stays at backbone level (section 2).
+    - The GAN replaces only PairedVAE's translation loss. Nothing unpaired replaces the pair
+      alignment of GAP(μ), which trains retrieval pairing directly. If alignment carries
+      PairedVAE's gain, this route is capped.
+  - What could change the view, cheapest first:
+    1. **Ablate PairedVAE: translation only, no alignment** (`configs/paired_vae_translation_only.yaml`
+       = `configs/paired_vae.yaml` with `align_weight: 0`, else identical to `ysltwjoj`; the
+       module changed since `f48c72a` only by the `log_paired_validation` refactor).
+       `uv run sipe fit --config configs/paired_vae_translation_only.yaml`. **Not launched.**
+       If translation alone keeps most of the gain, a GAN replacing it is worth pursuing; if
+       alignment does the work, the route is capped.
+    2. **PLISM on the unpaired runs.** The goal is beating GAP on PLISM, not the val probe.
+       Both unpaired methods gain a little on val retrieval without visible removal (section 2
+       training table: `retrieval_top1_zgap` for `runs/2026-10-13_11-54-38_lxbelshark_36b0`
+       and `runs/2026-10-13_15-02-26_lxbelshark_6774` vs `retrieval_top1_backbone`). Tags
+       `mathieu_gan_h65a5z5x`, `dist_match_vae_sr40r1h1`, `dist_match_vae_g7fkiwbp`:
+       `bench/run python -m sipe.bench.plism --ckpt runs/<run>/checkpoints/last.ckpt --tag <tag>`.
+       MathieuGAN launched (`runs/bench/2026-10-13_19-02-32_lxbelshark_dcf2_mathieu_gan_h65a5z5x`,
+       SIPE `e0b8cd2`): **in progress**, no results file at the last check. DistMatchVAE runs
+       queued after it.
+    3. **Close the decoder loophole** (only if 1 keeps the gain): re-encode each fake and
+       require `z(fake) ≈ z_i` and `s(fake) ≈ s(other)`. This latent cycle is the standard
+       fix in unpaired translation (MUNIT, DRIT, StarGAN-v2): the decoder can't fake the
+       scanner unless the encoder agrees. A lower adversarial weight (0.1) is a cheap knob,
+       not expected to help much.
+  - Decision rule: if 1 shows alignment does the work and 2 shows nothing for the unpaired
+    runs, drop this route.
+  - Note: MathieuGAN was written from memory of Mathieu et al. 2016 (arXiv 1611.03383), not
+    checked against the paper text or any reference code (deliberate deviations: token space,
+    VAE z, projection D + hinge, fakes from another scanner and location).
 - PairedVAE `ysltwjoj`: done; beats GAP on PLISM, no harm on HEST.
   PLISM inter-scanner 0.839 vs 0.810, all 0.267 vs 0.227. To make the claim solid:
   - ~~re-run the GAP baseline with the current tooling~~ done: it reproduces 0.810/0.811;
