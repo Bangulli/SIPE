@@ -50,6 +50,17 @@ class HESTEncoder(nn.Module):
         return self.model(images)
 
 
+def resolve_datasets(bench_data_root: Path, datasets: list[str]) -> list[str]:
+    """Expand '*' to the task folders of `bench_data_root`.
+
+    HEST expands '*' with a bare `os.listdir`, which also picks up the Hugging Face
+    download's `.cache` and `.gitattributes` and then crashes on `.cache/splits`.
+    """
+    if datasets != ["*"]:
+        return datasets
+    return sorted(p.name for p in bench_data_root.iterdir() if (p / "splits").is_dir())
+
+
 def main(argv: list[str] | None = None) -> Path:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--ckpt", type=Path, required=True)
@@ -70,6 +81,7 @@ def main(argv: list[str] | None = None) -> Path:
     args = parser.parse_args(argv)
 
     ckpt = args.ckpt.resolve()
+    datasets = resolve_datasets(args.bench_data_root, args.datasets)
     loaded = load_cats_checkpoint(ckpt)
     features = CATSFeatures(loaded.network, args.representation)
     encoder = HESTEncoder(
@@ -86,7 +98,7 @@ def main(argv: list[str] | None = None) -> Path:
         "exp_code": args.tag,
         # Default ['resnet50'] would be benchmarked alongside.
         "encoders": [],
-        "datasets": args.datasets,
+        "datasets": datasets,
         "batch_size": args.batch_size,
         "num_workers": args.num_workers,
     }
@@ -110,6 +122,7 @@ def main(argv: list[str] | None = None) -> Path:
         },
     )
     logger.info(f"Bench run dir: {run_dir}")
+    logger.info(f"HEST tasks: {datasets}")
 
     benchmark(encoder, None, None, **bench_kwargs)
     logger.success(f"HEST results: {run_dir / 'results'}")

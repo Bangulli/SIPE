@@ -49,3 +49,16 @@ def test_hest_encoder_duck_type(make_cats_checkpoint):
     with torch.inference_mode():
         out = encoder.eval()(x[None])
     assert out.shape == (1, 704)
+
+
+def test_hest_resolve_datasets_skips_hidden_entries(tmp_path):
+    pytest.importorskip("hest")
+    from sipe.bench.hest import resolve_datasets
+
+    for name in ("IDC", "PAAD", ".cache"):
+        (tmp_path / name).mkdir()
+    (tmp_path / "IDC" / "splits").mkdir()
+    (tmp_path / "PAAD" / "splits").mkdir()
+    (tmp_path / ".gitattributes").touch()
+    assert resolve_datasets(tmp_path, ["*"]) == ["IDC", "PAAD"]
+    assert resolve_datasets(tmp_path, ["LUNG"]) == ["LUNG"]
