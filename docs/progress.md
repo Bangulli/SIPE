@@ -134,6 +134,8 @@ reads the scanner (logreg 0.966) but carries little location (region probe 0.36,
 |---|---|---|---|---|---|---|---|---|---|---|
 | softshrink_h0mini_gap | gap | 0 | 0.802 | 0.919 | 0.956 | 0.939 | 0.974 | raw | `runs/bench/2026-10-13_15-44-35_lxbelshark_d6f7_scorpion_softshrink_h0mini_gap` | 5405d71 |
 | softshrink_h0mini_gap | gap | 100 | 0.966 | 0.993 | 0.265 | 0.363 | 0.984 | best val top-1 | `runs/bench/2026-10-13_15-44-35_lxbelshark_d6f7_scorpion_softshrink_h0mini_gap` | 5405d71 |
+| softshrink_h0mini_gap_gain95 | gap | 0 | 0.802 | 0.919 | 0.956 | 0.939 | 0.974 | raw | `runs/bench/2026-10-13_17-45-08_lxbelshark_db10_scorpion_softshrink_h0mini_gap_gain95` | 59e49ee* |
+| softshrink_h0mini_gap_gain95 | gap | 0.5 | 0.959 | 0.991 | 0.684 | 0.455 | 0.985 | smallest lambda with val top-1 gain >= 0.95 x best gain | `runs/bench/2026-10-13_17-45-08_lxbelshark_db10_scorpion_softshrink_h0mini_gap_gain95` | 59e49ee* |
 
 Test split, proxy protocol (`summary_test.csv`); λ selected on val, rule in the note (`selected.json`).
 
@@ -427,6 +429,20 @@ section 2 are the reference.
   tile-pair deltas). Compare it with PairedVAE, not with the unpaired candidates.
 - **Goal (user, 2026-10-13): a method that needs no paired data.** PairedVAE is the paired
   reference to approach; DistMatchVAE (item 6) is the current unpaired candidate.
+- **Is the GAN route toward an unpaired PairedVAE worth pursuing?** (planned 2026-10-13, not
+  launched). Two cheap checks before deciding:
+  - PairedVAE ablation, translation only (`configs/paired_vae_translation_only.yaml`:
+    `configs/paired_vae.yaml` with `align_weight: 0`, else identical to `ysltwjoj`; the
+    module changed since `f48c72a` only by the `log_paired_validation` refactor). If most of
+    PairedVAE's gain survives without the alignment, a GAN replacing the translation can in
+    principle reach it; if not, the GAN route is capped.
+    `uv run sipe fit --config configs/paired_vae_translation_only.yaml`
+  - PLISM on the unpaired runs (both have a small val retrieval gain without probe removal):
+    MathieuGAN `h65a5z5x`, DistMatchVAE `sr40r1h1` and `g7fkiwbp` (commands in the reply of
+    2026-10-13; tags `mathieu_gan_h65a5z5x`, `dist_match_vae_sr40r1h1`,
+    `dist_match_vae_g7fkiwbp`).
+  - If the ablation keeps the gain: add a latent cycle to MathieuGAN (re-encode the fake,
+    `z(fake) ≈ z_i`, `s(fake) ≈ s(other)`) so the decoder can't overwrite the scanner.
 - PairedVAE `ysltwjoj`: done; beats GAP on PLISM, no harm on HEST.
   PLISM inter-scanner 0.839 vs 0.810, all 0.267 vs 0.227. To make the claim solid:
   - ~~re-run the GAP baseline with the current tooling~~ done: it reproduces 0.810/0.811;
