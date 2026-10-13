@@ -34,11 +34,16 @@ Reference: GAP of the backbone patch tokens (`backbone_gap`).
 Bench runs: `runs/bench/2026-10-08_10-18-32_lxbelshark_6ee6_cats_s2bqyu2g_z_gap` (legacy-step CATS)
 and `runs/bench/2026-10-08_20-42-51_lxbelshark_de75_cats_9lctrbqp_z_gap` (CATSv2). The other
 columns come from earlier comparisons (H0-mini GAP: `../plism-benchmark/output/metrics/8139_tiles/h0_mini_gap`,
-2026-10-07). PairedVAE: `runs/bench/2026-10-10_17-32-32_lxbelshark_95c5_paired_vae_ysltwjoj`
+2026-10-07). H0-mini GAP was re-run with the current tooling
+(`sipe.bench.plism --representation backbone_gap`,
+`runs/bench/2026-10-13_10-02-08_lxbelshark_053f_h0_mini_gap_ref`, SIPE `06257ff`; dirty only in
+`docs/progress.md`). It reproduces the old row: inter-scanner 0.811 (0.810 before),
+the other rows are identical, and the mean per-pair difference is 0.000 on every row.
+So both GAP rows and PairedVAE share the same preprocessing. PairedVAE: `runs/bench/2026-10-10_17-32-32_lxbelshark_95c5_paired_vae_ysltwjoj`
 (SIPE `06257ff` clean, checkpoint `last.ckpt` step 6,000).
 
 **PairedVAE is the first method to beat raw H0-mini GAP on PLISM, on every row.** Paired
-comparison per slide pair against GAP (top-1, mean difference / share of pairs improved):
+comparison per slide pair against GAP (same numbers against the old and the re-run GAP) (top-1, mean difference / share of pairs improved):
 inter-scanner +0.028 / 88% (273 pairs), inter-staining +0.034 / 90% (546),
 scanner + staining +0.042 / 89% (3,276), all +0.040 / 89% (4,095). Every scanner gains on
 average (P the most: +0.072, GAP's weakest scanner at 0.655). It also gains on
@@ -46,9 +51,29 @@ inter-staining, which it never trained on. One failure: the **HR** stain loses �
 inter-scanner pairs (e.g. AT2↔P 0.33 → 0.07, GT450↔S360 0.41 → 0.10; slide-pair cosine
 drops from ~0.89 to ~0.66–0.71), while HRH and every other stain gain. HR is already hard for
 GAP; the latent seems to break on it (out-of-distribution stain for SCORPION?).
-Caveats: one seed; the GAP row was made 2026-10-07 with the old tooling, not by
-`sipe.bench.plism --representation backbone_gap` at the current commit (not verified to
-be bit-identical in preprocessing).
+Caveat: one PairedVAE seed.
+
+### HEST (official code, ridge on PCA-256, Pearson over 50 genes)
+
+| task | H0-mini GAP | PairedVAE z_gap (`ysltwjoj`) |
+|---|---|---|
+| CCRCC | 0.267 (0.045) | in progress |
+| COAD | 0.256 (0.025) | |
+| HCC | 0.074 (0.020) | |
+| IDC | 0.578 (0.078) | 0.577 (0.078) (IDC-only run) |
+| LUNG | 0.535 (0.051) | |
+| LYMPH_IDC | 0.267 (0.033) | |
+| PAAD | 0.497 (0.044) | |
+| PRAD | 0.371 (0.032) | |
+| READ | 0.202 (0.049) | |
+| SKCM | 0.594 (0.067) | |
+| **average** | **0.364** | |
+
+GAP, all tasks: `runs/bench/2026-10-13_11-03-53_lxbelshark_8f0f_h0_mini_gap_ref` (finished; its
+IDC equals the IDC-only run `..._df55_h0_mini_gap_ref`). PairedVAE IDC only:
+`runs/bench/2026-10-13_10-12-16_lxbelshark_b34d_paired_vae_ysltwjoj`; no cost on IDC. PairedVAE
+all tasks: `runs/bench/2026-10-13_13-20-25_lxbelshark_2cf4_paired_vae_ysltwjoj`, **in progress**
+(read at CCRCC). SIPE `06257ff`/`5da426e`, dirty only in `docs/progress.md`.
 
 ### SCORPION proxy (held-out split)
 
@@ -160,7 +185,7 @@ reads the scanner (logreg 0.966) but carries little location (region probe 0.36,
 
 5. **MathieuGAN**, stage 2 toward Mathieu et al. (`uv run sipe fit --config
    configs/mathieu_gan.yaml`; `src/sipe/training/mathieu_gan_module.py`). Implemented
-   2026-10-10, not trained yet (only a 300-step smoke run in the box). Design:
+   2026-10-10; full run `h65a5z5x` 2026-10-13 (results at the end of this item). Design:
    - Same network as PairedVAE (`PairedVAE`). Training is **unpaired** (scanner labels
      only); paired batches are kept so validation matches PairedVAE.
    - Losses: same-scanner swap reconstruction + KL (β 0.1) + class-conditional GAN.
@@ -190,26 +215,53 @@ reads the scanner (logreg 0.966) but carries little location (region probe 0.36,
      - Probe z 0.69 vs backbone 0.73; retrieval z 0.860 vs backbone 0.865; s probe 0.52.
      - Verdict: works mechanically. Watch whether recon recovers and `fake_target_acc` rises.
        Adversarial weight 1.0 may be too high; 0.1 is the first knob to try.
+   - Full run `h65a5z5x` (`runs/2026-10-13_11-54-38_lxbelshark_36b0`, commit `5da426e`, dirty
+     only in `docs/progress.md`; `configs/mathieu_gan.yaml` defaults: adversarial weight 1.0,
+     warm-up 1,000, D LR decay on, 6,000 steps, frozen H0-mini, 16-mixed). **Finished.**
+     Mean of the last 10 validations, PairedVAE `ysltwjoj` in brackets:
+
+     | metric (val) | step 99 | step 5,999 | last-10 mean | PairedVAE |
+     |---|---|---|---|---|
+     | probe z / backbone | 0.79 / 0.80 | 0.78 / 0.80 | 0.783 / 0.802 | 0.689 / 0.802 |
+     | probe s | 0.66 | 0.83 | 0.83 | 0.93 |
+     | retrieval top-1 z / backbone | 0.896 / 0.887 | 0.921 / 0.887 | 0.921 / 0.887 | 0.977 / 0.887 |
+     | feature recon / KL | 0.098 / 2.66 | 0.197 / 2.23 | 0.195 / 2.23 | 0.047 / 1.64 |
+     | translation (eval only) | 0.41 | 0.44 | 0.44 | 0.24 (trained) |
+     | fake target / source acc (chance 0.2) | 0.18 / 0.24 | 0.34 / 0.25 | 0.37 / 0.25 | |
+     | D real / fake acc (val) | 0.99 / 0.89 | 0.26 / 0.74 | 0.30 / 0.71 | |
+
+     - Almost no removal: probe gap 0.02 (PairedVAE 0.11, GRL 0.06), within noise.
+     - The GAN does move fakes toward the target scanner (fake_target 0.18 → ~0.37), but
+       z keeps the scanner, so the decoder rewrites the scanner signature on top of z
+       (the known limitation above).
+     - Reconstruction gets worse throughout (0.07 at step 499 → 0.197, still rising); no
+       recovery after the warm-up.
+     - D does not dominate: training D accuracies fall from ~0.90/0.86 to ~0.79/0.77 as the
+       LRs decay.
+     - Small retrieval gain on val (0.921 vs 0.887), well below PairedVAE.
+     - Verdict: **unpaired GAN alone does not remove the scanner from z**; worse than
+       PairedVAE on every val metric. PLISM/HEST still to run for the record.
 
 ## 4. Open points / next steps
 
 - PairedVAE `ysltwjoj`: done. PLISM beats GAP on all rows (inter-scanner 0.839 vs 0.810,
   all 0.267 vs 0.227). To make the claim solid:
-  - re-run the GAP baseline with the current tooling
-    (`bench/run python -m sipe.bench.plism --ckpt <same ckpt> --representation backbone_gap
-    --tag h0_mini_gap_ref`) so both rows share preprocessing;
+  - ~~re-run the GAP baseline with the current tooling~~ done: it reproduces 0.810/0.811;
   - a second seed of PairedVAE (gain +0.03 inter-scanner vs ±? seed noise);
   - look into the HR stain failure;
-  - HEST "does no harm" check on this checkpoint.
-- Launch MathieuGAN (`uv run sipe fit --config configs/mathieu_gan.yaml`) and compare with
-  PairedVAE on the same val metrics; watch `train/d_{real,fake}_acc` for D domination or
-  collapse and `val/fake_target_acc` vs `val/fake_source_acc`. If the second GPU is
-  free, run `--model.init_args.adversarial_weight=0.1` in parallel (smoke run: recon
-  suffers at 1.0).
+  - HEST "does no harm" check: IDC is on par (0.577 vs 0.578). GAP on all tasks is running;
+    then run `bench/run python -m sipe.bench.hest --ckpt
+    runs/2026-10-10_15-18-38_lxbelshark_20c2/checkpoints/last.ckpt --tag paired_vae_ysltwjoj
+    --datasets '*'` (needs `8a28a6a` for `'*'`).
+- MathieuGAN `h65a5z5x`: finished, weak on val (probe gap 0.02, recon 0.195). PLISM/HEST:
+  `bench/run python -m sipe.bench.plism --ckpt
+  runs/2026-10-13_11-54-38_lxbelshark_36b0/checkpoints/last.ckpt --tag mathieu_gan_h65a5z5x`
+  and the same with `sipe.bench.hest ... --datasets '*'`. An `adversarial_weight=0.1` run
+  would likely trade even less removal for better recon; not a priority given the z probe.
 - If adversaries on z come back: the Fader knobs not tried are a larger
   `adversary_weight` (3–5), fewer `adversary_steps`, and decaying the adversary's LR with
   the encoder's (the end of the Fader run was dominated by the adversary).
 - Not started: H-optimus-1 training (memory at bs 512 untested; `unspecified_dim` choice
-  open), HEST runs on a winning model ("does no harm" check), and baselines beyond raw GAP.
+  open), and baselines beyond raw GAP.
 - Each run (and the H0-mini GAP baseline) has one seed, so small differences
   (about ±0.03 on the val probe) are within noise.
