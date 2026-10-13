@@ -23,6 +23,20 @@ SCORPION proxy, PLISM/HEST bench runs), update it in the same turn:
 - update the "as of" date.
 Say in your reply that you updated it.
 
+**Never type a metric by hand.** Every value must be read from a file under `runs/` (or from
+W&B), and each row must name the run dir it came from.
+- Section 2 tables are generated: `uv run python -m sipe.eval.results_tables --write` refreshes
+  the `<!-- results:… -->` blocks, and `--check` exits 1 if they are stale. Never edit inside a
+  block. Block options (`exclude=`, `extra=`, `cols=`, `min_steps=`, `module=`) are listed in
+  the module docstring.
+- A new benchmark output or metric goes into a parser in `sipe.eval.results_tables`, not
+  into a hand-typed table.
+- Numbers in prose must be copied from a generated table or a result file, with the run dir
+  cited. For W&B values, use `wandb_history` / `last_val_mean` from that module (it reads the
+  local `.wandb` file; `wandb.Api()` has no key here).
+- Exception: references outside `runs/` (`../plism-benchmark/output/...`) go through
+  `extra=` and are labeled by their path.
+
 ## Layout
 
 - `main` = original author code. Read-only checkout at `../SIPE-main` (never modify it).
@@ -140,7 +154,9 @@ Reference, not invariants. Checked against `../SIPE-main` on 2026-10-02 (L = leg
 - **Soft-shrinkage eraser** (from `../vfm-geom-xai`). It acts on frozen backbone features:
   `x' = mu + P (x - mu)`, `P = A (A + λB)^-1`, where A is the shrunk feature covariance and B
   the second moment of the scanner deltas. Deltas are per-slide scanner means minus the slide
-  mean, so the fit needs slide identity but no tile pairs.
+  mean. That needs every slide under several scanners, i.e. **paired data at slide level**
+  (on SCORPION the tile sets are identical, so it equals the mean of tile-pair deltas). It is
+  a paired baseline, comparable to PairedVAE, not to unpaired methods.
 - The eraser code is vendored verbatim in `src/sipe/baselines/soft_delta_legacy.py` and
   `shrinkage_legacy.py`, with the source commit in the header. Don't edit them; re-vendor
   instead. vfm-geom-xai itself is not a dependency.
@@ -178,6 +194,9 @@ uv run pytest
 uv run ruff check .
 uv run sipe fit --config <config.yaml>
 ```
+
+`uv run pytest` skips tests marked `slow` (the `sipe fit` checkpoint roundtrips, ~2–3 min each
+on CPU). Run them with `uv run pytest -m slow` after any training-related change.
 
 Smoke test after any training-related change (plus the relevant focused tests):
 
