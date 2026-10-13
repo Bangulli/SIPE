@@ -16,6 +16,7 @@ next. Setup details are in `docs/benchmarks.md` (PLISM/HEST),
 | `82b61c5`, `4fd9c05` | Backbone tokens via `forward_features` (required for H-optimus-1); H-optimus-1 config. The H-optimus-1 config has only been smoke-tested (recon phase), not trained. |
 | `fe1c930` | SCORPION proxy `sipe.eval.scorpion_retrieval`: cross-scanner retrieval of the same region on the held-out split, plus post-hoc scanner probes (logreg/MLP). |
 | `5a77728` | A SCORPION region probe was added to the proxy. |
+| (this commit) | `sipe.eval.soft_shrinkage_sweep`: post-hoc soft-shrinkage scanner eraser from vfm-geom-xai (vendored in `sipe.baselines.soft_delta_legacy`, `P = A (A + λB)^-1`, slide-to-mean scanner deltas), fit on the train split, λ swept on val, `--poolings gap cls`. |
 
 Benchmarked representation: GAP over the 16×16 patch grid of the scanner-free latent (`z_gap`).
 Reference: GAP of the backbone patch tokens (`backbone_gap`).
@@ -292,6 +293,15 @@ reads the scanner (logreg 0.966) but carries little location (region probe 0.36,
 
 ## 4. Open points / next steps
 
+- **Soft-shrinkage baseline (vfm-geom-xai), not run yet.** User launches on the host:
+  `uv run python -m sipe.eval.soft_shrinkage_sweep --tag softshrink_h0mini_gap --poolings gap
+  --device 1 --workers 8` (CLS later from the same features: `--features-from <run dir>
+  --poolings cls`). λ is selected by val cross-scanner top-1 (region probe as guard); then
+  `summary_test.csv` gives the proxy-table row (compare GAP 0.802/0.956, PairedVAE
+  0.962/0.850). Smoke run (2 slides/split, val, GAP): λ=10 top-1 0.87 → 0.97, logreg probe
+  0.90 → 0.20, region 0.99 kept, which is promising but tiny. Uses no pairs at fit time beyond
+  slide identity (deltas = per-slide scanner means), so it is close to unpaired. If it holds,
+  next: PLISM/HEST with a `backbone_gap` + eraser extractor.
 - **Goal (user, 2026-10-13): a method that needs no paired data.** PairedVAE is the paired
   reference to approach; DistMatchVAE (item 6) is the current unpaired candidate.
 - PairedVAE `ysltwjoj`: done; beats GAP on PLISM, no harm on HEST.
