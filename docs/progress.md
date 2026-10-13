@@ -132,12 +132,38 @@ reads the scanner (logreg 0.966) but carries little location (region probe 0.36,
 
 | tag | pooling | λ | top-1 | top-5 | scanner probe logreg | scanner probe MLP | region probe | note | bench run dir | SIPE commit |
 |---|---|---|---|---|---|---|---|---|---|---|
+| softshrink_h0mini_gap_gain95 | – | – | – | – | – | – | – | no test yet (0 val λ rows) | `runs/bench/2026-10-13_15-39-21_claude-box_33e2_scorpion_softshrink_h0mini_gap_gain95` | 605eca3* |
 | softshrink_h0mini_gap | gap | 0 | 0.802 | 0.919 | 0.956 | 0.939 | 0.974 | raw | `runs/bench/2026-10-13_15-44-35_lxbelshark_d6f7_scorpion_softshrink_h0mini_gap` | 5405d71 |
-| softshrink_h0mini_gap | gap | 100 | 0.966 | 0.993 | 0.265 | 0.363 | 0.984 | selected on val | `runs/bench/2026-10-13_15-44-35_lxbelshark_d6f7_scorpion_softshrink_h0mini_gap` | 5405d71 |
+| softshrink_h0mini_gap | gap | 100 | 0.966 | 0.993 | 0.265 | 0.363 | 0.984 | best val top-1 | `runs/bench/2026-10-13_15-44-35_lxbelshark_d6f7_scorpion_softshrink_h0mini_gap` | 5405d71 |
 
-Test split, proxy protocol (`summary_test.csv`); λ selected by val top-1 (`selected.json`).
+Test split, proxy protocol (`summary_test.csv`); λ selected on val, rule in the note (`selected.json`).
 
 <!-- /results:softshrink -->
+
+Run `runs/bench/2026-10-13_15-44-35_lxbelshark_d6f7_scorpion_softshrink_h0mini_gap` (SIPE
+`5405d71` clean; GAP pooling, fp16 autocast features; eraser fit on train, λ grid 0–1000 on
+val). **Finished** (GAP only; CLS not run).
+
+- λ=0 reproduces the `backbone_gap` proxy row (top-1 0.802, logreg 0.956, MLP 0.939; region
+  0.974 vs 0.975), so the features and protocol match.
+- Val sweep (`sweep_val.csv`): top-1 saturates early (0.887 raw → 0.966 at λ=0.1, 0.975 at
+  λ=1, 0.977 from λ=10 to 1000). Paired cosine peaks at λ=3 (0.952; 0.919 raw). The scanner
+  probes fall later: logreg 0.926 at λ=1, 0.728 at λ=3, 0.297 at λ=10, 0.199 at λ=100 (chance
+  0.2). The MLP falls faster at small λ (0.830 at λ=0.1) but plateaus at 0.40–0.43 from λ=10
+  on. The region probe is 0.978 raw and 0.983–0.985 for every λ>0, so the guard is never close.
+- This run selected λ=100 by best val top-1 (`selected.json`). **That rule is dropped** (user,
+  2026-10-13): the eraser is meant to *mitigate scanner-induced distances*, not to erase the
+  scanner, and λ=100 is close to a hard projection. Most of the distance reduction happens by
+  λ≈0.3–1 while the linear probe still reads the scanner (~0.93). New rule (uncommitted on `605eca3`, flag
+  `--select-gain-frac`, default 0.95): the smallest λ reaching 95% of the best val top-1 gain;
+  scanner probes are diagnostics only. On this sweep it picks λ=1. The test row for λ=100 above
+  stays as a record. Re-run with the new rule on the same features: **in progress** (tag
+  `softshrink_h0mini_gap_gain95`).
+- Test at λ=100 (old rule): top-1 0.966 (PairedVAE 0.962, GAP 0.802), scanner probe logreg
+  0.265 / MLP 0.363, region probe 0.984, mean relative feature change 0.27
+  (`summary_test.csv`).
+- Paired baseline (slide-level deltas): the bar for PairedVAE, not for unpaired methods.
+  PLISM/HEST decide (not wired yet).
 
 ### Training runs (val)
 
@@ -389,17 +415,17 @@ section 2 are the reference.
 
 ## 4. Open points / next steps
 
-- **Soft-shrinkage baseline (vfm-geom-xai), not run yet.** User launches on the host:
-  `uv run python -m sipe.eval.soft_shrinkage_sweep --tag softshrink_h0mini_gap --poolings gap
-  --device 1 --workers 8` (CLS later from the same features: `--features-from <run dir>
-  --poolings cls`). λ is selected by val cross-scanner top-1 (region probe as guard); then
-  `summary_test.csv` gives the proxy-table row (compare GAP 0.802/0.956, PairedVAE
-  0.962/0.850). Smoke run (2 slides/split, val, GAP): λ=10 top-1 0.87 → 0.97, logreg probe
-  0.90 → 0.20, region 0.99 kept, which is promising but tiny. It is a **paired** baseline:
-  its deltas (per-slide scanner means minus the slide mean) need every slide under several
-  scanners, i.e. slide-level pairs (on SCORPION equal to the mean of tile-pair deltas).
-  Compare it with PairedVAE, not with the unpaired candidates. If it holds,
-  next: PLISM/HEST with a `backbone_gap` + eraser extractor.
+- **Soft-shrinkage baseline (vfm-geom-xai).** GAP sweep done
+  (`runs/bench/2026-10-13_15-44-35_lxbelshark_d6f7_scorpion_softshrink_h0mini_gap`); λ rule
+  changed to "smallest λ at ≥95% of the val top-1 gain" (goal: mitigate scanner distances, not
+  remove the scanner). Next:
+  - Read the re-run (`softshrink_h0mini_gap_gain95`, same features) and its test row at λ=1.
+  - PLISM/HEST: needs a `backbone_gap` + eraser extractor in `sipe.bench` (load the
+    `eraser_gap_lam<λ>.pt` of the selected run). This is the real comparison with PairedVAE.
+  - CLS pooling from the saved features: `--features-from <run dir> --poolings cls`.
+  It is a **paired** baseline: its deltas (per-slide scanner means minus the slide mean) need
+  every slide under several scanners, i.e. slide-level pairs (on SCORPION equal to the mean of
+  tile-pair deltas). Compare it with PairedVAE, not with the unpaired candidates.
 - **Goal (user, 2026-10-13): a method that needs no paired data.** PairedVAE is the paired
   reference to approach; DistMatchVAE (item 6) is the current unpaired candidate.
 - PairedVAE `ysltwjoj`: done; beats GAP on PLISM, no harm on HEST.

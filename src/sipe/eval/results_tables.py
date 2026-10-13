@@ -341,7 +341,7 @@ def softshrink_table(root: Path, opts: dict[str, list[str]]) -> str:
         selected = _read_json(run.dir / "selected.json")
         for _, r in pd.read_csv(summary).iterrows():
             sel = selected.get(r["pooling"], {})
-            note = "raw" if r["lambda"] == 0 else "selected on val"
+            note = "raw" if r["lambda"] == 0 else sel.get("rule", "best val top-1")
             if r["lambda"] != 0 and sel.get("region_guard_violated"):
                 note += ", region guard violated"
             if r["lambda"] != 0 and sel.get("at_grid_edge"):
@@ -353,7 +353,7 @@ def softshrink_table(root: Path, opts: dict[str, list[str]]) -> str:
             )
     return (
         _table(header, rows) + "\n\nTest split, proxy protocol (`summary_test.csv`);"
-        " λ selected by val top-1 (`selected.json`)."
+        " λ selected on val, rule in the note (`selected.json`)."
     )
 
 

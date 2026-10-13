@@ -11,8 +11,11 @@ with A the shrunk feature covariance and B the second moment of scanner deltas.
   slide, the mean of each scanner minus the mean over scanners. Eraser options are
   those of vfm-geom's soft configs (trace-normalized source, `match_x_trace`).
 - Sweep on val: cross-scanner retrieval, scanner probes (train -> val) and the region
-  probe, the metrics of `sipe.eval.scorpion_retrieval`. The selected lambda has the
-  best val top-1 (ties -> smaller lambda).
+  probe, the metrics of `sipe.eval.scorpion_retrieval`. The selected lambda is the
+  smallest one whose val top-1 gain over lambda = 0 reaches `--select-gain-frac` of
+  the best gain (default 0.95). The eraser is meant to shrink scanner-induced
+  distances, not to erase the scanner, so lambda is not pushed to full removal;
+  scanner probes are diagnostics. `--select-gain-frac 1` = best val top-1.
 - Test, once, for lambda = 0 and the selected lambda: the proxy protocol (probe
   trained on val, retrieval/probes on test), comparable to the proxy table.
 
@@ -156,6 +159,15 @@ def evaluate(
     }
 
 
+def select_lambda(rows: pd.DataFrame, gain_frac: float) -> pd.Series:
+    """Smallest lambda whose val top-1 gain over lambda = 0 is >= gain_frac x best."""
+    rows = rows.sort_values("lambda")
+    raw = float(rows.loc[rows["lambda"] == 0.0, "top_1_accuracy"].iloc[0])
+    gain = rows["top_1_accuracy"] - raw
+    # Tolerance so that gain_frac = 1 keeps the best row despite float rounding.
+    return rows.loc[gain >= gain_frac * gain.max() - 1e-12].iloc[0]
+
+
 def main(argv: list[str] | None = None) -> Path:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--tag", required=True)
@@ -183,6 +195,12 @@ def main(argv: list[str] | None = None) -> Path:
         type=float,
         default=0.02,
         help="Flag the selection if its val region probe drops more than this.",
+    )
+    parser.add_argument(
+        "--select-gain-frac",
+        type=float,
+        default=0.95,
+        help="Pick the smallest lambda reaching this share of the best val top-1 gain.",
     )
     parser.add_argument(
         "--features-from",
@@ -305,14 +323,15 @@ def main(argv: list[str] | None = None) -> Path:
 
     selected = {}
     for pooling, rows in sweep.groupby("pooling", sort=False):
-        best = rows.sort_values(
-            ["top_1_accuracy", "lambda"], ascending=[False, True]
-        ).iloc[0]
+        best = select_lambda(rows, args.select_gain_frac)
         raw = rows.loc[rows["lambda"] == 0.0].iloc[0]
         region_drop = float(raw["region_probe_acc"] - best["region_probe_acc"])
         selected[pooling] = {
             "lambda": float(best["lambda"]),
+            "rule": f"smallest lambda with val top-1 gain >= {args.select_gain_frac:g}"
+            " x best gain",
             "val_top_1": float(best["top_1_accuracy"]),
+            "val_top_1_best": float(rows["top_1_accuracy"].max()),
             "val_top_1_raw": float(raw["top_1_accuracy"]),
             "val_region_drop": region_drop,
             "region_guard_violated": region_drop > args.region_guard,

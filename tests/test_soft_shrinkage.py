@@ -10,6 +10,7 @@ from sipe.eval.soft_shrinkage_sweep import (
     ERASER_CONFIG,
     SOURCE,
     fit_family,
+    select_lambda,
     slide_to_mean_deltas,
 )
 
@@ -80,3 +81,16 @@ def test_large_lambda_removes_scanner_shift():
     # Content directions (orthogonal to the shift) are kept.
     kept = family.make_eraser(1000.0)(x)[:, 1:]
     assert float((kept - x[:, 1:]).norm() / x[:, 1:].norm()) < 0.1
+
+
+def test_select_lambda_smallest_reaching_gain_fraction():
+    rows = pd.DataFrame(
+        {
+            "lambda": [0.0, 0.1, 1.0, 10.0, 100.0],
+            "top_1_accuracy": [0.80, 0.90, 0.96, 0.99, 1.00],
+        }
+    )
+    # Best gain 0.20: 0.95 of it needs top-1 >= 0.99.
+    assert select_lambda(rows, 0.95)["lambda"] == 10.0
+    assert select_lambda(rows, 0.5)["lambda"] == 0.1
+    assert select_lambda(rows, 1.0)["lambda"] == 100.0
