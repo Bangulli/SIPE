@@ -1,4 +1,4 @@
-# Progress summary (as of 2026-10-10)
+# Progress summary (as of 2026-10-13)
 
 This file tracks what has been tried on SCORPION, what each attempt gave, and what comes
 next. Setup details are in `docs/benchmarks.md` (PLISM/HEST),
@@ -24,16 +24,31 @@ Reference: GAP of the backbone patch tokens (`backbone_gap`).
 
 ### PLISM (official code, 91 slides, 8,139 tiles/slide), top-1 accuracy
 
-| row | H0-mini GAP | H0-mini CLS | legacy-step CATS z_gap (`ce50`) | CATSv2 z_gap (`9lctrbqp`) | original SIPE |
-|---|---|---|---|---|---|
-| inter-scanner | **0.810** | 0.600 | 0.688 | 0.751 | 0.666 |
-| inter-staining | **0.259** | 0.120 | 0.239 | 0.255 | 0.237 |
-| scanner + staining | **0.173** | 0.055 | 0.154 | 0.165 | 0.158 |
-| all | **0.227** | 0.100 | 0.201 | 0.216 | 0.203 |
+| row | H0-mini GAP | H0-mini CLS | legacy-step CATS z_gap (`ce50`) | CATSv2 z_gap (`9lctrbqp`) | original SIPE | PairedVAE z_gap (`ysltwjoj`) |
+|---|---|---|---|---|---|---|
+| inter-scanner | 0.810 | 0.600 | 0.688 | 0.751 | 0.666 | **0.839** |
+| inter-staining | 0.259 | 0.120 | 0.239 | 0.255 | 0.237 | **0.293** |
+| scanner + staining | 0.173 | 0.055 | 0.154 | 0.165 | 0.158 | **0.215** |
+| all | 0.227 | 0.100 | 0.201 | 0.216 | 0.203 | **0.267** |
 
 Bench runs: `runs/bench/2026-10-08_10-18-32_lxbelshark_6ee6_cats_s2bqyu2g_z_gap` (legacy-step CATS)
 and `runs/bench/2026-10-08_20-42-51_lxbelshark_de75_cats_9lctrbqp_z_gap` (CATSv2). The other
-columns come from earlier comparisons. **No method beats raw H0-mini GAP on PLISM so far.**
+columns come from earlier comparisons (H0-mini GAP: `../plism-benchmark/output/metrics/8139_tiles/h0_mini_gap`,
+2026-10-07). PairedVAE: `runs/bench/2026-10-10_17-32-32_lxbelshark_95c5_paired_vae_ysltwjoj`
+(SIPE `06257ff` clean, checkpoint `last.ckpt` step 6,000).
+
+**PairedVAE is the first method to beat raw H0-mini GAP on PLISM, on every row.** Paired
+comparison per slide pair against GAP (top-1, mean difference / share of pairs improved):
+inter-scanner +0.028 / 88% (273 pairs), inter-staining +0.034 / 90% (546),
+scanner + staining +0.042 / 89% (3,276), all +0.040 / 89% (4,095). Every scanner gains on
+average (P the most: +0.072, GAP's weakest scanner at 0.655). It also gains on
+inter-staining, which it never trained on. One failure: the **HR** stain loses −0.179 on
+inter-scanner pairs (e.g. AT2↔P 0.33 → 0.07, GT450↔S360 0.41 → 0.10; slide-pair cosine
+drops from ~0.89 to ~0.66–0.71), while HRH and every other stain gain. HR is already hard for
+GAP; the latent seems to break on it (out-of-distribution stain for SCORPION?).
+Caveats: one seed; the GAP row was made 2026-10-07 with the old tooling, not by
+`sipe.bench.plism --representation backbone_gap` at the current commit (not verified to
+be bit-identical in preprocessing).
 
 ### SCORPION proxy (held-out split)
 
@@ -139,7 +154,9 @@ reads the scanner (logreg 0.966) but carries little location (region probe 0.36,
      - Metrics were flat after step ~4,000.
      - SCORPION proxy (held-out test split, section 2): top-1 0.962 vs 0.802 GAP; scanner
        probe 0.850 vs 0.956.
-     - Verdict: **best so far on SCORPION**. Next: PLISM.
+     - PLISM (section 2): inter-scanner 0.839 vs 0.810 GAP, all 0.267 vs 0.227; gains on
+       ~89% of slide pairs; fails on the HR stain.
+     - Verdict: **best so far on SCORPION and PLISM**; first method to beat GAP on PLISM.
 
 5. **MathieuGAN**, stage 2 toward Mathieu et al. (`uv run sipe fit --config
    configs/mathieu_gan.yaml`; `src/sipe/training/mathieu_gan_module.py`). Implemented
@@ -176,10 +193,14 @@ reads the scanner (logreg 0.966) but carries little location (region probe 0.36,
 
 ## 4. Open points / next steps
 
-- PairedVAE `ysltwjoj`: finished. SCORPION proxy 0.962 top-1 (GAP 0.802). Run PLISM:
-  `bench/run python -m sipe.bench.plism --ckpt
-  runs/2026-10-10_15-18-38_lxbelshark_20c2/checkpoints/last.ckpt --tag paired_vae_ysltwjoj`
-  (GAP 0.810 inter-scanner top-1 to beat; CATSv2 also won the proxy and lost on PLISM).
+- PairedVAE `ysltwjoj`: done. PLISM beats GAP on all rows (inter-scanner 0.839 vs 0.810,
+  all 0.267 vs 0.227). To make the claim solid:
+  - re-run the GAP baseline with the current tooling
+    (`bench/run python -m sipe.bench.plism --ckpt <same ckpt> --representation backbone_gap
+    --tag h0_mini_gap_ref`) so both rows share preprocessing;
+  - a second seed of PairedVAE (gain +0.03 inter-scanner vs ±? seed noise);
+  - look into the HR stain failure;
+  - HEST "does no harm" check on this checkpoint.
 - Launch MathieuGAN (`uv run sipe fit --config configs/mathieu_gan.yaml`) and compare with
   PairedVAE on the same val metrics; watch `train/d_{real,fake}_acc` for D domination or
   collapse and `val/fake_target_acc` vs `val/fake_source_acc`. If the second GPU is
