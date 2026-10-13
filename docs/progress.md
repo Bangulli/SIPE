@@ -36,7 +36,8 @@ Reference: GAP of the backbone patch tokens (`backbone_gap`).
 | cats_9lctrbqp_z_gap | z_gap | 0.751 | 0.255 | 0.165 | 0.216 | `runs/bench/2026-10-08_20-42-51_lxbelshark_de75_cats_9lctrbqp_z_gap` | 9lctrbqp | d0c7a1a |
 | paired_vae_ysltwjoj | z_gap | 0.839 | 0.293 | 0.215 | 0.267 | `runs/bench/2026-10-10_17-32-32_lxbelshark_95c5_paired_vae_ysltwjoj` | ysltwjoj | 06257ff |
 | h0_mini_gap_ref | backbone_gap | 0.811 | 0.259 | 0.173 | 0.227 | `runs/bench/2026-10-13_10-02-08_lxbelshark_053f_h0_mini_gap_ref` | – | 06257ff* |
-| mathieu_gan_h65a5z5x | z_gap | no results | – | – | – | `runs/bench/2026-10-13_19-02-32_lxbelshark_dcf2_mathieu_gan_h65a5z5x` | h65a5z5x | e0b8cd2 |
+| mathieu_gan_h65a5z5x | z_gap | 0.792 | 0.254 | 0.172 | 0.225 | `runs/bench/2026-10-13_19-02-32_lxbelshark_dcf2_mathieu_gan_h65a5z5x` | h65a5z5x | e0b8cd2 |
+| dist_match_vae_sr40r1h1 | z_gap | no results | – | – | – | `runs/bench/2026-10-13_20-17-04_lxbelshark_244b_dist_match_vae_sr40r1h1` | sr40r1h1 | ca9b819 |
 | h0_mini | – | 0.600 | 0.120 | 0.055 | 0.100 | `../plism-benchmark/output/metrics/8139_tiles/h0_mini` | – | – |
 | sipe_h0_mini | – | 0.666 | 0.237 | 0.158 | 0.203 | `../plism-benchmark/output/metrics/8139_tiles/sipe_h0_mini` | – | – |
 
@@ -197,6 +198,7 @@ val). **Finished** (GAP only; CLS not run).
 | `runs/2026-10-13_11-54-38_lxbelshark_36b0` | h65a5z5x | MathieuGANModule | 5da426e* | 6000/6000 | 0.783 | 0.802 | 0.832 | 0.921 | 0.887 | 0.195 | 2.225 |
 | `runs/2026-10-13_15-02-26_lxbelshark_6774` | sr40r1h1 | DistMatchVAEModule | d61bf26 | 6000/6000 | 0.796 | 0.802 | 0.891 | 0.953 | 0.887 | 0.027 | 1.235 |
 | `runs/2026-10-13_15-03-37_lxbelshark_a78f` | g7fkiwbp | DistMatchVAEModule | d61bf26 | 6000/6000 | 0.815 | 0.802 | 0.922 | 0.928 | 0.887 | 0.037 | 1.349 |
+| `runs/2026-10-13_19-12-17_lxbelshark_5465` | 8271lf26 | PairedVAEModule | ca9b819 | 6000/6000 | 0.797 | 0.802 | 0.933 | 0.952 | 0.887 | 0.045 | 1.309 |
 
 Mean of the last 10 validations of `val/<col>`, read from the local `.wandb` file; step = last logged `trainer/global_step` / `max_steps`.
 
@@ -295,6 +297,22 @@ section 2 are the reference.
      - PLISM (section 2): inter-scanner 0.839 vs 0.810 GAP, all 0.267 vs 0.227; gains on
        ~89% of slide pairs; fails on the HR stain.
      - Verdict: **best so far on SCORPION and PLISM**; first method to beat GAP on PLISM.
+   - **Ablation, translation only** (`configs/paired_vae_translation_only.yaml`, `align_weight: 0`,
+     else as `ysltwjoj`): run `8271lf26` (`runs/2026-10-13_19-12-17_lxbelshark_5465`, commit
+     `ca9b819`, clean). **Finished** (6,000 steps). Last-10-val means, `ysltwjoj` in brackets
+     (section 2 table and `wandb_history`/`last_val_mean` on both run dirs):
+     - probe z 0.797 (0.689), backbone 0.802: **no removal without the alignment**;
+     - retrieval top-1 z 0.952 (0.977), backbone 0.887;
+     - translation loss 0.234 (0.237): the translation is learned equally well;
+     - align loss 0.326 (0.241), backbone 0.299: z pairs end slightly *less* aligned than
+       the backbone;
+     - probe s 0.933 (0.933); feature recon 0.045 (0.047).
+     - Retrieval z is already 0.948 at step 99 (`ysltwjoj` 0.951, DistMatchVAE `sr40r1h1`
+       0.914), so a large part of the val retrieval gain over the backbone appears before
+       any real training. Not checked what causes it (e.g. the encoder's normalization).
+     - Verdict: **the alignment loss carries PairedVAE's scanner removal**; translation alone
+       gives the same val numbers as the unpaired DistMatchVAE `sr40r1h1` (probe z 0.796,
+       retrieval 0.953). PLISM not run for the ablation.
 
 5. **MathieuGAN**, stage 2 toward Mathieu et al. (`uv run sipe fit --config
    configs/mathieu_gan.yaml`; `src/sipe/training/mathieu_gan_module.py`). Implemented
@@ -353,7 +371,9 @@ section 2 are the reference.
        LRs decay.
      - Small retrieval gain on val (0.921 vs 0.887), well below PairedVAE.
      - Verdict: **unpaired GAN alone does not remove the scanner from z**; worse than
-       PairedVAE on every val metric. PLISM/HEST still to run for the record.
+       PairedVAE on every val metric.
+     - PLISM (`runs/bench/2026-10-13_19-02-32_lxbelshark_dcf2_mathieu_gan_h65a5z5x`, section 2):
+       inter-scanner 0.792 vs GAP 0.811, all 0.225 vs 0.227; below GAP. HEST not run.
 
 6. **DistMatchVAE**: unpaired scanner removal by distribution matching (`uv run sipe fit
    --config configs/dist_match_vae.yaml`; `src/sipe/training/dist_match_vae_module.py`,
@@ -458,10 +478,11 @@ section 2 are the reference.
       alignment of GAP(μ), which trains retrieval pairing directly. If alignment carries
       PairedVAE's gain, this route is capped.
   - What could change the view, cheapest first:
-    1. **Ablate PairedVAE: translation only, no alignment** (`configs/paired_vae_translation_only.yaml`
+    1. **DONE: alignment does the work** (`8271lf26`, item 4: probe z 0.797 vs 0.689 with
+       alignment). **Ablate PairedVAE: translation only, no alignment** (`configs/paired_vae_translation_only.yaml`
        = `configs/paired_vae.yaml` with `align_weight: 0`, else identical to `ysltwjoj`; the
        module changed since `f48c72a` only by the `log_paired_validation` refactor).
-       `uv run sipe fit --config configs/paired_vae_translation_only.yaml`. **Not launched.**
+       `uv run sipe fit --config configs/paired_vae_translation_only.yaml`.
        If translation alone keeps most of the gain, a GAN replacing it is worth pursuing; if
        alignment does the work, the route is capped.
     2. **PLISM on the unpaired runs.** The goal is beating GAP on PLISM, not the val probe.
@@ -470,14 +491,21 @@ section 2 are the reference.
        and `runs/2026-10-13_15-02-26_lxbelshark_6774` vs `retrieval_top1_backbone`). Tags
        `mathieu_gan_h65a5z5x`, `dist_match_vae_sr40r1h1`, `dist_match_vae_g7fkiwbp`:
        `bench/run python -m sipe.bench.plism --ckpt runs/<run>/checkpoints/last.ckpt --tag <tag>`.
-       MathieuGAN launched (`runs/bench/2026-10-13_19-02-32_lxbelshark_dcf2_mathieu_gan_h65a5z5x`,
-       SIPE `e0b8cd2`): **in progress**, no results file at the last check. DistMatchVAE runs
-       queued after it.
-    3. **Close the decoder loophole** (only if 1 keeps the gain): re-encode each fake and
+       - MathieuGAN **done** (`runs/bench/2026-10-13_19-02-32_lxbelshark_dcf2_mathieu_gan_h65a5z5x`,
+         SIPE `e0b8cd2`; section 2 PLISM table): inter-scanner 0.792 vs GAP 0.811, all 0.225
+         vs 0.227. **Below GAP**: the val retrieval gain does not transfer.
+       - DistMatchVAE `sr40r1h1` (`runs/bench/2026-10-13_20-17-04_lxbelshark_244b_dist_match_vae_sr40r1h1`,
+         SIPE `ca9b819`): **in progress** (features being extracted, no metrics yet).
+         `g7fkiwbp` queued after it.
+    3. **Not worth it given 1** (a GAN can at best replace the translation). **Close the decoder loophole** (only if 1 keeps the gain): re-encode each fake and
        require `z(fake) ≈ z_i` and `s(fake) ≈ s(other)`. This latent cycle is the standard
        fix in unpaired translation (MUNIT, DRIT, StarGAN-v2): the decoder can't fake the
        scanner unless the encoder agrees. A lower adversarial weight (0.1) is a cheap knob,
        not expected to help much.
+  - **Status 2026-10-13:** 1 says alignment does the work; 2 is negative for MathieuGAN,
+    DistMatchVAE pending. Unless DistMatchVAE beats GAP on PLISM, drop the route: an
+    unpaired method would need an unpaired substitute for the *alignment*, not for the
+    translation.
   - Decision rule: if 1 shows alignment does the work and 2 shows nothing for the unpaired
     runs, drop this route.
   - Note: MathieuGAN was written from memory of Mathieu et al. 2016 (arXiv 1611.03383), not
@@ -502,12 +530,8 @@ section 2 are the reference.
   soft-shrinkage eraser, which is therefore a paired baseline.
 - Results tables in section 2 are generated (`sipe.eval.results_tables --write`). Rows still
   hand-typed elsewhere (section 3, prose) predate it.
-- MathieuGAN `h65a5z5x`: finished, weak on val (probe gap 0.02, recon 0.195). PLISM/HEST
-  only as a negative control, if a GPU is idle:
-  `bench/run python -m sipe.bench.plism --ckpt
-  runs/2026-10-13_11-54-38_lxbelshark_36b0/checkpoints/last.ckpt --tag mathieu_gan_h65a5z5x`
-  and the same with `sipe.bench.hest ... --datasets '*'`. An `adversarial_weight=0.1` run
-  would likely trade even less removal for better recon; not a priority given the z probe.
+- MathieuGAN `h65a5z5x`: finished, weak on val (probe gap 0.02, recon 0.195) and below GAP on
+  PLISM (inter-scanner 0.792 vs 0.811). HEST not needed. Route on hold (see the GAN-route point).
 - If adversaries on z come back: the Fader knobs not tried are a larger
   `adversary_weight` (3–5), fewer `adversary_steps`, and decaying the adversary's LR with
   the encoder's (the end of the Fader run was dominated by the adversary).
