@@ -242,6 +242,52 @@ reads the scanner (logreg 0.966) but carries little location (region probe 0.36,
      - Verdict: **unpaired GAN alone does not remove the scanner from z**; worse than
        PairedVAE on every val metric. PLISM/HEST still to run for the record.
 
+6. **DistMatchVAE**: unpaired scanner removal by distribution matching (`uv run sipe fit
+   --config configs/dist_match_vae.yaml`; `src/sipe/training/dist_match_vae_module.py`,
+   `UnpairedTrainSCORPIONDataModule`). Implemented 2026-10-13. Goal (user, 2026-10-13): a
+   method that needs **no paired data**. PairedVAE stays the paired upper reference.
+   - Why: every unpaired attempt so far relied on a learned adversary that the
+     encoder or decoder could satisfy without z losing the scanner (GRL fooled, Fader
+     adversary wins, MathieuGAN decoder overwrites). Fixed statistics can't be fooled.
+   - Same network as PairedVAE. Losses: same-scanner swap recon + KL (β 0.1) +
+     matching on g = GAP(μ), standardized per dimension over the batch (statistics not
+     detached, so shrinking z doesn't help):
+     - MMD² between every pair of scanners (unbiased; mean of RBF kernels at
+       0.25–4 × the median squared distance);
+     - per-scanner mean (‖mean_a‖²/D) and covariance (‖Cov_a − Cov‖²_F/D²) matching:
+       what a linear probe reads.
+     - Weights 1.0 each, warm-up 1,000 steps. No adversary, no pairs, no translation.
+   - Data: training batches are 512 **shuffled tiles** (no location key), so each scanner
+     in a batch sees random, mostly different locations. Paired batches would leak
+     pairing into MMD, since both views of a location share tissue. Validation stays
+     paired (all 5 scanners per location) and logs the PairedVAE metrics. On those
+     batches every scanner sees the same tissue, so `val/mmd`, `val/mean_loss` and
+     `val/cov_loss` measure the scanner effect alone. `*_backbone` versions give the scale.
+   - Assumption: every scanner sees the same tissue distribution. True for SCORPION by
+     construction; it breaks on data where tissue differs by scanner.
+   - Box smoke run (`runs/2026-10-13_12-27-13_claude-box_bc5a`, W&B offline `klr6rd9h`;
+     300 steps, warm-ups 50 instead of 1,000, 8 val batches only, so the val probes are
+     noisy and not comparable with full runs). Finished; mechanics OK:
+
+     | val (paired batches) | step 99 | step 299 | backbone |
+     |---|---|---|---|
+     | MMD / mean / cov term | 0.0200 / 0.0377 / 0.0075 | 0.0194 / 0.0372 / 0.0073 | 0.0317 / 0.0536 / 0.0084 |
+     | probe z (backbone) | 0.79 (0.71) | 0.80 (0.71) | |
+     | retrieval top-1 z (backbone) | 0.921 (0.865) | 0.927 (0.865) | |
+     | feature recon / KL / \|z\| | 0.012 / 1.67 / 0.73 | 0.015 / 1.56 / 0.71 | |
+
+     - On val, z shows less scanner difference than the backbone (MMD −39%, mean −31%,
+       cov −13%), but the terms are flat after step 99.
+     - Training batches: MMD drops to ~0.001 (backbone ~0.02). The mean and cov terms sit
+       at their **sampling-noise floor**: for 512 i.i.d. 768-d samples over 5 scanners the
+       floor is 0.0078 for each; train reads 0.008–0.009 and 0.010. So with
+       ~100 random tiles per scanner, the per-batch moment estimates can't see the
+       remaining scanner difference. Fixes if the full run stalls: running (EMA)
+       per-scanner statistics across batches, or larger matching weights.
+     - Probe z ≥ probe backbone here is a warning sign but uses 8 val batches only; the
+       full run's probes (whole val split) decide.
+     - Reconstruction is fine (0.015; PairedVAE ends at 0.047). All 768 units active.
+
 ## 4. Open points / next steps
 
 - PairedVAE `ysltwjoj`: done. PLISM beats GAP on all rows (inter-scanner 0.839 vs 0.810,
@@ -253,6 +299,12 @@ reads the scanner (logreg 0.966) but carries little location (region probe 0.36,
     then run `bench/run python -m sipe.bench.hest --ckpt
     runs/2026-10-10_15-18-38_lxbelshark_20c2/checkpoints/last.ckpt --tag paired_vae_ysltwjoj
     --datasets '*'` (needs `8a28a6a` for `'*'`).
+- DistMatchVAE: launch `uv run sipe fit --config configs/dist_match_vae.yaml` on the host
+  (smoke run OK, but the moment terms hit their noise floor on 512-tile batches). In
+  parallel, a stronger run: `--model.init_args.mmd_weight=10 --model.init_args.mean_weight=10
+  --model.init_args.cov_weight=10`.
+  Compare with PairedVAE on the val probe (z vs backbone) and retrieval. Watch
+  `val/mmd` vs `val/mmd_backbone`, recon, active units and |z| for collapse.
 - MathieuGAN `h65a5z5x`: finished, weak on val (probe gap 0.02, recon 0.195). PLISM/HEST:
   `bench/run python -m sipe.bench.plism --ckpt
   runs/2026-10-13_11-54-38_lxbelshark_36b0/checkpoints/last.ckpt --tag mathieu_gan_h65a5z5x`

@@ -604,3 +604,22 @@ class PairedSCORPIONDataModule(SCORPIONDataModule):
             shuffle=False,
             drop_last=False,
         )
+
+
+class UnpairedTrainSCORPIONDataModule(PairedSCORPIONDataModule):
+    """Unpaired training, paired evaluation (same splits as the parent).
+
+    Training batches are plain shuffled tiles (``SCORPIONDataModule``):
+    ``batch_size`` counts images, there is no ``location`` key, and the scanners in a
+    batch see random, mostly different locations. Validation/test are the parent's
+    paired batches (``val_batch_size`` locations × ``val_views`` scanners), used only
+    for evaluation metrics.
+    """
+
+    def _eval_batch_size(self) -> int:
+        if self.val_batch_size is not None:
+            return int(self.val_batch_size)
+        return max(1, self.batch_size // (self.val_views or self.num_domains))
+
+    def train_dataloader(self) -> DataLoader:
+        return SCORPIONDataModule.train_dataloader(self)
