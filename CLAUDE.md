@@ -3,12 +3,17 @@
 Port/refactor of https://github.com/Bangulli/SIPE (SIPE/CATS) to the **SCORPION multi-scanner
 histopathology dataset**, modernized around PyTorch Lightning / LightningCLI.
 
-**Goal:** get CATS converging on SCORPION and benchmark it against baselines, fast. Fix only
-what blocks convergence or makes results invalid. Each run must save its config and git commit
-hash.
+**Goal:** a scanner-removal method on frozen H0-mini features that beats the raw backbone
+(`backbone_gap`) on PLISM (robustness) and does no harm on HEST (utility), ideally **without
+paired data**. CATS was the starting point. It loses to GAP on PLISM, so the work moved to
+feature-space models. Each run must save its config and git commit hash.
 
-**Current phase: convergence + baselines.** Data sanity tests: `docs/parity-audit.md`.
-Baselines: `docs/baselines.md`.
+**Current phase: benchmarking + method search.**
+- Screen each run on the SCORPION proxy (`sipe.eval.scorpion_retrieval`), then run PLISM/HEST
+  (`docs/benchmarks.md`).
+- PairedVAE is the paired reference to approach. DistMatchVAE is the current unpaired
+  candidate.
+- Data sanity tests: `docs/parity-audit.md`. Baselines: `docs/baselines.md`.
 
 **Progress log: `docs/progress.md`.** Whenever you check or interpret runs (training runs,
 SCORPION proxy, PLISM/HEST bench runs), update it in the same turn:
@@ -45,8 +50,16 @@ Say in your reply that you updated it.
 - Filenames encode location + scanner: `slide_1-sample_1-tile_0_0-AT2.jpg`. The shared prefix
   identifies the matched tissue location across scanners.
 - Splits must be grouped by WSI (no leakage).
-- The CATS cycle objective does not need a paired sampler; pairing info may be exposed for
-  evaluation or future paired objectives.
+- Datamodules (`src/sipe/data/scorpion.py`):
+  - `SCORPIONDataModule`: unpaired tiles. CATS, ScannerVAE.
+  - `PairedSCORPIONDataModule`: locations × scanner views via `pair_id`. PairedVAE, MathieuGAN.
+  - `UnpairedTrainSCORPIONDataModule`: unpaired training batches, paired validation.
+    DistMatchVAE.
+
+  All three share the same seeded, WSI-grouped split. A method that claims "unpaired" may
+  use `pair_id` in evaluation only.
+- Normalization follows the backbone's timm data config (encoder builder,
+  `src/sipe/model/encoders.py`). Runs before `4dfde46` used ImageNet mean/std by mistake.
 - **Augmentations** (legacy, `../SIPE-main/pretrain_50k.py:63`): `GaussianBlur(3),
   RandomAffine(3), RandomErasing(p=0.5), RandomGrayscale(p=0.1), RandomInvert(p=0.5)`, then the
   timm H0-mini transform. `train_1M.py` uses no augmentation. `RandomErasing` has always needed
@@ -112,6 +125,37 @@ Reference, not invariants. Checked against `../SIPE-main` on 2026-10-02 (L = leg
   (or a structured `forward()` returning `s, z, reconstruction`).
 - H0-mini dims: backbone 768, `s` 64 (global/sample-level), `z` 704 (spatial).
 - The re-entangler combines broadcast `s` with spatial `z` before image reconstruction.
+- Feature-space models: ScannerVAE, PairedVAE, MathieuGAN, DistMatchVAE (`src/sipe/model/`,
+  `src/sipe/training/*_module.py`, one config each in `configs/`).
+  - They encode the frozen backbone patch tokens per token into `z`, with `s` global. There is
+    no curriculum, and pixel decoding is for visualization only.
+  - They subclass `FrozenBackboneModule` (`src/sipe/training/base.py`).
+  - The benchmarked representation is `z_gap`, the GAP of `z`, the posterior mean for VAEs
+    (`sipe.bench.encoders.CATSFeatures`).
+- Adversaries at chance prove nothing on their own. Judge scanner removal with fresh
+  WSI-disjoint probes, comparing `z` against the backbone.
+
+# Post-hoc baselines
+
+- **Soft-shrinkage eraser** (from `../vfm-geom-xai`). It acts on frozen backbone features:
+  `x' = mu + P (x - mu)`, `P = A (A + λB)^-1`, where A is the shrunk feature covariance and B
+  the second moment of the scanner deltas. Deltas are per-slide scanner means minus the slide
+  mean, so the fit needs slide identity but no tile pairs.
+- The eraser code is vendored verbatim in `src/sipe/baselines/soft_delta_legacy.py` and
+  `shrinkage_legacy.py`, with the source commit in the header. Don't edit them; re-vendor
+  instead. vfm-geom-xai itself is not a dependency.
+- Sweep: `uv run python -m sipe.eval.soft_shrinkage_sweep --tag <tag> [--poolings gap cls]`.
+  - It fits on SIPE's train split (seed 42, val/test 0.1, grouped by slide).
+  - It sweeps λ on val with the SCORPION-proxy metrics and selects by val cross-scanner top-1.
+    The region probe is the guard; it is flagged in `selected.json`.
+  - It reads test once, for λ=0 and the selected λ, with the proxy protocol (probe trained
+    on val).
+  - Outputs go to `runs/bench/<stamp>_scorpion_<tag>/`. Use `--features-from <run dir>` to
+    skip feature extraction. Most of the run time is the per-λ sklearn probes.
+- `--poolings`: `gap` = mean of the patch tokens without prefix tokens (= `backbone_gap`, the
+  reference for CATS-style models); `cls` = token 0. Report which pooling a number uses.
+- Compare its test row with the SCORPION-proxy table in `docs/progress.md`. PLISM/HEST for the
+  eraser is not wired yet (it needs a `backbone_gap` + eraser extractor in `sipe.bench`).
 
 # Logging
 
@@ -146,6 +190,21 @@ uv run sipe fit --config <config.yaml> \
 `fast_dev_run` replaces loggers with a dummy, so it doesn't test logger or W&B code. For that,
 run `--trainer.max_steps=2 --trainer.limit_train_batches=2 --trainer.limit_val_batches=1` with
 `WANDB_MODE=offline`.
+
+`uv run ruff check .` already fails on legacy code (`*_legacy.py`, `scripts/`, old eval
+scripts). Keep new or changed files clean: `uv run ruff check <files>`.
+
+Evaluation (each writes `runs/bench/<stamp>_<host>_<rand>_<tag>/` with config, git info and
+provenance):
+
+```bash
+uv run python -m sipe.eval.scorpion_retrieval --ckpt runs/<run>/checkpoints/last.ckpt --tag <tag>
+bench/run python -m sipe.bench.plism --ckpt runs/<run>/checkpoints/last.ckpt --tag <tag>
+bench/run python -m sipe.bench.hest  --ckpt runs/<run>/checkpoints/last.ckpt --tag <tag> --datasets '*'
+```
+
+PLISM/HEST run in the separate bench env through `bench/run`, never plain `uv run`. Inside
+claude-box, pass `--workers 0` / `num_workers=0`, because shared memory there is 64 MB.
 
 Don't hard-code a config filename into tooling unless it is the canonical project config.
 
