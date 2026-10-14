@@ -362,6 +362,16 @@ Experiment 1 reading (all values from `runs/bench/2026-10-13_20-09-24_claude-box
   blur/grayscale/invert/erasing/small-angle affine (blur and colour ops wash out scanner
   differences between the views) change PLISM/SCORPION? Compare with `ysltwjoj` (PLISM
   `runs/bench/2026-10-10_17-32-32_lxbelshark_95c5_paired_vae_ysltwjoj`). One seed each.
+- Optional TODO (engineering, only if paired augmentation becomes a requirement): the
+  scanner views of a location share their augmentation through seed replay in
+  `PairedSCORPIONDataset.__getitem__` (same torch seed before each view). Correct and
+  tested (`test_paired_views_share_geometric_augmentation`), but it relies on an implicit
+  invariant: every random op draws from the torch RNG, the same number of times
+  regardless of content. Albumentations / numpy / `random`-based ops would desync the
+  views silently. Cleaner: torchvision v2, one call on all views (`t(*views)`) draws the
+  parameters once; the paired dataset loads raw views and transforms them together,
+  `RandomRot90` becomes a v2 transform; keep the v1 path for the legacy default so old
+  configs reproduce bit-for-bit. ~1 h with tests.
 - PLISM retrieval viz (tools added 2026-10-14, `docs/benchmarks.md`): pair table
   `runs/bench/2026-10-14_15-13-12_claude-box_1353_plism_pairs_gap_g0_eraser` (GAP ref, G0,
   eraser λ=0.5; merge of the official per-pair metrics, no recomputation). Smoke only so
