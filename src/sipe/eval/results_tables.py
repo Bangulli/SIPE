@@ -7,6 +7,8 @@ Sources, all under runs/ (gitignored, so every row names the dir it came from):
   - soft-shrinkage sweep: runs/bench/*/summary_test.csv + selected.json
   - content dependence (Experiment 1): runs/bench/*/summary.csv
     (sipe.eval.content_dependence)
+  - mixture sweep (Experiment 3): runs/bench/*/summary_{val,test}.csv, selected.json,
+    likelihood.csv, gating.csv (sipe.eval.mixture_sweep)
   - training: runs/<run>/wandb/*run-*/*.wandb (local W&B history; no API key needed)
 
 progress.md holds generated blocks:
@@ -410,6 +412,104 @@ def content_table(root: Path, opts: dict[str, list[str]]) -> str:
     )
 
 
+# --- mixture sweep (Experiment 3) ----------------------------------------------
+
+
+def _mixture_rows(run: BenchRun, split: str) -> list[dict[str, Any]]:
+    """Candidates of one mixture run with their selection, likelihood and gate."""
+    summary = pd.read_csv(run.dir / f"summary_{split}.csv")
+    selected = _read_json(run.dir / "selected.json")
+    lik = pd.read_csv(run.dir / "likelihood.csv")
+    gating = pd.read_csv(run.dir / "gating.csv")
+    rows = []
+    for _, r in summary.iterrows():
+        row: dict[str, Any] = {**r.to_dict(), **selected.get(r["name"], {})}
+        if r["name"] in selected:
+            sel = selected[r["name"]]
+            match = (lik["variant"] == sel["variant"]) & (lik["K"] == sel["K"])
+            if sel["variant"] in ("G1", "G2"):  # rows of the b / g grids
+                key = "beta" if sel["variant"] == "G1" else "gamma"
+                match &= lik[key].sub(sel[key]).abs() < 1e-12
+            if match.any():
+                row.update(lik.loc[match].iloc[-1].to_dict())
+            gate = gating.loc[
+                (gating["variant"] == sel["variant"]) & (gating["K"] == sel["K"])
+            ]
+            if len(gate):
+                row.update(gate.iloc[0].to_dict())
+        rows.append(row)
+    return rows
+
+
+def mixture_table(root: Path, opts: dict[str, list[str]]) -> str:
+    header = [
+        "model", "α", "β", "γ", "val top-1 (α=1)", "val region probe",
+        "val ll resid", "val ll x", "gate agree / views consistent",
+        "test top-1", "test top-5", "test scanner probe logreg / MLP",
+        "test region probe", "note", "bench run dir", "SIPE commit",
+    ]  # fmt: skip
+    rows = []
+    for run in _bench_runs(root, "scorpion_mixture_sweep", opts.get("exclude", [])):
+        source = [f"`{_rel(run.dir)}`", run.source_cells()[2]]
+        if not (run.dir / "summary_val.csv").exists():
+            rows.append(["no results", *["–"] * (len(header) - 3), *source])
+            continue
+        test = {}
+        if (run.dir / "summary_test.csv").exists():
+            test = {r["name"]: r for r in _mixture_rows(run, "test")}
+        for r in _mixture_rows(run, "val"):
+            t = test.get(r["name"], {})
+            name = {"raw": "raw", "reference": "reference (eraser)"}.get(
+                r["name"], f"{r.get('variant')} K={r.get('K')}"
+            )
+            note = []
+            if r.get("region_guard_violated"):
+                note.append("region guard violated")
+            if r.get("at_grid_edge"):
+                note.append("α at grid edge")
+            gate = (
+                f"{r['gate_agreement']:.3f} / {r['gate_view_consistent']:.3f}"
+                if "gate_agreement" in r
+                else "–"
+            )
+            rows.append(
+                [
+                    name,
+                    _fmt(r.get("alpha"), 2) if "alpha" in r else "–",
+                    _fmt(r.get("beta"), 2) if "beta" in r else "–",
+                    _fmt(r.get("gamma"), 2) if "gamma" in r else "–",
+                    f"{r['top_1_accuracy']:.3f}"
+                    + (f" ({r['val_top_1_alpha1']:.3f})" if "val_top_1_alpha1" in r
+                       else ""),
+                    _fmt(r["region_probe_acc"]),
+                    _fmt(r.get("val_ll_residual")),
+                    _fmt(r.get("val_ll_x")),
+                    gate,
+                    _fmt(t.get("top_1_accuracy")),
+                    _fmt(t.get("top_5_accuracy")),
+                    " / ".join(
+                        _fmt(t.get(c)) for c in ("probe_logreg_acc", "probe_mlp_acc")
+                    ),
+                    _fmt(t.get("region_probe_acc")),
+                    ", ".join(note) or "–",
+                    *source,
+                ]
+            )  # fmt: skip
+    return (
+        _table(header, rows)
+        + "\n\nVal: selection split, scanner/region probes trained on train"
+        " (`summary_val.csv`); α chosen by the 95%-of-best-val-top-1-gain rule, β by"
+        " the val consensus likelihood, γ by the val residual likelihood"
+        " (`selected.json`, `likelihood.csv`). ll = mean held-out log-likelihood,"
+        " nats/dim: resid = residuals under N_k of their consensus cluster, x = single"
+        " views under the mixture marginal. Gate = single-view argmax p(k|x) vs the"
+        " consensus cluster, and share of tiles whose 5 views gate to one cluster"
+        " (α=1 map, `gating.csv`). Test: proxy protocol, probes trained on val"
+        " (`summary_test.csv`). Reference = soft-shrinkage eraser map evaluated in the"
+        " same run."
+    )
+
+
 # --- training runs (local W&B history) -----------------------------------------
 
 
@@ -521,6 +621,7 @@ TABLES = {
     "scorpion": scorpion_table,
     "softshrink": softshrink_table,
     "content": content_table,
+    "mixture": mixture_table,
     "training": training_table,
 }
 

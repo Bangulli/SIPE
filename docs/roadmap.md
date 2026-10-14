@@ -6,11 +6,15 @@
 > is unchanged except for the dated "Update" notes in sections 3, 5 and 12):
 > - The new soft-shrinkage selection rule has a SCORPION test row (λ=0.5,
 >   `runs/bench/2026-10-13_17-45-08_lxbelshark_db10_scorpion_softshrink_h0mini_gap_gain95`).
->   The post-hoc PLISM/HEST extractor exists (`--posthoc`, `sipe.bench.posthoc`); the full
->   PLISM/HEST runs of the λ=0.5 eraser are pending, so D0 is still open.
+>   Its full PLISM/HEST runs are done (`--posthoc`): above PairedVAE in every PLISM row, HEST
+>   average unchanged. D0 taken: soft shrinkage is the main bar to beat.
 > - Experiment 1 is done (`runs/bench/2026-10-13_20-09-24_claude-box_c190_scorpion_content_dep_gap`): clear, held-out content dependence of the acquisition
->   residuals, mostly in covariance *shape*. D1 is proposed as "clear, stable" → Experiment 3
->   first, pending confirmation and two checks (see the update under Decision D1).
+>   residuals, mostly in covariance *shape*. D1 taken (→ Experiment 3 first). Of the two
+>   checks, the high-energy tile cluster turned out to be mostly background/glass, and
+>   single-view gating recovers the consensus clusters for most views.
+> - Experiment 3 has SCORPION val/test results (`runs/bench/2026-10-13_21-47-56_claude-box_6fdf_scorpion_mixture_gap`); D3 is proposed, see the update under
+>   "Evaluation and decisions D3". Its G0 is Experiment 2A and already beats the eraser on
+>   SCORPION.
 > - The anchor table in section 0 is from before these runs; the current tables are the
 >   generated ones in `docs/progress.md`.
 > - The soft-shrinkage deltas are slide-to-mean scanner deltas. On SCORPION every slide has the
@@ -254,6 +258,21 @@ Control possible systematic offsets: pooled residuals have zero mean *within eac
 
 ### Evaluation and decisions D3
 
+> **Update 2026-10-13: Experiment 3 result** (`runs/bench/2026-10-13_21-47-56_claude-box_6fdf_scorpion_mixture_gap`, `mixture` table in
+> `docs/progress.md`). Implementation: `sipe.estimators.mixture` + `sipe.eval.mixture_sweep`,
+> tile-level pairs, plug-in moments (C_k = Cov(consensus | k), N_k = E[r rᵀ | k]), C_k
+> shrunk toward the pooled within-cluster covariance (β on val consensus likelihood), N_k
+> toward N_0 (γ on val residual likelihood), attenuation P_k = C_k (C_k + α N_k)⁻¹ with α
+> by the eraser's 95%-gain rule on val, gating in the top-32 PCA subspace of single views.
+> G2-scale uses the maximum-likelihood scale.
+> - G2 > G1 ≈ G2-scale on held-out nuisance likelihood *and* SCORPION retrieval, without
+>   region-probe loss, for K = 2, 4, 8. Formally the first bullet below.
+> - But G1 does not beat G0, and G2's margin over the *linear* G0 is small on SCORPION
+>   (test top-1 +0.000 to +0.003), and G0 itself beats the soft-shrinkage eraser.
+> - **Proposed D3:** do not move to Experiment 5 yet. Run PLISM/HEST for G0 and G2 first;
+>   promote G2 only if it beats G0 externally. Check that the gain is not carried by
+>   background tiles (the high-energy cluster is mostly glass).
+
 - **G2 > G1 on held-out nuisance likelihood *and* SCORPION retrieval, without morphology loss:** evidence that $B(c)$ is useful → **conditional covariance estimator** (Experiment 5) is justified; possibly a constrained VAE (Experiment 6).
 - **G1 > G0 but G2 ≈ G1:** non-Gaussian/multimodal *content* is useful; local nuisance covariance is not yet justified. Explore content priors before building $B_\theta(c)$.
 - **Better likelihood but no retrieval improvement:** better generative fit is insufficient; do not promote G2 as the method without another demonstrated advantage.
@@ -425,14 +444,17 @@ For a **4-page paper**, aim for one central new estimator, the previous soft-shr
 
 ## 12. Deliverables checklist
 
-- [ ] Final soft-shrinkage operator, selected $\lambda$, and SCORPION / PLISM / HEST outputs
+- [x] Final soft-shrinkage operator, selected $\lambda$, and SCORPION / PLISM / HEST outputs
+  (2026-10-13; per-pair/HR breakdown still open)
 - [ ] Stable per-region paired consensus/residual data representation, with split checks
   (built in memory by `sipe.eval.content_dependence.paired_views`, checked for complete
   scanner views; not saved as a file yet)
 - [x] Content-dependence diagnostic including shuffled-content control (2026-10-13,
   `sipe.eval.content_dependence`; D1 proposed, see section 3)
-- [ ] Global consensus covariance model and direct affine fit
-- [ ] Gaussian mixture G0/G1/G2 comparison with regularized covariances and single-view gating
+- [ ] Global consensus covariance model and direct affine fit (consensus covariance =
+  G0 of Experiment 3, 2026-10-13; 2A = 2B at α=1 checked in `tests/test_mixture.py`)
+- [x] Gaussian mixture G0/G1/G2 comparison with regularized covariances and single-view gating
+  (2026-10-13, SCORPION only; PLISM/HEST pending)
 - [ ] Analytic quadratic Q1/Q2 baseline and linear-fallback sanity test
 - [ ] One conditional-covariance or VAE prototype **only if the decision gates support it**
 - [ ] Unseen-scanner-model PLISM breakdown, paired confidence intervals, and HEST summary

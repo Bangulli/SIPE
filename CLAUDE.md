@@ -113,10 +113,20 @@ W&B), and each row must name the run dir it came from.
 - Experiment 1 (content-dependence diagnostic, no map): `uv run python -m
   sipe.eval.content_dependence --tag <tag> --features-from <feature cache>`; reads train/val
   only, writes `summary.csv`, `likelihood.csv`, `cluster_stats.csv` (table block `content`).
-- New estimators (roadmap Experiments 1–5): fit on cached features, save the fitted operator
-  and a config/provenance in a `runs/bench/...` dir (`sipe.bench.provenance`), and expose the
-  same SCORPION-proxy metrics as the sweep, so `results_tables` can parse them. Settle a shared
-  layout with the first one and document it here.
+- New estimators (roadmap Experiments 2–5) follow the layout of the first one, Experiment 3:
+  - fit code + an `nn.Module` map in `src/sipe/estimators/<name>.py` (numpy float64 fit,
+    float32 buffers; the module is the map that is evaluated *and* saved, so `--posthoc`
+    benchmarks exactly what was screened);
+  - driver `sipe.eval.<name>_sweep --features-from <cache>`: hyperparameters on val only
+    (reuse `soft_shrinkage_sweep.evaluate` / `select_lambda`), the eraser λ=0.5 evaluated
+    in the same run as `reference` (`--reference-map`), test read once;
+  - run dir outputs: `sweep_val.csv`, `summary_val.csv` (probes trained on train),
+    `summary_test.csv` (probes trained on val), `selected.json`, `map_<...>.pt` (module
+    map file), plus estimator-specific CSVs; a parser + block in `results_tables`.
+- Experiment 3 (Gaussian-mixture shrinkage G0/G1/G2-scale/G2, `sipe.estimators.mixture`):
+  `uv run python -m sipe.eval.mixture_sweep --tag <tag> --features-from <feature cache>
+  [--ks 2 4 8]`. Pairing unit: tile-level pairs (consensus over the 5 scanners). Single-view
+  gating in the top-32 PCA subspace of the train views. Table block `mixture`.
 
 # Benchmarks and commands
 
