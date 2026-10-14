@@ -320,6 +320,7 @@ def softshrink_table(root: Path, opts: dict[str, list[str]]) -> str:
     header = [
         "tag",
         "pooling",
+        "deltas",
         "λ",
         *PROXY_COLS.values(),
         "note",
@@ -332,6 +333,8 @@ def softshrink_table(root: Path, opts: dict[str, list[str]]) -> str:
     ):
         source = [f"`{_rel(run.dir)}`", run.source_cells()[2]]
         tag = str(run.config.get("tag"))
+        # Pairing unit of B; runs before --deltas existed used slide-level deltas.
+        level = str(run.config.get("delta_level", "slide"))
         summary = run.dir / "summary_test.csv"
         if not summary.exists():
             n_val = (
@@ -340,7 +343,7 @@ def softshrink_table(root: Path, opts: dict[str, list[str]]) -> str:
                 else 0
             )
             note = f"no test yet ({n_val} val λ rows)"
-            rows.append([tag, "–", "–", *["–"] * len(PROXY_COLS), note, *source])
+            rows.append([tag, "–", level, "–", *["–"] * len(PROXY_COLS), note, *source])
             continue
         selected = _read_json(run.dir / "selected.json")
         for _, r in pd.read_csv(summary).iterrows():
@@ -351,7 +354,7 @@ def softshrink_table(root: Path, opts: dict[str, list[str]]) -> str:
             if r["lambda"] != 0 and sel.get("at_grid_edge"):
                 note += ", at grid edge"
             rows.append(
-                [tag, str(r["pooling"]), f"{r['lambda']:g}"]
+                [tag, str(r["pooling"]), level, f"{r['lambda']:g}"]
                 + [_fmt(r.get(c)) for c in PROXY_COLS]
                 + [note, *source]
             )

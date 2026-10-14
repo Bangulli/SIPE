@@ -10,6 +10,10 @@ with A the shrunk feature covariance and B the second moment of scanner deltas.
 - Fit on the train split only. Deltas are vfm-geom's `scanner_slide_to_mean`: per
   slide, the mean of each scanner minus the mean over scanners. Eraser options are
   those of vfm-geom's soft configs (trace-normalized source, `match_x_trace`).
+- `--deltas` sets the pairing unit of the deltas (roadmap Experiment 2C): `slide`
+  (default, the vfm-geom deltas above), `region` (ROI) or `tile` (per matched tile:
+  each scanner's view minus the mean over scanners of that tile). Only B changes; A,
+  the eraser options and the lambda rule are the same.
 - Sweep on val: cross-scanner retrieval, scanner probes (train -> val) and the region
   probe, the metrics of `sipe.eval.scorpion_retrieval`. The selected lambda is the
   smallest one whose val top-1 gain over lambda = 0 reaches `--select-gain-frac` of
@@ -57,6 +61,8 @@ ERASER_CONFIG = {
     "ridge": 1e-4,
     "svd_tol": 1e-7,
 }
+# Pairing unit of the scanner deltas -> meta column that defines the group.
+DELTA_LEVELS = {"slide": "slide_id", "region": "region_id", "tile": "pair_id"}
 SOURCE = DeltaSourceSpec(
     name="scanner", moment="second_moment", shrinkage=False, normalization="trace"
 )
@@ -116,12 +122,43 @@ def slide_to_mean_deltas(feats: np.ndarray, meta: pd.DataFrame) -> np.ndarray:
     return np.concatenate(deltas).astype(np.float32)
 
 
-def fit_family(feats: np.ndarray, meta: pd.DataFrame, device: torch.device):
+def group_to_mean_deltas(
+    feats: np.ndarray, meta: pd.DataFrame, group: str
+) -> np.ndarray:
+    """Per group: mean(group, scanner) - mean over the group's scanners.
+
+    `slide_to_mean_deltas` for any grouping column; vectorized, so `pair_id` (one
+    group per matched tile) is cheap. Groups seen by fewer than 2 scanners are dropped.
+    Rows are ordered by group, then scanner (B is a second moment: order-free).
+    """
+    g, _ = pd.factorize(meta[group], sort=True)
+    s, _ = pd.factorize(meta["scanner"], sort=True)
+    n_g, n_s = g.max() + 1, s.max() + 1
+    rows = meta["row"].to_numpy()
+    sums = np.zeros((n_g * n_s, feats.shape[1]))
+    np.add.at(sums, g * n_s + s, feats[rows].astype(np.float64))
+    counts = np.bincount(g * n_s + s, minlength=n_g * n_s).reshape(n_g, n_s)
+    means = sums.reshape(n_g, n_s, -1) / np.maximum(counts, 1)[..., None]
+    present = counts > 0
+    centre = (means * present[..., None]).sum(1) / present.sum(1)[:, None]
+    deltas = means - centre[:, None]
+    keep = present & (present.sum(1) >= 2)[:, None]
+    return deltas[keep].astype(np.float32)
+
+
+def fit_family(
+    feats: np.ndarray,
+    meta: pd.DataFrame,
+    device: torch.device,
+    deltas: str = "slide",
+):
+    if deltas == "slide":
+        delta_rows = slide_to_mean_deltas(feats, meta)
+    else:
+        delta_rows = group_to_mean_deltas(feats, meta, DELTA_LEVELS[deltas])
     fitter = PairedDeltaFitter(x_dim=feats.shape[1], device=device, dtype=torch.float32)
     fitter.update_x(torch.from_numpy(feats).to(device))
-    fitter.update_delta_source(
-        SOURCE.name, torch.from_numpy(slide_to_mean_deltas(feats, meta)).to(device)
-    )
+    fitter.update_delta_source(SOURCE.name, torch.from_numpy(delta_rows).to(device))
     return fitter.prepare_soft_eraser_family(delta_sources=[SOURCE], **ERASER_CONFIG)
 
 
@@ -185,6 +222,12 @@ def main(argv: list[str] | None = None) -> Path:
         "--lambdas", nargs="+", type=float, default=list(DEFAULT_LAMBDAS)
     )
     parser.add_argument(
+        "--deltas",
+        default="slide",
+        choices=list(DELTA_LEVELS),
+        help="Pairing unit of the scanner deltas (B); slide = vfm-geom default.",
+    )
+    parser.add_argument(
         "--probe-train-max",
         type=int,
         default=20000,
@@ -242,7 +285,10 @@ def main(argv: list[str] | None = None) -> Path:
             **{k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items()},
             "datamodule": dm_hparams,
             "eraser": {**ERASER_CONFIG, "source": asdict(SOURCE)},
-            "deltas": "scanner_slide_to_mean (vfm-geom-xai)",
+            "delta_level": args.deltas,
+            "deltas": "scanner_slide_to_mean (vfm-geom-xai)"
+            if args.deltas == "slide"
+            else f"scanner_{args.deltas}_to_mean (group: {DELTA_LEVELS[args.deltas]})",
         },
         checkpoint={"encoder": args.encoder, "weights": "pretrained (timm/HF)"},
         features={
@@ -302,7 +348,9 @@ def main(argv: list[str] | None = None) -> Path:
     probe_y = train_meta["domain"].to_numpy()[probe_rows]
     records, families = [], {}
     for pooling in args.poolings:
-        family = fit_family(feats["train"][pooling], train_meta, device)
+        family = fit_family(
+            feats["train"][pooling], train_meta, device, deltas=args.deltas
+        )
         families[pooling] = family
         for lam in args.lambdas:
             eraser = family.make_eraser(lam)
@@ -328,6 +376,7 @@ def main(argv: list[str] | None = None) -> Path:
         region_drop = float(raw["region_probe_acc"] - best["region_probe_acc"])
         selected[pooling] = {
             "lambda": float(best["lambda"]),
+            "deltas": args.deltas,
             "rule": f"smallest lambda with val top-1 gain >= {args.select_gain_frac:g}"
             " x best gain",
             "val_top_1": float(best["top_1_accuracy"]),
@@ -344,6 +393,7 @@ def main(argv: list[str] | None = None) -> Path:
                 "bias": eraser.bias.cpu(),
                 "lambda": float(best["lambda"]),
                 "pooling": pooling,
+                "deltas": args.deltas,
                 "encoder": args.encoder,
                 "eraser_config": ERASER_CONFIG,
             },

@@ -10,6 +10,7 @@ from sipe.eval.soft_shrinkage_sweep import (
     ERASER_CONFIG,
     SOURCE,
     fit_family,
+    group_to_mean_deltas,
     select_lambda,
     slide_to_mean_deltas,
 )
@@ -27,7 +28,12 @@ def synthetic(n_slides: int = 12, n_tiles: int = 30, dim: int = 16, seed: int = 
         for scanner in SCANNERS:
             feats.append(content + shifts[scanner])
             rows += [
-                {"slide_id": f"slide_{slide}", "scanner": scanner, "tile": t}
+                {
+                    "slide_id": f"slide_{slide}",
+                    "scanner": scanner,
+                    "tile": t,
+                    "pair_id": f"slide_{slide}-tile_{t}",
+                }
                 for t in range(n_tiles)
             ]
     meta = pd.DataFrame(rows)
@@ -94,3 +100,32 @@ def test_select_lambda_smallest_reaching_gain_fraction():
     assert select_lambda(rows, 0.95)["lambda"] == 10.0
     assert select_lambda(rows, 0.5)["lambda"] == 0.1
     assert select_lambda(rows, 1.0)["lambda"] == 100.0
+
+
+def test_group_deltas_match_slide_deltas_and_center_per_tile():
+    feats, meta = synthetic()
+    slide = slide_to_mean_deltas(feats, meta).astype(np.float64)
+    group = group_to_mean_deltas(feats, meta, "slide_id").astype(np.float64)
+    # Same rows up to order (groups are sorted): compare the second moments.
+    np.testing.assert_allclose(group.T @ group, slide.T @ slide, rtol=1e-4, atol=1e-3)
+    tile = group_to_mean_deltas(feats, meta, "pair_id")
+    n_tiles = meta["pair_id"].nunique()
+    assert tile.shape == (n_tiles * len(SCANNERS), feats.shape[1])
+    per_tile = tile.reshape(n_tiles, len(SCANNERS), -1).sum(axis=1)
+    np.testing.assert_allclose(per_tile, 0.0, atol=1e-4)
+
+
+def test_group_deltas_drop_single_scanner_groups():
+    feats, meta = synthetic()
+    keep = ~((meta["pair_id"] == "slide_0-tile_0") & (meta["scanner"] != "A"))
+    deltas = group_to_mean_deltas(feats, meta.loc[keep], "pair_id")
+    assert len(deltas) == (meta["pair_id"].nunique() - 1) * len(SCANNERS)
+
+
+def test_tile_deltas_equal_slide_deltas_for_a_constant_shift():
+    """With a pure per-scanner shift, every tile delta is the shift: same eraser."""
+    feats, meta = synthetic()
+    device = torch.device("cpu")
+    slide = fit_family(feats, meta, device).make_eraser(10.0)
+    tile = fit_family(feats, meta, device, deltas="tile").make_eraser(10.0)
+    torch.testing.assert_close(tile.P, slide.P, atol=1e-3, rtol=1e-3)

@@ -101,6 +101,10 @@ W&B), and each row must name the run dir it came from.
     val). The val sweep trains its probes on the train split, so val and test probe numbers
     are not comparable.
   - Outputs: `runs/bench/<stamp>_<host>_<rand>_scorpion_<tag>/` with `eraser_<pool>_lam<λ>.pt`.
+  - `--deltas slide|region|tile` (roadmap 2C): pairing unit of the deltas in B. `slide` is
+    the default and the vfm-geom deltas; `region` / `tile` = each scanner's mean over the
+    region / the tile's view, minus the mean over scanners. Only B changes; reselect λ on
+    val (B is trace-normalized, so λ does not carry over between levels).
 - `--poolings`: `gap` = mean of the patch tokens without prefix tokens (= `backbone_gap`);
   `cls` = token 0. Report which pooling a number uses.
 - PLISM/HEST for post-hoc estimators: `--posthoc <map file>` instead of `--ckpt` in
@@ -131,6 +135,11 @@ W&B), and each row must name the run dir it came from.
 # Benchmarks and commands
 
 Always through uv; never call the environment's Python directly (except to debug the env).
+
+**Long commands are run by the user.** Anything expected to take more than ~5 minutes
+(sweeps on the full cache, PLISM/HEST runs, fits) is not run from here: implement and test
+it (unit tests, a smoke run on a few slides), then give the exact command and say what to
+check afterwards. Short checks and smoke runs are fine to run directly.
 
 ```bash
 uv run pytest                 # skips tests marked slow (sipe fit roundtrips)
