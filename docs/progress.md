@@ -208,6 +208,7 @@ Val: selection split, scanner/region probes trained on train (`summary_val.csv`)
 | Diagnostic: scanner offsets / exchangeability (for Exp 6 design) | done 2026-10-14 (`sipe.eval.scanner_offsets`) | `runs/bench/2026-10-14_11-45-49_claude-box_f4c9_scorpion_scanner_offsets_gap` (offsets table) | – (informs Exp 6; no gate) |
 | Exp 4: quadratic correction Q1/Q2 | full sweep **running** (`runs/bench/2026-10-14_11-53-58_lxbelshark_687d_scorpion_quadratic_gap`): val sweep written (`sweep_val.csv`, all 42 rows), selection / probes / test not yet; implemented 2026-10-14 (`sipe.eval.quadratic_sweep`); base = consensus regression (user decision 2026-10-14: the linear limit must be G0, not the eraser); full sweep not run yet (user command, see open points). Smoke run on the real cache (deleted): in-run G0 reproduces the Exp 3 G0 val top-1 | – | D4 pending |
 | Exp 5/6: conditional covariance / constrained VAE | gated by D3/D4 | – | – |
+| Exp 7: consensus generative model (CGM, `docs/experiment7-draft.md` Step 3), V1-S arm, backbone in the loop | implemented 2026-10-14 (`sipe.model.consensus_gen`, `sipe.training.consensus_gen_module`, `configs/consensus_gen.yaml`); smoke run only (4 steps, deleted); full fit not run (user command, see open points). Draft Steps 0–2 (bookkeeping, offset-span quadratic, feature-cache augmentation study) skipped for now | – | – |
 
 Notes carried over from the CATS phase (details and run dirs in the archive):
 - Soft shrinkage at λ=0.5 nearly matches PairedVAE on the SCORPION proxy (see the
@@ -335,6 +336,16 @@ Experiment 1 reading (all values from `runs/bench/2026-10-13_20-09-24_claude-box
 
 ## 3. Open points / next steps
 
+- Exp 7 CGM fit (user command, one GPU, overnight):
+  `uv run sipe fit --config configs/consensus_gen.yaml`. Arm V1-S: frozen H0-mini GAP,
+  per-scanner likelihood at fit time, nonlinear encoder, linear g; init = linear-Gaussian
+  solution from 40 train batches; 128 locations x 5 views; geometric augmentations only.
+  Check: `val/retrieval_top1_cgm` vs `val/retrieval_top1_backbone` over training
+  (step 0 = linear init), `val/nonlinear_rel` (how far f moved from linear), `val/nll`.
+  Then PLISM with `--posthoc runs/<run>/map_cgm.pt` (written at each checkpoint save) and
+  compare with G0. Caveats: hyperparameters (ρ, β, lrs) not selected on val yet; the
+  draft's `cgm_select` driver (clean-cache val/test with the shared protocol) and LOSO
+  check are not implemented.
 - Exp 6 design (discussed 2026-10-14, not started): consensus VAE whose linear limit is
   G0 (content latent shared by the views, acquisition latent marginalized analytically,
   decoder outputs the consensus). The offset diagnostic rejects exchangeable scanner
