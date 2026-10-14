@@ -9,6 +9,8 @@ Sources, all under runs/ (gitignored, so every row names the dir it came from):
     (sipe.eval.content_dependence)
   - mixture sweep (Experiment 3): runs/bench/*/summary_{val,test}.csv, selected.json,
     likelihood.csv, gating.csv (sipe.eval.mixture_sweep)
+  - scanner offsets (exchangeability diagnostic): runs/bench/*/summary.csv
+    (sipe.eval.scanner_offsets)
   - quadratic sweep (Experiment 4): runs/bench/*/summary_{val,test}.csv,
     selected.json, sweep_val.csv (sipe.eval.quadratic_sweep)
   - training: runs/<run>/wandb/*run-*/*.wandb (local W&B history; no API key needed)
@@ -417,6 +419,78 @@ def content_table(root: Path, opts: dict[str, list[str]]) -> str:
     )
 
 
+# --- scanner offsets (exchangeability diagnostic) ---------------------------------
+
+
+def offsets_table(root: Path, opts: dict[str, list[str]]) -> str:
+    header = [
+        "setting", "scanners", "energy share raw: global / slide / region / tile",
+        "whitened: global / slide / region / tile", "val explained by train offsets"
+        " raw / whitened", "val Δll offset", "val Δll cov", "val Δll offset+cov [WSI"
+        " 95% CI]", "val Δll mixture, no label [WSI 95% CI]", "val resid. scanner acc",
+        "offset span: rank / offset fraction / content share",
+        "bench run dir", "SIPE commit",
+    ]  # fmt: skip
+    rows = []
+    for run in _bench_runs(root, "scorpion_scanner_offsets", opts.get("exclude", [])):
+        source = [f"`{_rel(run.dir)}`", run.source_cells()[2]]
+        summary = run.dir / "summary.csv"
+        if not summary.exists():
+            rows.append(["no results", *["–"] * (len(header) - 3), *source])
+            continue
+        for _, r in pd.read_csv(summary).iterrows():
+
+            def shares(metric: str, r=r) -> str:
+                return " / ".join(
+                    f"{r[f'{metric}_{lv}']:.3f}"
+                    for lv in ("global", "slide", "region", "tile")
+                )
+
+            def ci(model: str, r=r) -> str:
+                return (
+                    f"{r[f'val_diff_{model}']:.3f} [{r[f'val_ci_lo_{model}']:.3f},"
+                    f" {r[f'val_ci_hi_{model}']:.3f}]"
+                )
+
+            rows.append(
+                [
+                    str(r["setting"]),
+                    str(r["n_scanners"]),
+                    shares("raw"),
+                    shares("whitened"),
+                    f"{r['val_offset_explained_raw']:.3f} /"
+                    f" {r['val_offset_explained_whitened']:.3f}",
+                    _fmt(r["val_diff_offset"]),
+                    _fmt(r["val_diff_cov"]),
+                    ci("offset_cov"),
+                    ci("mixture"),
+                    _fmt(r["val_resid_scanner_acc"]),
+                    f"{r['offset_rank']} / {r['offset_fraction']:.3f} /"
+                    f" {r['offset_content_share']:.3f}"
+                    if "offset_rank" in r
+                    else "–",
+                    *source,
+                ]
+            )
+    return (
+        _table(header, rows)
+        + "\n\nTile-level residuals to the consensus over scanners (`summary.csv`)."
+        " Energy shares (train) of E||r||^2 = N_0 split into nested scanner offsets:"
+        " global per scanner, slide × scanner, region × scanner, tile; raw = identity"
+        " metric, whitened = train N_0^-1. Val explained = residual energy removed by"
+        " subtracting the train offsets per scanner. Δll = held-out val log-likelihood"
+        " minus the exchangeable N(0, N_0) model (nats/dim, top residual subspace of"
+        " train, > 0 favors scanner-aware): offset = per-scanner mean, cov ="
+        " per-scanner covariance, offset+cov = both (these use the scanner label);"
+        " mixture = equal-weight mixture of the offset+cov components, label"
+        " marginalized. Resid. scanner acc = argmax component on val residuals"
+        " (given the paired consensus). Offset span = span of the train global"
+        " offsets: offset fraction = share of the residual energy there explained by"
+        " the offsets; content share = share of the consensus variance there (what"
+        " suppressing the span loses)."
+    )
+
+
 # --- mixture sweep (Experiment 3) ----------------------------------------------
 
 
@@ -707,6 +781,7 @@ TABLES = {
     "scorpion": scorpion_table,
     "softshrink": softshrink_table,
     "content": content_table,
+    "offsets": offsets_table,
     "mixture": mixture_table,
     "quadratic": quadratic_table,
     "training": training_table,

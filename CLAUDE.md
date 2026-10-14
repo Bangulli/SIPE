@@ -117,6 +117,10 @@ W&B), and each row must name the run dir it came from.
 - Experiment 1 (content-dependence diagnostic, no map): `uv run python -m
   sipe.eval.content_dependence --tag <tag> --features-from <feature cache>`; reads train/val
   only, writes `summary.csv`, `likelihood.csv`, `cluster_stats.csv` (table block `content`).
+- Scanner-offset diagnostic (exchangeability of the nuisance, no map): `uv run python -m
+  sipe.eval.scanner_offsets --tag <tag> --features-from <feature cache>`; tile-level
+  pairs, train/val only, writes `summary.csv`, `energy.csv`, `likelihood.csv`,
+  `scanner_stats.csv` (table block `offsets`).
 - New estimators (roadmap Experiments 2–5) follow the layout of the first one, Experiment 3:
   - fit code + an `nn.Module` map in `src/sipe/estimators/<name>.py` (numpy float64 fit,
     float32 buffers; the module is the map that is evaluated *and* saved, so `--posthoc`
