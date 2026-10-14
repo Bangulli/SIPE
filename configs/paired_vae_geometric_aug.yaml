@@ -89,6 +89,8 @@ data:
     num_workers: 8
     image_size: 224
     domain_column: scanner
+    horizontal_flip: true # mirroring (default; explicit here)
+    vertical_flip: true
     # ABLATION: legacy default is [blur, affine, grayscale, invert, erasing].
     augmentations: [rot90, zoom]
     group_column: slide_id
