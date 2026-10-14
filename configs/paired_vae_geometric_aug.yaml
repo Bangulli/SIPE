@@ -37,9 +37,11 @@ trainer:
         num_images: 4
         every_n_steps: 100
 # Ablation of configs/paired_vae.yaml (run ysltwjoj): identical except the train
-# augmentations, restricted to geometric ones that keep pixel intensities (flips +
-# RandomAffine(3), nearest interpolation): no blur, grayscale, invert or erasing, so the
-# scanner differences between the two views are not washed out by the augmentation.
+# augmentations, restricted to geometric ones: flips, exact 90-degree rotations and a
+# mild zoom (80-100% area crop resized back; the only resampling step). No blur,
+# grayscale, invert, erasing or small-angle affine (no black corners), so the scanner
+# differences between the views are not washed out. The views of a location share
+# the same flip/rotation/zoom (PairedSCORPIONDataset shared seed).
 model:
   class_path: sipe.training.paired_vae_module.PairedVAEModule
   init_args:
@@ -88,7 +90,7 @@ data:
     image_size: 224
     domain_column: scanner
     # ABLATION: legacy default is [blur, affine, grayscale, invert, erasing].
-    augmentations: [affine]
+    augmentations: [rot90, zoom]
     group_column: slide_id
     val_fraction: 0.1
     test_fraction: 0.1

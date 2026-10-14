@@ -22,15 +22,41 @@ from .utils import (
     resolve_tile_path,
 )
 
+
+class RandomRot90:
+    """Rotate a PIL image by a random multiple of 90 degrees (exact, no interpolation).
+
+    Draws from the torch RNG, so the paired views of a location get the same rotation.
+    """
+
+    _ops = (None, Image.Transpose.ROTATE_90, Image.Transpose.ROTATE_180,
+            Image.Transpose.ROTATE_270)  # fmt: skip
+
+    def __call__(self, image: Image.Image) -> Image.Image:
+        op = self._ops[int(torch.randint(4, (1,)))]
+        return image if op is None else image.transpose(op)
+
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}()"
+
+
 # Train-time augmentations by name (`augmentations` init arg; flips are separate flags).
 # PIL operations run in the listed order, "erasing" always after ToTensor. The default
-# is the original SIPE set (docs/cats-reference.md). Intensity-preserving subset:
-# ["affine"] (nearest interpolation; rotated tiles get black corners).
+# is the original SIPE set (docs/cats-reference.md). All draw from the torch RNG, so
+# PairedSCORPIONDataset gives the views of a location the same parameters.
+# - "affine": RandomAffine(3), nearest interpolation, rotated tiles get black corners;
+# - "rot90": exact 90-degree rotations (pixel permutation);
+# - "zoom": square crop of 80-100% of the area resized back (<= ~1.12x magnification);
+#   bilinear + antialias, so it resamples (mild smoothing), unlike flips/rot90.
 PIL_AUGMENTATIONS = {
-    "blur": lambda: T.GaussianBlur(3),
-    "affine": lambda: T.RandomAffine(3),
-    "grayscale": lambda: T.RandomGrayscale(p=0.1),
-    "invert": lambda: T.RandomInvert(p=0.5),
+    "blur": lambda size: T.GaussianBlur(3),
+    "affine": lambda size: T.RandomAffine(3),
+    "grayscale": lambda size: T.RandomGrayscale(p=0.1),
+    "invert": lambda size: T.RandomInvert(p=0.5),
+    "rot90": lambda size: RandomRot90(),
+    "zoom": lambda size: T.RandomResizedCrop(
+        size, scale=(0.8, 1.0), ratio=(1.0, 1.0), antialias=True
+    ),
 }
 TENSOR_AUGMENTATIONS = {"erasing": lambda: T.RandomErasing(p=0.5)}
 LEGACY_AUGMENTATIONS = ("blur", "affine", "grayscale", "invert", "erasing")
@@ -242,7 +268,9 @@ class SCORPIONDataModule(L.LightningDataModule):
 
         augment = self.augmentations if train else []
         transforms += [
-            PIL_AUGMENTATIONS[a]() for a in augment if a in PIL_AUGMENTATIONS
+            PIL_AUGMENTATIONS[a](self.image_size)
+            for a in augment
+            if a in PIL_AUGMENTATIONS
         ]
 
         transforms.append(T.ToTensor())

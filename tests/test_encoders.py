@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import copy
 from pathlib import Path
 
+import numpy as np
 import pytest
 import timm
 import torch
@@ -91,3 +93,63 @@ def test_augmentations_default_is_legacy_and_configurable(tmp_path: Path) -> Non
     assert ops(SCORPIONDataModule(data_root=tmp_path, augmentations=[]), False) == plain
     with pytest.raises(ValueError, match="unknown augmentations"):
         SCORPIONDataModule(data_root=tmp_path, augmentations=["jitter"])
+
+
+def _structured_root(root: Path) -> Path:
+    """2 slides x 2 locations x 5 scanners, the same random image per location."""
+    import pandas as pd
+    from PIL import Image
+
+    rows = []
+    for slide in (1, 2):
+        for tile in ("0_0", "0_1"):
+            rng = np.random.default_rng(slide * 10 + int(tile[-1]))
+            pixels = rng.integers(0, 256, (32, 32, 3), dtype=np.uint8)
+            for scanner in ("AT2", "DP200", "GT450", "P1000", "Philips"):
+                stem = f"slide_{slide}-sample_1-tile_{tile}-{scanner}"
+                Image.fromarray(pixels).save(root / f"{stem}.png")
+                rows.append({"slide_id": f"slide_{slide}", "sample_id": "sample_1",
+                             "scanner_id": scanner, "tile_id": stem.rsplit("-", 1)[0],
+                             "filename": f"{stem}.png"})  # fmt: skip
+    pd.DataFrame(rows).to_csv(root / "metadata.csv", index=False)
+    return root
+
+
+def test_rot90_is_exact_and_zoom_keeps_size() -> None:
+    from PIL import Image
+
+    from sipe.data.scorpion import PIL_AUGMENTATIONS, RandomRot90
+
+    img = Image.fromarray(
+        torch.randint(0, 256, (16, 16, 3), dtype=torch.uint8).numpy()
+    )
+    pixels = torch.as_tensor(np.asarray(img))
+    seen = set()
+    for seed in range(20):
+        torch.manual_seed(seed)
+        out = torch.as_tensor(np.asarray(RandomRot90()(img)))
+        seen.add(next(k for k in range(4) if torch.equal(out, torch.rot90(pixels, k))))
+    assert seen == {0, 1, 2, 3}
+    assert PIL_AUGMENTATIONS["zoom"](16)(img).size == (16, 16)
+
+
+def test_paired_views_share_geometric_augmentation(tmp_path: Path) -> None:
+    from sipe.data.scorpion import PairedSCORPIONDataModule
+
+    dm = PairedSCORPIONDataModule(
+        _structured_root(tmp_path), batch_size=2, views=5, num_workers=0,
+        image_size=32, val_fraction=0.0, test_fraction=0.0,
+        persistent_workers=False, augmentations=["rot90", "zoom"],
+    )  # fmt: skip
+    dm.setup("fit")
+    plain_base = copy.copy(dm.train_dataset)
+    plain_base.transform = dm._build_transform(train=False)
+    changed = False
+    for _ in range(5):
+        for idx in range(len(dm.train_pairs)):
+            views = dm.train_pairs[idx]
+            for view in views[1:]:  # same pixels per scanner -> same output
+                assert torch.equal(view["image"], views[0]["image"])
+            original = plain_base[int(views[0]["index"])]["image"]
+            changed |= not torch.equal(views[0]["image"], original)
+    assert changed

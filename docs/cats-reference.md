@@ -45,8 +45,10 @@ feature-space models (ScannerVAE, PairedVAE, MathieuGAN, DistMatchVAE). Results 
   refactor (`src/sipe/data/scorpion.py`) applies PIL ops → `ToTensor` → `RandomErasing`, which
   moves Erasing after Grayscale/Invert (an order change). It also adds random flips.
   The set is configurable via `data.init_args.augmentations` (names `blur`, `affine`,
-  `grayscale`, `invert`, `erasing`; unset = this legacy set, unchanged); flips stay separate
-  flags. `configs/paired_vae_geometric_aug.yaml` uses `[affine]` (no intensity change).
+  `grayscale`, `invert`, `erasing`, plus the new `rot90` = exact 90° rotations and `zoom` =
+  80–100 % area crop resized back; unset = this legacy set, unchanged); flips stay separate
+  flags. `configs/paired_vae_geometric_aug.yaml` uses `[rot90, zoom]` + flips. All ops draw
+  from the torch RNG, so the paired views of a location share them (tested).
 
 ## Legacy reference behavior
 
