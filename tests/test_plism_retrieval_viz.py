@@ -87,7 +87,8 @@ def test_main_smoke(tmp_path, monkeypatch):
     )  # fmt: skip
     out = viz.main(
         ["--tag", "t", "--features", *map(str, runs), "--pair", "GMH_S60:GMH_P",
-         "--n-tiles", "460", "--n-examples", "2"]
+         "--n-tiles", "460", "--n-examples", "2",
+         "--figure-kinds", "hits", "misses", "fixed"]
     )  # fmt: skip
     summary = pd.read_csv(out / "summary.csv")
     assert set(summary["direction"]) == {"both", "a->b", "b->a"}
@@ -98,6 +99,24 @@ def test_main_smoke(tmp_path, monkeypatch):
     figs = {p.name for p in (out / "figures").glob("*.png")}
     assert "rank_curve_GMH_S60--GMH_P.png" in figs
     assert any("misses" in f for f in figs) and any("hits" in f for f in figs)
+    assert not any("broken" in f for f in figs)
+
+
+def test_figure_pairs_zero_skips_grids(tmp_path, monkeypatch):
+    slides = ["GMH_S60_to_GMH_S60.tif", "GMH_P_to_GMH_S60.tif"]
+    run = _fake_run(tmp_path, "ref", slides, np.random.default_rng(2), 0.6)
+    bench = tmp_path / "runs" / "bench"
+    monkeypatch.setattr(
+        viz, "new_bench_run_dir",
+        lambda tag: (bench / tag).mkdir(parents=True) or bench / tag,
+    )  # fmt: skip
+    out = viz.main(
+        ["--tag", "t", "--features", str(run), "--pair", "GMH_S60:GMH_P",
+         "--n-tiles", "460", "--figure-pairs", "0"]
+    )  # fmt: skip
+    figs = sorted(p.name for p in (out / "figures").glob("*.png"))
+    assert figs == ["rank_curve_GMH_S60--GMH_P.png"]
+    assert len(pd.read_csv(out / "summary.csv")) == 3
 
 
 def test_tile_reader(tmp_path):

@@ -52,7 +52,10 @@ Diagnostic for the top-k numbers, no new metric. Two steps:
    (`inter-scanner` / `inter-staining` / `joint`), `hr`, per run cosine/top-1/top-10 and
    the top-1 delta vs the reference. `shortlist.csv` (also printed): per shift, the `--k`
    worst/best reference pairs and the largest gains/losses per method (`reason` column).
-2. **Draw neighbours** (bench env, ~1–2 min per pair, mostly figure rendering):
+2. **Draw neighbours** (bench env). Ranks and summaries for every pair take ~1–2 s per
+   pair and representation; tile grids take ~7 s per figure, so they are drawn only for
+   the first `--figure-pairs` pairs (default 3; `-1` = all, `0` = none) and the
+   `--figure-kinds` (default `misses fixed`; also `hits`, `broken`):
    ```bash
    bench/run python -m sipe.bench.plism_retrieval_viz \
        --pairs-csv runs/bench/<plism_pairs run>/shortlist.csv --reason worst_ref gain_<label> \

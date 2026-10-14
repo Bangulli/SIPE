@@ -125,8 +125,9 @@ W&B), and each row must name the run dir it came from.
   `uv run python -m sipe.eval.plism_pairs --runs <ref run> <method runs> --tag <tag>`
   merges the runs' per-pair `metrics.csv` into `pairs.csv` + `shortlist.csv`; then
   `bench/run python -m sipe.bench.plism_retrieval_viz --pairs-csv <shortlist.csv>
-  [--reason worst_ref gain_<label>] [--pair GMH_S60:GMH_P] --tag <tag>` draws the top-10
-  neighbours of sampled hit / miss / fixed / broken queries and writes per-query ranks.
+  [--reason worst_ref gain_<label>] [--pair GMH_S60:GMH_P] --tag <tag>` writes per-query
+  ranks for every pair (fast) and draws top-10 grids only for `--figure-pairs` pairs
+  (default 3) and `--figure-kinds` (default misses, fixed).
 - New estimators (roadmap Experiments 2–5) follow the layout of the first one, Experiment 3:
   - fit code + an `nn.Module` map in `src/sipe/estimators/<name>.py` (numpy float64 fit,
     float32 buffers; the module is the map that is evaluated *and* saved, so `--posthoc`

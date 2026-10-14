@@ -29,6 +29,10 @@ tile units between the top-1's location and the query's (0 = the matching locati
 Cosine in float32 (plismbench casts to float16, so top-k can differ at the 3rd decimal;
 `summary.csv` puts plismbench's per-pair value next to ours where available).
 
+Ranks and summaries are computed for every pair (~1-2 s per pair and representation);
+the tile grids are the slow part (~7 s per figure), so they are drawn only for the first
+`--figure-pairs` pairs (default 3) and the `--figure-kinds` (default misses, fixed).
+
 Figures (`figures/`): per pair, direction and kind (`hits`, `misses`, and per method
 `fixed_<label>` / `broken_<label>` against the reference), rows = sampled queries x
 representations, columns = query | true match | top-10. Frame and tag per tile:
@@ -61,6 +65,7 @@ TOP = 10
 # dataviz reference palette (light): aqua, orange, blue.
 COLORS = {"T": "#1baf7a", "S": "#eb6834", "O": "#2a78d6"}
 MISS_BUCKETS = ((2, 10), (11, 100), (101, None))
+FIGURE_KINDS = ("hits", "misses", "fixed", "broken")
 
 
 @dataclass
@@ -412,6 +417,19 @@ def main(argv: list[str] | None = None) -> Path:
     )
     parser.add_argument("--n-tiles", type=int, default=8139)
     parser.add_argument("--n-examples", type=int, default=8, help="Queries per figure.")
+    parser.add_argument(
+        "--figure-pairs",
+        type=int,
+        default=3,
+        help="Draw tile grids for the first N pairs only (0 = none, -1 = all).",
+    )
+    parser.add_argument(
+        "--figure-kinds",
+        nargs="+",
+        default=["misses", "fixed"],
+        choices=FIGURE_KINDS,
+        help="Tile grids to draw (fixed/broken: per method vs the reference).",
+    )
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--download-dir", type=Path, default=DEFAULT_DOWNLOAD_DIR)
     args = parser.parse_args(argv)
@@ -442,7 +460,7 @@ def main(argv: list[str] | None = None) -> Path:
     tiles = TileReader(args.download_dir.resolve())
     all_queries, summary = [], []
     try:
-        for slide_a, slide_b, reason in pairs:
+        for i_pair, (slide_a, slide_b, reason) in enumerate(pairs):
             name = f"{short_name(slide_a)}--{short_name(slide_b)}"
             logger.info(f"{name} ({reason})")
             tables, results, coords = {}, {}, None
@@ -497,6 +515,8 @@ def main(argv: list[str] | None = None) -> Path:
                 fig_dir / f"rank_curve_{name}.png", f"{name} ({reason})", tables
             )
 
+            if 0 <= args.figure_pairs <= i_pair:
+                continue
             n = coords.shape[0]
             for direction, offset, short in (("a->b", 0, "a2b"), ("b->a", n, "b2a")):
                 per_dir = {
@@ -507,7 +527,7 @@ def main(argv: list[str] | None = None) -> Path:
                 others = {k: v for k, v in per_dir.items() if k != ref_label}
                 kinds = sample_queries(per_dir[ref_label], others, args.n_examples, rng)
                 for kind, rows in kinds.items():
-                    if not len(rows):
+                    if kind.split("_")[0] not in args.figure_kinds or not len(rows):
                         continue
                     stem = re.sub(r"[^\w.-]", "_", f"{name}_{short}_{kind}")
                     plot_queries(
