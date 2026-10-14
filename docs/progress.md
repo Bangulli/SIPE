@@ -48,7 +48,7 @@ Top-1 accuracy, mean over slide pairs (PLISM `results.csv`).
 | paired_vae_ysltwjoj | z_gap | 0.248 (0.041) | 0.261 (0.023) | 0.075 (0.024) | 0.577 (0.078) | 0.543 (0.039) | 0.266 (0.035) | 0.501 (0.052) | 0.371 (0.032) | 0.196 (0.061) | 0.600 (0.056) | 0.364 | `runs/bench/2026-10-13_13-20-25_lxbelshark_2cf4_paired_vae_ysltwjoj` | ysltwjoj | 5da426e* |
 | softshrink_gap_lam0.5 | posthoc_gap | 0.259 (0.043) | 0.268 (0.019) | 0.067 (0.022) | 0.577 (0.079) | 0.534 (0.051) | 0.266 (0.035) | 0.500 (0.048) | 0.382 (0.016) | 0.199 (0.058) | 0.591 (0.055) | 0.364 | `runs/bench/2026-10-13_23-15-00_lxbelshark_c5a0_softshrink_gap_lam0.5` | – | 9ee82ff* |
 | mixture_G0_K1 | posthoc_gap | 0.265 (0.042) | 0.262 (0.029) | 0.067 (0.023) | 0.580 (0.077) | 0.535 (0.052) | 0.266 (0.035) | 0.505 (0.050) | 0.383 (0.023) | 0.178 (0.080) | 0.587 (0.060) | 0.363 | `runs/bench/2026-10-14_10-08-10_lxbelshark_41cf_mixture_G0_K1` | – | 4b6e266 |
-| mixture_G2_K8 | posthoc_gap | no results | – | – | – | – | – | – | – | – | – | – | `runs/bench/2026-10-14_11-53-10_lxbelshark_d3bf_mixture_G2_K8` | – | e1692a2 |
+| mixture_G2_K8 | posthoc_gap | 0.267 (0.047) | 0.266 (0.029) | 0.075 (0.018) | 0.579 (0.076) | 0.529 (0.056) | 0.264 (0.034) | 0.504 (0.051) | 0.376 (0.032) | 0.184 (0.072) | 0.596 (0.062) | 0.364 | `runs/bench/2026-10-14_11-53-10_lxbelshark_d3bf_mixture_G2_K8` | – | e1692a2 |
 
 Pearson mean (std over folds), HEST `dataset_results.json`; average only when all tasks ran.
 
@@ -89,7 +89,7 @@ Held-out test split; probes trained on val (`summary.csv`).
 | softshrink_h0mini_gap | gap | slide | 100 | 0.966 | 0.993 | 0.265 | 0.363 | 0.984 | best val top-1 | `runs/bench/2026-10-13_15-44-35_lxbelshark_d6f7_scorpion_softshrink_h0mini_gap` | 5405d71 |
 | softshrink_h0mini_gap_gain95 | gap | slide | 0 | 0.802 | 0.919 | 0.956 | 0.939 | 0.974 | raw | `runs/bench/2026-10-13_17-45-08_lxbelshark_db10_scorpion_softshrink_h0mini_gap_gain95` | 59e49ee* |
 | softshrink_h0mini_gap_gain95 | gap | slide | 0.5 | 0.959 | 0.991 | 0.684 | 0.455 | 0.985 | smallest lambda with val top-1 gain >= 0.95 x best gain | `runs/bench/2026-10-13_17-45-08_lxbelshark_db10_scorpion_softshrink_h0mini_gap_gain95` | 59e49ee* |
-| softshrink_gap_tile | – | tile | – | – | – | – | – | – | no test yet (13 val λ rows) | `runs/bench/2026-10-14_09-21-09_lxbelshark_c54b_scorpion_softshrink_gap_tile` | 4b6e266 |
+| softshrink_gap_tile | – | tile | – | – | – | – | – | – | no test yet (14 val λ rows) | `runs/bench/2026-10-14_09-21-09_lxbelshark_c54b_scorpion_softshrink_gap_tile` | 4b6e266 |
 
 Test split, proxy protocol (`summary_test.csv`); λ selected on val, rule in the note (`selected.json`).
 
@@ -195,10 +195,10 @@ Val: selection split, scanner/region probes trained on train (`summary_val.csv`)
 | Exp 0: soft shrinkage, new λ rule, SCORPION test | done: λ=0.5 | `runs/bench/2026-10-13_17-45-08_lxbelshark_db10_scorpion_softshrink_h0mini_gap_gain95` | – |
 | Exp 0: PLISM / HEST for the eraser | done (λ=0.5, `--posthoc`) | PLISM `runs/bench/2026-10-13_21-54-02_lxbelshark_e26b_softshrink_gap_lam0.5`, HEST `runs/bench/2026-10-13_23-15-00_lxbelshark_c5a0_softshrink_gap_lam0.5` | D0 taken 2026-10-13: shrinkage beats PairedVAE on PLISM (every row) and keeps the HEST average → main bar to beat (one fit; per-pair/HR breakdown pending) |
 | Exp 1: content-dependence diagnostic | done (`sipe.eval.content_dependence`); both D1 checks done 2026-10-13 (see Exp 3 reading) | `runs/bench/2026-10-13_20-09-24_claude-box_c190_scorpion_content_dep_gap` (content table; `cluster_stats.csv`); tiles: `runs/bench/2026-10-13_21-47-56_claude-box_6fdf_scorpion_mixture_gap/inspection/` | D1 taken (user asked for Exp 3): clear, stable content dependence → Exp 3 first, Exp 4 as competitor |
-| Exp 2: consensus covariance (2A), affine regression (2B), pairing-scale control (2C) | 2A covered by G0 of Exp 3 (α grid; 2A=2B at α=1 is a unit test); 2C implemented (`soft_shrinkage_sweep --deltas slide|region|tile`, 2026-10-14); tile sweep **running** (`runs/bench/2026-10-14_09-21-09_lxbelshark_c54b_scorpion_softshrink_gap_tile`, 10 of 16 val λ rows at the 2026-10-14 table refresh), region sweep not run | `runs/bench/2026-10-13_21-47-56_claude-box_6fdf_scorpion_mixture_gap` (mixture table, G0 row) | D2 pending: G0 (tile-level consensus target) beats the eraser on SCORPION and on PLISM (all four rows; PLISM `runs/bench/2026-10-14_07-10-49_lxbelshark_0721_mixture_G0_K1`, one fit, no intervals yet); needs 2C + HEST |
-| Exp 3: Gaussian mixture G0/G1/G2-scale/G2, K=2/4/8 | SCORPION val + test done (`sipe.eval.mixture_sweep`); PLISM G0 done (`runs/bench/2026-10-14_07-10-49_lxbelshark_0721_mixture_G0_K1`; its git.txt says 9ee82ff dirty with the mixture code untracked = code of 099e76e): above the eraser in all four PLISM rows (PLISM table); PLISM G2_K8 done (`runs/bench/2026-10-14_08-02-19_lxbelshark_2d27_mixture_G2_K8`): below G0 in all four PLISM rows, about at the eraser's level; PLISM G2_K4 done (`runs/bench/2026-10-14_08-54-57_lxbelshark_38d3_mixture_G2_K4`): also below G0 in all four rows; HEST G0 **running** (`runs/bench/2026-10-14_10-08-10_lxbelshark_41cf_mixture_G0_K1`) | `runs/bench/2026-10-13_21-47-56_claude-box_6fdf_scorpion_mixture_gap` (mixture table) | D3 taken 2026-10-14 (user): G2 > G1 ≈ G2-scale on SCORPION, but G2 − G0 is small there and G2_K8 and G2_K4 are both below G0 on PLISM → don't promote G2, no Exp 5; G0 is the candidate linear bar (pending HEST, intervals); next = Exp 4 |
+| Exp 2: consensus covariance (2A), affine regression (2B), pairing-scale control (2C) | 2A covered by G0 of Exp 3 (α grid; 2A=2B at α=1 is a unit test); 2C implemented (`soft_shrinkage_sweep --deltas slide|region|tile`, 2026-10-14); tile sweep **running** (`runs/bench/2026-10-14_09-21-09_lxbelshark_c54b_scorpion_softshrink_gap_tile`, 14 of 16 val λ rows at the 2026-10-14 check; live count in the softshrink table), region sweep not run | `runs/bench/2026-10-13_21-47-56_claude-box_6fdf_scorpion_mixture_gap` (mixture table, G0 row) | D2 pending: G0 (tile-level consensus target) beats the eraser on SCORPION and on PLISM (all four rows; PLISM `runs/bench/2026-10-14_07-10-49_lxbelshark_0721_mixture_G0_K1`, one fit, no intervals yet) and keeps the HEST average (0.363 vs eraser 0.364 and GAP 0.364, `runs/bench/2026-10-14_10-08-10_lxbelshark_41cf_mixture_G0_K1`); needs 2C before calling it |
+| Exp 3: Gaussian mixture G0/G1/G2-scale/G2, K=2/4/8 | SCORPION val + test done (`sipe.eval.mixture_sweep`); PLISM G0 done (`runs/bench/2026-10-14_07-10-49_lxbelshark_0721_mixture_G0_K1`; its git.txt says 9ee82ff dirty with the mixture code untracked = code of 099e76e): above the eraser in all four PLISM rows (PLISM table); PLISM G2_K8 done (`runs/bench/2026-10-14_08-02-19_lxbelshark_2d27_mixture_G2_K8`): below G0 in all four PLISM rows, about at the eraser's level; PLISM G2_K4 done (`runs/bench/2026-10-14_08-54-57_lxbelshark_38d3_mixture_G2_K4`): also below G0 in all four rows; HEST G0 done (`runs/bench/2026-10-14_10-08-10_lxbelshark_41cf_mixture_G0_K1`): average 0.363, the eraser and GAP 0.364; HEST G2_K8 done (`runs/bench/2026-10-14_11-53-10_lxbelshark_d3bf_mixture_G2_K8`): average 0.364 | `runs/bench/2026-10-13_21-47-56_claude-box_6fdf_scorpion_mixture_gap` (mixture table) | D3 taken 2026-10-14 (user): G2 > G1 ≈ G2-scale on SCORPION, but G2 − G0 is small there and G2_K8 and G2_K4 are both below G0 on PLISM → don't promote G2, no Exp 5; G0 is the candidate linear bar (HEST done 2026-10-14; intervals pending); next = Exp 4 |
 | Diagnostic: scanner offsets / exchangeability (for Exp 6 design) | done 2026-10-14 (`sipe.eval.scanner_offsets`) | `runs/bench/2026-10-14_11-45-49_claude-box_f4c9_scorpion_scanner_offsets_gap` (offsets table) | – (informs Exp 6; no gate) |
-| Exp 4: quadratic correction Q1/Q2 | implemented 2026-10-14 (`sipe.eval.quadratic_sweep`); base = consensus regression (user decision 2026-10-14: the linear limit must be G0, not the eraser); full sweep not run yet (user command, see open points). Smoke run on the real cache (deleted): in-run G0 reproduces the Exp 3 G0 val top-1 | – | D4 pending |
+| Exp 4: quadratic correction Q1/Q2 | full sweep **running** (`runs/bench/2026-10-14_11-53-58_lxbelshark_687d_scorpion_quadratic_gap`): val sweep written (`sweep_val.csv`, all 42 rows), selection / probes / test not yet; implemented 2026-10-14 (`sipe.eval.quadratic_sweep`); base = consensus regression (user decision 2026-10-14: the linear limit must be G0, not the eraser); full sweep not run yet (user command, see open points). Smoke run on the real cache (deleted): in-run G0 reproduces the Exp 3 G0 val top-1 | – | D4 pending |
 | Exp 5/6: conditional covariance / constrained VAE | gated by D3/D4 | – | – |
 
 Notes carried over from the CATS phase (details and run dirs in the archive):
@@ -216,6 +216,27 @@ Experiment 0, external (D0; PLISM and HEST tables):
   0.364, the same as GAP and PairedVAE (`runs/bench/2026-10-13_23-15-00_lxbelshark_c5a0_softshrink_gap_lam0.5`);
   per task within 0.012 of GAP (largest: COAD 0.268 vs 0.256, PRAD 0.382 vs 0.371).
 - Not yet done: the per-slide-pair / HR-stain breakdown and group-aware intervals; one fit.
+
+HEST reading for G0 and G2_K8 (2026-10-14; HEST table, `runs/bench/2026-10-14_10-08-10_lxbelshark_41cf_mixture_G0_K1`, `runs/bench/2026-10-14_11-53-10_lxbelshark_d3bf_mixture_G2_K8`):
+- G0 keeps the HEST average: 0.363, against 0.364 for the eraser
+  (`runs/bench/2026-10-13_23-15-00_lxbelshark_c5a0_softshrink_gap_lam0.5`) and for GAP
+  (`runs/bench/2026-10-13_11-03-53_lxbelshark_8f0f_h0_mini_gap_ref`). Largest per-task
+  change vs GAP: READ 0.178 vs 0.202, but the READ fold sd is 0.080 (GAP 0.049); PRAD
+  0.383 vs 0.371. G2_K8: average 0.364, READ 0.184.
+- With the PLISM result (G0 above the eraser in all four rows), G0 is better on robustness
+  and equal on utility: the linear bar for Exp 4 and later. Still one fit, no intervals.
+
+Exp 4 partial reading (val sweep only, `runs/bench/2026-10-14_11-53-58_lxbelshark_687d_scorpion_quadratic_gap` `sweep_val.csv`; selection, probes and test not
+written yet, so nothing is selected):
+- G0 (γ = inf) val top-1 0.978735. Q1 stays at G0 (best 0.978857, m=16 γ=0.1).
+- Q2 rises as γ falls: m=16 0.983122 at γ=0.001, m=8 0.981082 at γ=0.01. The Q2-rand
+  control also rises, less: m=16 0.980653, m=8 0.979469 (γ=0.001). So part of the Q2 gain
+  is generic extra capacity, part is the content × nuisance structure.
+- Val consensus MSE: Q2 m=16 0.0143149 (γ=0.01) vs G0 0.0151742; Q2-rand m=16 best
+  0.0149636 (γ=0.1).
+- The best Q2 top-1 is at the smallest γ of the grid (0.001): the grid edge, less
+  regularization might go further; the selection rule (largest γ at 95% of the best gain)
+  will be read from `selected.json`.
 
 Scanner-offset reading (2026-10-14; all values from `runs/bench/2026-10-14_11-45-49_claude-box_f4c9_scorpion_scanner_offsets_gap`,
 offsets table, `likelihood.csv`, `scanner_stats.csv`). Question: is G0's pooled,
@@ -324,7 +345,7 @@ Experiment 1 reading (all values from `runs/bench/2026-10-13_20-09-24_claude-box
   The question is whether G2's content-dependent N_k adds anything over G0 outside
   SCORPION, and whether G0 keeps its lead over the eraser on PLISM.
   Status 2026-10-14: G0 PLISM done (above the eraser in every row, see PLISM table);
-  G2_K8 and G2_K4 PLISM done (both below G0 in every row); G0 HEST running; next per-pair / HR breakdown with
+  G2_K8 and G2_K4 PLISM done (both below G0 in every row); G0 and G2_K8 HEST done (see the G0 HEST reading); next per-pair / HR breakdown with
   group-aware intervals for G0 vs eraser.
 - Background tiles: add a tissue fraction per tile (cheap image threshold) and report
   SCORPION retrieval on tissue tiles only, to see whether the G2 − G0 gain comes from the
