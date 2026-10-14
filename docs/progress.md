@@ -355,6 +355,12 @@ Experiment 1 reading (all values from `runs/bench/2026-10-13_20-09-24_claude-box
   Status 2026-10-14: G0 PLISM done (above the eraser in every row, see PLISM table);
   G2_K8 and G2_K4 PLISM done (both below G0 in every row); G0 and G2_K8 HEST done (see the G0 HEST reading); next per-pair / HR breakdown with
   group-aware intervals for G0 vs eraser.
+- Augmentation check (2026-10-14, config ready, not run): PairedVAE as `ysltwjoj`
+  (`configs/paired_vae.yaml`) but train augmentations restricted to flips +
+  RandomAffine(3) (`configs/paired_vae_geometric_aug.yaml`, `augmentations: [affine]`):
+  does dropping blur/grayscale/invert/erasing (which wash out scanner differences between
+  the views) change PLISM/SCORPION? Compare with `ysltwjoj` (PLISM
+  `runs/bench/2026-10-10_17-32-32_lxbelshark_95c5_paired_vae_ysltwjoj`). One seed each.
 - PLISM retrieval viz (tools added 2026-10-14, `docs/benchmarks.md`): pair table
   `runs/bench/2026-10-14_15-13-12_claude-box_1353_plism_pairs_gap_g0_eraser` (GAP ref, G0,
   eraser λ=0.5; merge of the official per-pair metrics, no recomputation). Smoke only so

@@ -69,3 +69,25 @@ def test_datamodule_normalization_follows_encoder(tmp_path: Path) -> None:
         assert isinstance(normalize, T.Normalize)
         assert tuple(normalize.mean) == meta.mean
         assert tuple(normalize.std) == meta.std
+
+
+def test_augmentations_default_is_legacy_and_configurable(tmp_path: Path) -> None:
+    def ops(dm: SCORPIONDataModule, train: bool) -> list[type]:
+        return [type(t) for t in dm._build_transform(train=train).transforms]
+
+    legacy = [
+        T.Resize, T.RandomHorizontalFlip, T.RandomVerticalFlip, T.GaussianBlur,
+        T.RandomAffine, T.RandomGrayscale, T.RandomInvert, T.ToTensor,
+        T.RandomErasing, T.Normalize,
+    ]  # fmt: skip
+    assert ops(SCORPIONDataModule(data_root=tmp_path), True) == legacy
+    geometric = SCORPIONDataModule(data_root=tmp_path, augmentations=["affine"])
+    assert ops(geometric, True) == [
+        T.Resize, T.RandomHorizontalFlip, T.RandomVerticalFlip, T.RandomAffine,
+        T.ToTensor, T.Normalize,
+    ]  # fmt: skip
+    plain = [T.Resize, T.ToTensor, T.Normalize]
+    assert ops(geometric, False) == plain
+    assert ops(SCORPIONDataModule(data_root=tmp_path, augmentations=[]), False) == plain
+    with pytest.raises(ValueError, match="unknown augmentations"):
+        SCORPIONDataModule(data_root=tmp_path, augmentations=["jitter"])

@@ -44,6 +44,9 @@ feature-space models (ScannerVAE, PairedVAE, MathieuGAN, DistMatchVAE). Results 
   a tensor, so BPTorch probably fed tensors (timm 1.x `MaybeToTensor` passes them through). The
   refactor (`src/sipe/data/scorpion.py`) applies PIL ops → `ToTensor` → `RandomErasing`, which
   moves Erasing after Grayscale/Invert (an order change). It also adds random flips.
+  The set is configurable via `data.init_args.augmentations` (names `blur`, `affine`,
+  `grayscale`, `invert`, `erasing`; unset = this legacy set, unchanged); flips stay separate
+  flags. `configs/paired_vae_geometric_aug.yaml` uses `[affine]` (no intensity change).
 
 ## Legacy reference behavior
 

@@ -22,6 +22,19 @@ from .utils import (
     resolve_tile_path,
 )
 
+# Train-time augmentations by name (`augmentations` init arg; flips are separate flags).
+# PIL operations run in the listed order, "erasing" always after ToTensor. The default
+# is the original SIPE set (docs/cats-reference.md). Intensity-preserving subset:
+# ["affine"] (nearest interpolation; rotated tiles get black corners).
+PIL_AUGMENTATIONS = {
+    "blur": lambda: T.GaussianBlur(3),
+    "affine": lambda: T.RandomAffine(3),
+    "grayscale": lambda: T.RandomGrayscale(p=0.1),
+    "invert": lambda: T.RandomInvert(p=0.5),
+}
+TENSOR_AUGMENTATIONS = {"erasing": lambda: T.RandomErasing(p=0.5)}
+LEGACY_AUGMENTATIONS = ("blur", "affine", "grayscale", "invert", "erasing")
+
 
 class SCORPIONTileDataset(Dataset):
     """Single-view SCORPION tile dataset.
@@ -132,6 +145,7 @@ class SCORPIONDataModule(L.LightningDataModule):
         encoder: str = "h0-mini",
         horizontal_flip: bool = True,
         vertical_flip: bool = True,
+        augmentations: list[str] | None = None,
         path_column: str = "path",
         filename_column: str = "filename",
         domain_column: str = "scanner",
@@ -174,6 +188,12 @@ class SCORPIONDataModule(L.LightningDataModule):
         self.std = meta.std
         self.horizontal_flip = bool(horizontal_flip)
         self.vertical_flip = bool(vertical_flip)
+        self.augmentations = list(
+            LEGACY_AUGMENTATIONS if augmentations is None else augmentations
+        )
+        known = {*PIL_AUGMENTATIONS, *TENSOR_AUGMENTATIONS}
+        if unknown := [a for a in self.augmentations if a not in known]:
+            raise ValueError(f"unknown augmentations {unknown}; known: {sorted(known)}")
 
         self.path_column = path_column
         self.filename_column = filename_column
@@ -220,20 +240,16 @@ class SCORPIONDataModule(L.LightningDataModule):
         if train and self.vertical_flip:
             transforms.append(T.RandomVerticalFlip())
 
-        if train:
-            transforms.extend(
-                [
-                    T.GaussianBlur(3),
-                    T.RandomAffine(3),
-                    T.RandomGrayscale(p=0.1),
-                    T.RandomInvert(p=0.5),
-                ]
-            )
+        augment = self.augmentations if train else []
+        transforms += [
+            PIL_AUGMENTATIONS[a]() for a in augment if a in PIL_AUGMENTATIONS
+        ]
 
         transforms.append(T.ToTensor())
 
-        if train:
-            transforms.append(T.RandomErasing(p=0.5))
+        transforms += [
+            TENSOR_AUGMENTATIONS[a]() for a in augment if a in TENSOR_AUGMENTATIONS
+        ]
 
         transforms.append(T.Normalize(mean=self.mean, std=self.std))
 
