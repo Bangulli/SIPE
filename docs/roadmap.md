@@ -298,6 +298,13 @@ $$
 
 With fixed features, this is a ridge-type quadratic optimization with an **analytic minimizer** (including regularization on the nonlinear block only). It returns the original full linear optimum as the nonlinear penalty becomes large, provided the same input statistics/objective and pairing protocol are used.
 
+> **Update 2026-10-14 (D3 → Experiment 4, user decision):** the base objective is the
+> consensus regression of Experiment 2B, $\min_W \mathbb E\|W\phi(u)-(\hat c-\mu)\|^2
+> + \gamma\|W_q\|_F^2$ (tile-level pairs), not the eraser objective above: its
+> $\gamma\to\infty$ limit is G0, which beats the eraser on SCORPION and PLISM. Directions:
+> $v_j$ = generalized eigenvectors of $(N, C+N)$, $w_j$ = PCA of $C$; plus a Q2 control with
+> random $v_k$. Implementation `sipe.estimators.quadratic`, `sipe.eval.quadratic_sweep`.
+
 ### Two variants, not a large search
 
 - **Q1 — Nuisance squares:** $q_j(u)=(v_j^\top u)^2$ for a few fixed generalized nuisance directions $v_j$.

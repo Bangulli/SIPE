@@ -131,6 +131,12 @@ W&B), and each row must name the run dir it came from.
   `uv run python -m sipe.eval.mixture_sweep --tag <tag> --features-from <feature cache>
   [--ks 2 4 8]`. Pairing unit: tile-level pairs (consensus over the 5 scanners). Single-view
   gating in the top-32 PCA subspace of the train views. Table block `mixture`.
+- Experiment 4 (quadratic correction Q1/Q2/Q2-rand, `sipe.estimators.quadratic`):
+  `uv run python -m sipe.eval.quadratic_sweep --tag <tag> --features-from <feature cache>
+  [--ms 8 16]`. Base = consensus ridge regression (Exp 2B), not the eraser objective
+  (decision 2026-10-14): γ = inf is exactly G0 (in-run G0 row). Pairing unit: tile-level
+  pairs. γ = ridge on the quadratic block, largest γ reaching 95% of the best val gain
+  over G0. Table block `quadratic`.
 
 # Benchmarks and commands
 

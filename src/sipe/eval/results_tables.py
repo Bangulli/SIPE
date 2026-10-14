@@ -9,6 +9,8 @@ Sources, all under runs/ (gitignored, so every row names the dir it came from):
     (sipe.eval.content_dependence)
   - mixture sweep (Experiment 3): runs/bench/*/summary_{val,test}.csv, selected.json,
     likelihood.csv, gating.csv (sipe.eval.mixture_sweep)
+  - quadratic sweep (Experiment 4): runs/bench/*/summary_{val,test}.csv,
+    selected.json, sweep_val.csv (sipe.eval.quadratic_sweep)
   - training: runs/<run>/wandb/*run-*/*.wandb (local W&B history; no API key needed)
 
 progress.md holds generated blocks:
@@ -513,6 +515,87 @@ def mixture_table(root: Path, opts: dict[str, list[str]]) -> str:
     )
 
 
+# --- quadratic correction (Experiment 4) ---------------------------------------
+
+
+def quadratic_table(root: Path, opts: dict[str, list[str]]) -> str:
+    header = [
+        "model", "features", "γ", "val top-1", "val Δtop-1 vs G0",
+        "val consensus MSE / G0 (train)", "val region probe", "test top-1",
+        "test top-5", "test scanner probe logreg / MLP", "test region probe", "note",
+        "bench run dir", "SIPE commit",
+    ]  # fmt: skip
+    rows = []
+    for run in _bench_runs(root, "scorpion_quadratic_sweep", opts.get("exclude", [])):
+        source = [f"`{_rel(run.dir)}`", run.source_cells()[2]]
+        if not (run.dir / "summary_val.csv").exists():
+            rows.append(["no results", *["–"] * (len(header) - 3), *source])
+            continue
+        selected = _read_json(run.dir / "selected.json")
+        test = {}
+        if (run.dir / "summary_test.csv").exists():
+            test = {
+                r["name"]: r
+                for _, r in pd.read_csv(run.dir / "summary_test.csv").iterrows()
+            }
+        summary = pd.read_csv(run.dir / "summary_val.csv")
+        g0_val = summary.loc[summary["name"] == "G0", "top_1_accuracy"]
+        for _, r in summary.iterrows():
+            sel = selected.get(r["name"], {})
+            t = test.get(r["name"], {})
+            name = {"raw": "raw", "reference": "reference (eraser)", "G0": "G0"}.get(
+                r["name"], f"{sel.get('variant')} m={sel.get('m')}"
+            )
+            note = []
+            if sel.get("fallback_to_g0"):
+                note.append("no γ beats G0 (= G0)")
+            if sel.get("region_guard_violated"):
+                note.append("region guard violated")
+            if sel.get("at_grid_edge"):
+                note.append("γ at grid edge")
+            mse = (
+                f"{sel['val_mse'] / sel['val_mse_g0']:.3f}"
+                f" ({sel['train_mse'] / sel['train_mse_g0']:.3f})"
+                if sel
+                else "–"
+            )
+            delta = (
+                f"{r['top_1_accuracy'] - float(g0_val.iloc[0]):+.4f}"
+                if len(g0_val) and r["name"] not in ("raw", "reference")
+                else "–"
+            )
+            rows.append(
+                [
+                    name,
+                    str(sel["n_features"]) if sel else "–",
+                    _fmt(sel.get("gamma"), 3) if sel else "–",
+                    _fmt(r["top_1_accuracy"]),
+                    delta,
+                    mse,
+                    _fmt(r["region_probe_acc"]),
+                    _fmt(t.get("top_1_accuracy")),
+                    _fmt(t.get("top_5_accuracy")),
+                    " / ".join(
+                        _fmt(t.get(c)) for c in ("probe_logreg_acc", "probe_mlp_acc")
+                    ),
+                    _fmt(t.get("region_probe_acc")),
+                    ", ".join(note) or "–",
+                    *source,
+                ]
+            )  # fmt: skip
+    return (
+        _table(header, rows)
+        + "\n\nVal: selection split, scanner/region probes trained on train"
+        " (`summary_val.csv`); γ = ridge on the quadratic block, the largest γ whose"
+        " val top-1 gain over G0 reaches 95% of the best gain (γ = inf is G0;"
+        " `selected.json`). Features = number of quadratic terms (Q1: m squares, Q2:"
+        " m × m products). Consensus MSE = mean squared error to the tile consensus"
+        " per dim, ratio to G0 on val (train in brackets; `sweep_val.csv`). Test: proxy"
+        " protocol, probes trained on val (`summary_test.csv`). G0 is fitted in the"
+        " same run; reference = soft-shrinkage eraser map."
+    )
+
+
 # --- training runs (local W&B history) -----------------------------------------
 
 
@@ -625,6 +708,7 @@ TABLES = {
     "softshrink": softshrink_table,
     "content": content_table,
     "mixture": mixture_table,
+    "quadratic": quadratic_table,
     "training": training_table,
 }
 
