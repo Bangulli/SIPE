@@ -40,6 +40,36 @@ bench/run python -m sipe.bench.hest  --posthoc runs/bench/<fit run>/<map>.pt --t
 `provenance.json` → `checkpoint` then holds the map file (sha256, kind, scalar fields such
 as `lambda`) and the fit run dir with its `git.txt`.
 
+## Inspect PLISM retrieval (which tiles are retrieved)
+
+Diagnostic for the top-k numbers, no new metric. Two steps:
+
+1. **Pick pairs** (main env, seconds; reads the runs' `metrics/8139_tiles/<tag>/metrics.csv`):
+   ```bash
+   uv run python -m sipe.eval.plism_pairs --runs <gap ref run> <method run> ... --tag <tag>
+   ```
+   The first run is the reference. `pairs.csv`: one row per slide pair, `shift`
+   (`inter-scanner` / `inter-staining` / `joint`), `hr`, per run cosine/top-1/top-10 and
+   the top-1 delta vs the reference. `shortlist.csv` (also printed): per shift, the `--k`
+   worst/best reference pairs and the largest gains/losses per method (`reason` column).
+2. **Draw neighbours** (bench env, ~1–2 min per pair, mostly figure rendering):
+   ```bash
+   bench/run python -m sipe.bench.plism_retrieval_viz \
+       --pairs-csv runs/bench/<plism_pairs run>/shortlist.csv --reason worst_ref gain_<label> \
+       [--pair GMH_S60:GMH_P] [--max-pairs N] --tag <tag>
+   ```
+   Representations default to the runs of the `plism_pairs` run (same reference);
+   `--features` overrides. Protocol as plismbench `TopkAccuracy` (candidates = both
+   slides minus the query, both directions), cosine in float32 instead of float16.
+   Outputs: `queries.csv.gz` (per query `rank_true`, `rank_true_cross` = rank among the
+   other slide only, `n_same_top10`, `grid_dist_top1`, cosines), `summary.csv` (per pair
+   and direction; misses: rank quartiles, share with a same-slide top-1, share with
+   `rank_true_cross == 1` = lost only to same-slide tiles; hit/miss transitions vs the
+   reference; plismbench's per-pair top-1/10 next to ours), and `figures/`: query | true
+   match | top-10 grids for `hits`, `misses` (stratified by rank) and `fixed_<label>` /
+   `broken_<label>`, tagged T (true) / S (same slide as the query) / O (other slide, wrong
+   location), plus `rank_curve_<pair>.png` (top-r accuracy for every r).
+
 ## Benchmark a checkpoint
 
 The checkpoint must be self-contained, i.e. written at or after `6ccb1e3`. The

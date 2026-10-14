@@ -89,7 +89,7 @@ Held-out test split; probes trained on val (`summary.csv`).
 | softshrink_h0mini_gap | gap | slide | 100 | 0.966 | 0.993 | 0.265 | 0.363 | 0.984 | best val top-1 | `runs/bench/2026-10-13_15-44-35_lxbelshark_d6f7_scorpion_softshrink_h0mini_gap` | 5405d71 |
 | softshrink_h0mini_gap_gain95 | gap | slide | 0 | 0.802 | 0.919 | 0.956 | 0.939 | 0.974 | raw | `runs/bench/2026-10-13_17-45-08_lxbelshark_db10_scorpion_softshrink_h0mini_gap_gain95` | 59e49ee* |
 | softshrink_h0mini_gap_gain95 | gap | slide | 0.5 | 0.959 | 0.991 | 0.684 | 0.455 | 0.985 | smallest lambda with val top-1 gain >= 0.95 x best gain | `runs/bench/2026-10-13_17-45-08_lxbelshark_db10_scorpion_softshrink_h0mini_gap_gain95` | 59e49ee* |
-| softshrink_gap_tile | – | tile | – | – | – | – | – | – | no test yet (14 val λ rows) | `runs/bench/2026-10-14_09-21-09_lxbelshark_c54b_scorpion_softshrink_gap_tile` | 4b6e266 |
+| softshrink_gap_tile | – | tile | – | – | – | – | – | – | no test yet (15 val λ rows) | `runs/bench/2026-10-14_09-21-09_lxbelshark_c54b_scorpion_softshrink_gap_tile` | 4b6e266 |
 
 Test split, proxy protocol (`summary_test.csv`); λ selected on val, rule in the note (`selected.json`).
 
@@ -182,7 +182,15 @@ random nuisance directions (control).
 
 | model | features | γ | val top-1 | val Δtop-1 vs G0 | val consensus MSE / G0 (train) | val region probe | test top-1 | test top-5 | test scanner probe logreg / MLP | test region probe | note | bench run dir | SIPE commit |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| no results | – | – | – | – | – | – | – | – | – | – | – | `runs/bench/2026-10-14_11-53-58_lxbelshark_687d_scorpion_quadratic_gap` | e1692a2 |
+| raw | – | – | 0.887 | – | – | 0.978 | – | – | – / – | – | – | `runs/bench/2026-10-14_11-53-58_lxbelshark_687d_scorpion_quadratic_gap` | e1692a2 |
+| reference (eraser) | – | – | 0.973 | – | – | 0.985 | – | – | – / – | – | – | `runs/bench/2026-10-14_11-53-58_lxbelshark_687d_scorpion_quadratic_gap` | e1692a2 |
+| G0 | – | – | 0.979 | +0.0000 | – | 0.986 | – | – | – / – | – | – | `runs/bench/2026-10-14_11-53-58_lxbelshark_687d_scorpion_quadratic_gap` | e1692a2 |
+| Q1 m=8 | 8 | 1.000 | 0.979 | +0.0001 | 0.999 (0.999) | 0.986 | – | – | – / – | – | – | `runs/bench/2026-10-14_11-53-58_lxbelshark_687d_scorpion_quadratic_gap` | e1692a2 |
+| Q1 m=16 | 16 | 0.100 | 0.979 | +0.0002 | 0.996 (0.996) | 0.986 | – | – | – / – | – | – | `runs/bench/2026-10-14_11-53-58_lxbelshark_687d_scorpion_quadratic_gap` | e1692a2 |
+| Q2 m=8 | 64 | 0.010 | 0.981 | +0.0024 | 0.960 (0.959) | 0.986 | – | – | – / – | – | – | `runs/bench/2026-10-14_11-53-58_lxbelshark_687d_scorpion_quadratic_gap` | e1692a2 |
+| Q2 m=16 | 256 | 0.010 | 0.983 | +0.0043 | 0.943 (0.930) | 0.986 | – | – | – / – | – | – | `runs/bench/2026-10-14_11-53-58_lxbelshark_687d_scorpion_quadratic_gap` | e1692a2 |
+| Q2-rand m=8 | 64 | 0.010 | 0.980 | +0.0008 | 0.995 (0.988) | 0.987 | – | – | – / – | – | – | `runs/bench/2026-10-14_11-53-58_lxbelshark_687d_scorpion_quadratic_gap` | e1692a2 |
+| Q2-rand m=16 | 256 | 0.010 | 0.981 | +0.0019 | 0.991 (0.964) | 0.987 | – | – | – / – | – | – | `runs/bench/2026-10-14_11-53-58_lxbelshark_687d_scorpion_quadratic_gap` | e1692a2 |
 
 Val: selection split, scanner/region probes trained on train (`summary_val.csv`); γ = ridge on the quadratic block, the largest γ whose val top-1 gain over G0 reaches 95% of the best gain (γ = inf is G0; `selected.json`). Features = number of quadratic terms (Q1: m squares, Q2: m × m products). Consensus MSE = mean squared error to the tile consensus per dim, ratio to G0 on val (train in brackets; `sweep_val.csv`). Test: proxy protocol, probes trained on val (`summary_test.csv`). G0 is fitted in the same run; reference = soft-shrinkage eraser map.
 
@@ -347,6 +355,14 @@ Experiment 1 reading (all values from `runs/bench/2026-10-13_20-09-24_claude-box
   Status 2026-10-14: G0 PLISM done (above the eraser in every row, see PLISM table);
   G2_K8 and G2_K4 PLISM done (both below G0 in every row); G0 and G2_K8 HEST done (see the G0 HEST reading); next per-pair / HR breakdown with
   group-aware intervals for G0 vs eraser.
+- PLISM retrieval viz (tools added 2026-10-14, `docs/benchmarks.md`): pair table
+  `runs/bench/2026-10-14_15-13-12_claude-box_1353_plism_pairs_gap_g0_eraser` (GAP ref, G0,
+  eraser λ=0.5; merge of the official per-pair metrics, no recomputation). Smoke only so
+  far: `runs/bench/2026-10-14_15-40-06_claude-box_cb44_plism_retrieval_viz_smoke_gmh`
+  (one pair, GMH_S60–GMH_P, 460 tiles, not 8,139: not a result). Next: run the viz on the
+  shortlist at 8,139 tiles (`--reason worst_ref gain_mixture_G0_K1`) and read
+  `miss_frac_top1_same_slide` / `miss_frac_cross_rank1` in `summary.csv`. These measure
+  whether misses lose to same-acquisition tiles rather than to other content.
 - Background tiles: add a tissue fraction per tile (cheap image threshold) and report
   SCORPION retrieval on tissue tiles only, to see whether the G2 − G0 gain comes from the
   background cluster.
