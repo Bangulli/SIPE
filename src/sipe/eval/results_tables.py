@@ -1,7 +1,8 @@
 """Results tables for docs/progress.md, read from run dirs (no metric typed by hand).
 
 Sources, all under runs/ (gitignored, so every row names the dir it came from):
-  - PLISM: runs/bench/*/metrics/<n>_tiles/<tag>/results.csv (top-1, mean part)
+  - PLISM: runs/bench/*/metrics/<n>_tiles/<tag>/results.csv (top-1, mean part); with
+    drop_stain=, the same means recomputed from the sibling per-pair metrics.csv
   - PLISM per pair vs a reference: runs/bench/*/metrics/<n>_tiles/<tag>/metrics.csv
     (plismbench per-pair metrics, merged as in sipe.eval.plism_pairs)
   - HEST: runs/bench/*/results/*/dataset_results.json
@@ -31,6 +32,8 @@ Options on the opening marker (space-separated key=value):
   min_steps=<n>             training only: skip runs that stopped before step n
   ref=<tag>                 plism_pairs only: reference PLISM run (by tag)
   tags=<tag>[,<tag>]        plism_pairs only: methods compared with ref
+  drop_stain=<s>[,<s>]      plism / plism_pairs: drop the slide pairs with one of these
+                            stains on either side (e.g. HR), then aggregate as usual
 
   uv run python -m sipe.eval.results_tables          # print every table
   uv run python -m sipe.eval.results_tables --write  # refresh the blocks in progress.md
@@ -218,7 +221,37 @@ def read_plism_results(results_csv: Path) -> dict[str, float]:
     }
 
 
+def _keeps_stains(df: pd.DataFrame, drop: list[str]) -> pd.Series:
+    """Pairs with none of the `drop` stains on either side."""
+    return ~(df["staining_a"].isin(drop) | df["staining_b"].isin(drop))
+
+
+def plism_top1_from_metrics(
+    metrics_csv: Path, drop_stains: list[str]
+) -> dict[str, float]:
+    """Top-1 mean per row from plismbench's per-pair metrics.csv, as in plismbench
+    `get_results` (same row masks), after dropping pairs with a `drop_stains` stain."""
+    df = pd.read_csv(metrics_csv)
+    df = df[_keeps_stains(df, drop_stains)]
+    same_stain = df["staining_a"] == df["staining_b"]
+    same_scanner = df["scanner_a"] == df["scanner_b"]
+    masks = {
+        "inter-scanner": same_stain,
+        "inter-staining": same_scanner,
+        "scanner + staining": ~same_stain & ~same_scanner,
+        "all": pd.Series(True, index=df.index),
+    }
+    return {k: float(df.loc[m, "top_1_accuracy"].mean()) for k, m in masks.items()}
+
+
 def plism_table(root: Path, opts: dict[str, list[str]]) -> str:
+    drop = opts.get("drop_stain", [])
+
+    def read(results_csv: Path) -> dict[str, float]:
+        if not drop:
+            return read_plism_results(results_csv)
+        return plism_top1_from_metrics(results_csv.with_name("metrics.csv"), drop)
+
     header = ["tag", "repr", *PLISM_ROWS.values(), *SOURCE_HEADER]
     rows = []
     for run in _bench_runs(root, "plism", opts.get("exclude", [])):
@@ -228,23 +261,28 @@ def plism_table(root: Path, opts: dict[str, list[str]]) -> str:
             tag = str(run.config.get("tag"))
             rows.append([tag, run.representation, *empty, *run.source_cells()])
             continue
-        top1 = read_plism_results(found[0])
+        top1 = read(found[0])
         rows.append(
             [str(run.config.get("tag")), run.representation]
             + [_fmt(top1.get(k)) for k in PLISM_ROWS.values()]
             + run.source_cells()
         )
     for extra in opts.get("extra", []):
-        top1 = read_plism_results(SIPE_ROOT / extra / "results.csv")
+        top1 = read(SIPE_ROOT / extra / "results.csv")
         rows.append(
             [Path(extra).name, "–"]
             + [_fmt(top1.get(k)) for k in PLISM_ROWS.values()]
             + [f"`{extra}`", "–", "–"]
         )
-    return (
-        _table(header, rows)
-        + "\n\nTop-1 accuracy, mean over slide pairs (PLISM `results.csv`)."
-    )
+    if not drop:
+        caption = "Top-1 accuracy, mean over slide pairs (PLISM `results.csv`)."
+    else:
+        caption = (
+            "Top-1 accuracy, mean over slide pairs without the stain(s)"
+            f" {', '.join(drop)} on either side (recomputed from PLISM `metrics.csv`"
+            " with the `results.csv` row masks)."
+        )
+    return _table(header, rows) + "\n\n" + caption
 
 
 # --- PLISM per pair vs a reference ----------------------------------------------
@@ -291,6 +329,10 @@ def plism_pairs_table(root: Path, opts: dict[str, list[str]]) -> str:
     pairs = merge_runs(
         [(str(run.config["tag"]), pd.read_csv(path)) for run, path in loaded]
     )
+    drop = opts.get("drop_stain", [])
+    if drop:
+        pairs = pairs[_keeps_stains(pairs, drop)].reset_index(drop=True)
+    groups = [g for g in PAIR_GROUPS if not (drop and g[2])]
     weights = slide_bootstrap_weights(pairs, PAIR_BOOTSTRAPS)
     header = [
         "method", "pairs", "n", "top-1", "ref top-1", "Δ top-1", "95% CI",
@@ -300,13 +342,15 @@ def plism_pairs_table(root: Path, opts: dict[str, list[str]]) -> str:
     for run, _ in loaded[1:]:
         tag = str(run.config["tag"])
         delta = (pairs[f"{tag}__top_1"] - pairs[f"{ref}__top_1"]).to_numpy()
-        for label, shift, hr in PAIR_GROUPS:
+        for label, shift, hr in groups:
             mask = pd.Series(True, index=pairs.index)
             if shift is not None:
                 mask &= pairs["shift"] == shift
             if hr:
                 mask &= pairs["hr"].astype(bool)
             mask = mask.to_numpy()
+            if not mask.any():
+                continue
             lo, hi = bootstrap_mean_ci(delta[mask], weights[:, mask])
             rows.append(
                 [
@@ -331,6 +375,12 @@ def plism_pairs_table(root: Path, opts: dict[str, list[str]]) -> str:
         " drawn copy of each of its slides); pairs better = share of pairs with"
         " Δ > 0. HR = either slide has the HR stain. One fit per method, so the"
         " interval covers the slide sample only, not seeds."
+        + (
+            f" Pairs with the stain(s) {', '.join(drop)} on either side are dropped"
+            " before grouping and bootstrapping."
+            if drop
+            else ""
+        )
     )
 
 

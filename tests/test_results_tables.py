@@ -134,3 +134,45 @@ def test_plism_pairs_table_delta_vs_reference(tmp_path):
     assert cells[5] == f"{delta.mean():+.3f}"
     assert "bench/s_m" in cells[-1]
     assert rt.plism_pairs_table(tmp_path, {}).startswith("(needs")
+
+
+def test_plism_drop_stain_recomputes_from_metrics(tmp_path):
+    from test_plism_pairs import fake_metrics
+
+    run = bench_dir(tmp_path, "s_x_plism", "plism")
+    out = run / "metrics" / "8139_tiles" / "s_x_plism"
+    out.mkdir(parents=True)
+    (out / "results.csv").write_text(PLISM_CSV)
+    df = fake_metrics(0)
+    df.to_csv(out / "metrics.csv", index=False)
+
+    full = rt.plism_top1_from_metrics(out / "metrics.csv", [])
+    assert full["all"] == df["top_1_accuracy"].mean()
+    keep = (df["staining_a"] != "HR") & (df["staining_b"] != "HR")
+    inter_scanner = keep & (df["staining_a"] == df["staining_b"])
+    table = rt.plism_table(tmp_path, {"drop_stain": ["HR"]})
+    row = next(line for line in table.splitlines() if "s_x_plism" in line)
+    cells = [c.strip() for c in row.strip("|").split("|")]
+    assert cells[2] == f"{df.loc[inter_scanner, 'top_1_accuracy'].mean():.3f}"
+    assert cells[5] == f"{df.loc[keep, 'top_1_accuracy'].mean():.3f}"
+    assert "without the stain(s) HR" in table
+
+
+def test_plism_pairs_table_drop_stain(tmp_path):
+    from test_plism_pairs import fake_metrics
+
+    for name, seed in (("s_ref", 0), ("s_m", 1)):
+        run = bench_dir(tmp_path, name, "plism")
+        out = run / "metrics" / "8139_tiles" / name
+        out.mkdir(parents=True)
+        fake_metrics(seed).to_csv(out / "metrics.csv", index=False)
+    opts = {"ref": ["s_ref"], "tags": ["s_m"], "drop_stain": ["HR"]}
+    table = rt.plism_pairs_table(tmp_path, opts)
+    ref, m = fake_metrics(0), fake_metrics(1)
+    keep = (ref["staining_a"] != "HR") & (ref["staining_b"] != "HR")
+    delta = (m["top_1_accuracy"] - ref["top_1_accuracy"])[keep]
+    row = next(line for line in table.splitlines() if "| all |" in line)
+    cells = [c.strip() for c in row.strip("|").split("|")]
+    assert cells[2] == str(int(keep.sum()))
+    assert cells[5] == f"{delta.mean():+.3f}"
+    assert ", HR |" not in table
