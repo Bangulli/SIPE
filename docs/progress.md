@@ -93,6 +93,26 @@ Reference: `mixture_G0_K1` (`runs/bench/2026-10-14_07-10-49_lxbelshark_0721_mixt
 
 <!-- /results:plism_pairs -->
 
+**Why HR has its own rows.** HR is one of PLISM's 13 staining conditions (GIV, GIVH, GM,
+GMH, GV, GVH, HR, HRH, KR, KRH, LM, LMH, MY) and the one where cross-stain retrieval fails
+(roadmap section 1: "known HR-stain failure"). From `runs/bench/2026-10-15_05-38-58_claude-box_6ed5_plism_pairs_gap_g0_cgm_q2_vae/by_stain.csv` (inter-staining
+pairs, written by `by_stain.py` in that dir from its `pairs.csv`):
+- HR against any other stain: G0 top-1 0.001–0.017 per stain, 0.007 overall, vs 0.357 for
+  the inter-staining pairs without HR (per stain 0.209–0.432). Slide-pair cosine 0.690 vs
+  0.888 (GAP: 0.611 vs 0.857). HRH, the sibling stain, behaves like the others (0.374
+  without HR), so the failure is HR-specific.
+- HR against HR on another scanner is only harder: "inter-scanner, HR" above, G0 0.731
+  (21 pairs).
+
+Consequences for reading the tables: (1) HR is in 609 of the 4,095 pairs, and its
+cross-stain pairs sit near zero for every method, which dilutes the inter-staining /
+joint / all means; "all, HR" only shows that a method does not make those pairs worse.
+(2) "inter-scanner, HR" is the check for learned maps that break on an unusual stain:
+PairedVAE `ysltwjoj` lost there in the CATS phase (archive, PLISM section) and is still
+the lowest row; `lazztzda` recovers part of it; the linear maps and CGM stay at G0's
+level. Why HR is so far off (outside the stain range of SCORPION and of H0-mini's
+pretraining?) is not tested.
+
 ### HEST (official code, ridge on PCA-256, Pearson over 50 genes)
 
 <!-- results:hest exclude=*smoke* -->
@@ -266,8 +286,8 @@ Val: selection split, scanner/region probes trained on train (`summary_val.csv`)
 | run dir | W&B | module | commit | step | retrieval_top1_cgm | retrieval_top1_backbone | probe_cgm_acc | probe_backbone_acc | nll | kl | nonlinear_rel |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | `runs/2026-10-14_22-30-38_lxbelshark_7b71` | o2snd9bm | ConsensusGenModule | dd32d0a | 5999/6000 | 0.985 | 0.887 | 0.298 | 0.801 | 0.098 | 0.524 | 0.072 |
-| `runs/2026-10-15_08-50-48_lxbelshark_a602` | nbeqfgol | ConsensusGenModule | dd7e212* | 1324/6000 | 0.980 | 0.887 | 0.323 | 0.801 | 0.083 | 0.708 | 0.000 |
-| `runs/2026-10-15_08-51-41_lxbelshark_8ed0` | prb6pqng | ConsensusGenModule | dd7e212* | 1424/6000 | 0.982 | 0.887 | 0.310 | 0.802 | 0.087 | 0.699 | 0.035 |
+| `runs/2026-10-15_08-50-48_lxbelshark_a602` | nbeqfgol | ConsensusGenModule | dd7e212* | 1524/6000 | 0.980 | 0.887 | 0.319 | 0.801 | 0.086 | 0.689 | 0.000 |
+| `runs/2026-10-15_08-51-41_lxbelshark_8ed0` | prb6pqng | ConsensusGenModule | dd7e212* | 1599/6000 | 0.983 | 0.887 | 0.309 | 0.801 | 0.088 | 0.681 | 0.039 |
 
 Mean of the last 10 validations of `val/<col>`, read from the local `.wandb` file; step = last logged `trainer/global_step` / `max_steps`.
 
