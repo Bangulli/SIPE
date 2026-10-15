@@ -85,7 +85,10 @@ W&B), and each row must name the run dir it came from.
   --tag <tag> --policy none|geo|dihedral|zoom --copies K` (train split by default; meta
   column `aug` = copy; the scanner views of a tile copy share the transform; every view goes
   through the whole encoder). `sipe.features.extract.extract` is the one backbone pass behind
-  every cache. Record the run dirs here once extracted.
+  every cache. Extracted 2026-10-15 (train, GAP, 18,620 tiles x 5 scanners
+  per copy, seed 0): `runs/bench/2026-10-15_18-20-26_lxbelshark_cfad_augcache_geo` (geo x4),
+  `runs/bench/2026-10-15_18-25-53_lxbelshark_490a_augcache_dihedral` (dihedral x8),
+  `runs/bench/2026-10-15_18-37-41_lxbelshark_54ba_augcache_zoom` (zoom x4).
 
 # Post-hoc estimators
 

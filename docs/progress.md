@@ -527,6 +527,12 @@ reference in both.
 
 | model | arm | seed | config | val top-1 | val Δtop-1 vs G0 | val region probe | test top-1 | test top-5 | test scanner probe logreg / MLP | test region probe | note | bench run dir | SIPE commit |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| raw | – | – | – | 0.8870 | – | 0.978 | – | – | – / – | – | – | `runs/bench/2026-10-15_18-22-36_lxbelshark_aae8_scorpion_cgm_select` | c01bf2e |
+| reference | – | – | – | 0.9731 | – | 0.985 | – | – | – / – | – | – | `runs/bench/2026-10-15_18-22-36_lxbelshark_aae8_scorpion_cgm_select` | c01bf2e |
+| G0 | – | – | – | 0.9787 | +0.0000 | 0.986 | – | – | – / – | – | – | `runs/bench/2026-10-15_18-22-36_lxbelshark_aae8_scorpion_cgm_select` | c01bf2e |
+| V1-S_7b71 | V1-S | 42 | c0 | 0.9852 | +0.0065 | 0.983 | – | – | – / – | – | selected | `runs/bench/2026-10-15_18-22-36_lxbelshark_aae8_scorpion_cgm_select` | c01bf2e |
+| V1-S_8ed0 | V1-S | 43 | c0 | 0.9852 | +0.0065 | 0.984 | – | – | – / – | – | selected | `runs/bench/2026-10-15_18-22-36_lxbelshark_aae8_scorpion_cgm_select` | c01bf2e |
+| V0-S_a602 | V0-S | 42 | c1 | 0.9807 | +0.0020 | 0.983 | – | – | – / – | – | – | `runs/bench/2026-10-15_18-22-36_lxbelshark_aae8_scorpion_cgm_select` | c01bf2e |
 
 CGM fits (`map_cgm.pt`) on the shared SCORPION-proxy protocol (`sipe.eval.cgm_select`), clean features. Val: probes trained on train (`summary_val.csv`); selection = the simplest configuration (arm, then larger ρ) whose mean val top-1 gain over G0 (fitted in the run, α = 1) reaches 95% of the best gain (`selected.json`, `candidates.csv`). Test: read once after the selection, probes trained on val (`summary_test.csv`). Config = fits that differ only by seed share an id.
 
@@ -781,6 +787,12 @@ Experiment 1 reading (all values from `runs/bench/2026-10-13_20-09-24_claude-box
   `scripts/aug_study_3_cgm_select.sh` (independent); `scripts/aug_study_4_plism.sh
   <aug_attribution run dir>`. After each: `results_tables --write`; after step 4, add the
   three `aug_*` tags to the `plism_pairs` blocks with ref=mixture_G0_K1 and ref=cgm_v0s_a602.
+  Status 2026-10-15: step 1 done (`runs/bench/2026-10-15_18-20-26_lxbelshark_cfad_augcache_geo`,
+  `runs/bench/2026-10-15_18-25-53_lxbelshark_490a_augcache_dihedral`,
+  `runs/bench/2026-10-15_18-37-41_lxbelshark_54ba_augcache_zoom`; `meta_train.csv` row counts
+  372,400 / 744,800 / 372,400 = 4 / 8 / 4 copies x 93,100 views, 18,620 tiles each). Step 3
+  in progress (`runs/bench/2026-10-15_18-22-36_lxbelshark_aae8_scorpion_cgm_select`: val and
+  selection written, `summary_test.csv` pending). Step 2 next.
 - PLISM without HR (2026-10-15): HR = overnight Harris hematoxylin (checked on the images),
   so every PLISM table now has a `drop_stain=HR` twin (section 1). The ranking does not
   change: on all pairs without HR, CGM 7b71 0.371 and seed 43 0.372 > V0-S 0.367 > region
