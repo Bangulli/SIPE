@@ -266,8 +266,8 @@ Val: selection split, scanner/region probes trained on train (`summary_val.csv`)
 | run dir | W&B | module | commit | step | retrieval_top1_cgm | retrieval_top1_backbone | probe_cgm_acc | probe_backbone_acc | nll | kl | nonlinear_rel |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | `runs/2026-10-14_22-30-38_lxbelshark_7b71` | o2snd9bm | ConsensusGenModule | dd32d0a | 5999/6000 | 0.985 | 0.887 | 0.298 | 0.801 | 0.098 | 0.524 | 0.072 |
-| `runs/2026-10-15_08-50-48_lxbelshark_a602` | nbeqfgol | ConsensusGenModule | dd7e212* | 289/6000 | 0.980 | 0.887 | 0.350 | 0.800 | 0.046 | 0.790 | 0.000 |
-| `runs/2026-10-15_08-51-41_lxbelshark_8ed0` | prb6pqng | ConsensusGenModule | dd7e212* | 299/6000 | 0.980 | 0.887 | 0.337 | 0.803 | 0.051 | 0.790 | 0.011 |
+| `runs/2026-10-15_08-50-48_lxbelshark_a602` | nbeqfgol | ConsensusGenModule | dd7e212* | 1324/6000 | 0.980 | 0.887 | 0.323 | 0.801 | 0.083 | 0.708 | 0.000 |
+| `runs/2026-10-15_08-51-41_lxbelshark_8ed0` | prb6pqng | ConsensusGenModule | dd7e212* | 1424/6000 | 0.982 | 0.887 | 0.310 | 0.802 | 0.087 | 0.699 | 0.035 |
 
 Mean of the last 10 validations of `val/<col>`, read from the local `.wandb` file; step = last logged `trainer/global_step` / `max_steps`.
 
