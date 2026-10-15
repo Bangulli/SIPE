@@ -205,6 +205,13 @@ Use ridge regularization if needed. **Sanity check:** at $\alpha=1$, without dif
 - **Original soft shrinkage remains strongest:** keep its solution as the fallback/anchor for the nonlinear family.
 - **All near-identical:** this strengthens the case for testing **content dependence**, not more linear estimators.
 
+> **Update 2026-10-15 (D2 taken, ISBI scope):** for the ISBI paper the pairing unit is fixed
+> at tile level (G0 and CGM). At that level the eraser objective is about equal to G0, so G0
+> stays the linear base as CGM's linear limit; the original eraser is reported as published
+> (slide-level pairing). The region-level eraser is stronger on SCORPION and PLISM; pairing
+> scale is out of the ISBI scope and will be re-evaluated in the broader experimental setup of
+> the follow-up paper. Evidence and run dirs: `docs/progress.md` (Exp 2 row, ISBI scope).
+
 ---
 
 ## 5. Experiment 3 — Gaussian mixture with content-dependent nuisance covariance
