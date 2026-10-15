@@ -3,7 +3,7 @@
 > `docs/progress.md`; numbers there are generated from run files, numbers here are not.
 >
 > **Updates since 2026-10-13** (details and numbers in `docs/progress.md`; the body below
-> is unchanged except for the dated "Update" notes in sections 3, 5 and 12):
+> is unchanged except for the dated "Update" notes in sections 3, 4, 5 and 12):
 > - The new soft-shrinkage selection rule has a SCORPION test row (λ=0.5,
 >   `runs/bench/2026-10-13_17-45-08_lxbelshark_db10_scorpion_softshrink_h0mini_gap_gain95`).
 >   Its full PLISM/HEST runs are done (`--posthoc`): above PairedVAE in every PLISM row, HEST
@@ -15,6 +15,11 @@
 > - Experiment 3 has SCORPION val/test results (`runs/bench/2026-10-13_21-47-56_claude-box_6fdf_scorpion_mixture_gap`); D3 is proposed, see the update under
 >   "Evaluation and decisions D3". Its G0 is Experiment 2A and already beats the eraser on
 >   SCORPION.
+> - 2026-10-15, ISBI scope: the paper is **G0 → CGM** (Experiment 7, generative consensus
+>   model trained through the backbone) at fixed tile-level pairing. D2 and D4 taken (see the
+>   update under "Decision D2" and `docs/progress.md`, "ISBI scope"). Pairing scale, Q2,
+>   mixtures and PairedVAE are out of scope here and will be re-evaluated in the broader
+>   experimental setup of the follow-up paper.
 > - The anchor table in section 0 is from before these runs; the current tables are the
 >   generated ones in `docs/progress.md`.
 > - The soft-shrinkage deltas are slide-to-mean scanner deltas. On SCORPION every slide has the
