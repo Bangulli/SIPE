@@ -45,13 +45,14 @@ from sipe.estimators.quadratic import (
     QuadraticShrinkageMap,
 )
 from sipe.eval.content_dependence import paired_views
-from sipe.eval.mixture_sweep import (
-    DEFAULT_REFERENCE,
-    SETTING,
+from sipe.eval.mixture_sweep import DEFAULT_REFERENCE, SETTING
+from sipe.eval.proxy import (
     apply_map,
+    evaluate,
     retrieval_metrics,
+    select_lambda,
+    subsample,
 )
-from sipe.eval.soft_shrinkage_sweep import evaluate, select_lambda, subsample
 
 log = logging.getLogger(__name__)
 

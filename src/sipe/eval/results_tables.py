@@ -16,6 +16,10 @@ Sources, all under runs/ (gitignored, so every row names the dir it came from):
     (sipe.eval.scanner_offsets)
   - quadratic sweep (Experiment 4): runs/bench/*/summary_{val,test}.csv,
     selected.json, sweep_val.csv (sipe.eval.quadratic_sweep)
+  - CGM augmentation attribution: runs/bench/*/summary_val.csv + arms.json
+    (sipe.eval.aug_attribution)
+  - CGM selection (Experiment 7): runs/bench/*/summary_{val,test}.csv,
+    selected.json (sipe.eval.cgm_select)
   - training: runs/<run>/wandb/*run-*/*.wandb (local W&B history; no API key needed)
 
 progress.md holds generated blocks:
@@ -811,6 +815,135 @@ def quadratic_table(root: Path, opts: dict[str, list[str]]) -> str:
     )
 
 
+# --- CGM augmentation attribution and CGM selection (Experiment 7) -------------
+
+
+def _probes(r: Any) -> str:
+    """Scanner probes of a summary row (Series or dict; missing = –)."""
+    return " / ".join(_fmt(r.get(c)) for c in ("probe_logreg_acc", "probe_mlp_acc"))
+
+
+def aug_attribution_table(root: Path, opts: dict[str, list[str]]) -> str:
+    header = [
+        "model", "data", "units", "views", "G0 α", "val top-1", "val Δtop-1 vs G0",
+        "val top-5", "val scanner probe logreg / MLP", "val region probe",
+        "rel. change", "bench run dir", "SIPE commit",
+    ]  # fmt: skip
+    rows = []
+    for run in _bench_runs(root, "scorpion_aug_attribution", opts.get("exclude", [])):
+        source = [f"`{_rel(run.dir)}`", run.source_cells()[2]]
+        if not (run.dir / "summary_val.csv").exists():
+            rows.append(["no results", *["–"] * (len(header) - 3), *source])
+            continue
+        arms = _read_json(run.dir / "arms.json")
+        summary = pd.read_csv(run.dir / "summary_val.csv")
+        g0 = summary.loc[summary["name"] == "G0|clean|all", "top_1_accuracy"]
+        for _, r in summary.iterrows():
+            arm = arms.get(r["name"], {})
+            delta = (
+                f"{r['top_1_accuracy'] - float(g0.iloc[0]):+.4f}"
+                if len(g0) and r["name"] not in ("raw", "reference")
+                else "–"
+            )
+            rows.append(
+                [
+                    arm.get("estimator", r["name"]),
+                    arm.get("data", "–"),
+                    str(arm.get("n_units", "–")),
+                    str(arm.get("views", "–")),
+                    _fmt(arm.get("alpha"), 2) if "alpha" in arm else "–",
+                    _fmt(r["top_1_accuracy"], 4),
+                    delta,
+                    _fmt(r["top_5_accuracy"], 4),
+                    _probes(r),
+                    _fmt(r.get("region_probe_acc")),
+                    _fmt(r.get("relative_change")),
+                    *source,
+                ]
+            )
+    return (
+        _table(header, rows)
+        + "\n\nSCORPION val, clean features, probes trained on train (– ="
+        " `--retrieval-only`; `summary_val.csv`, arms in `arms.json`)."
+        " G0 = consensus shrinkage (K = 1,"
+        " α by the 95% rule on val); CGM-init = the V0-S init map (closed form, no"
+        " training). Data: clean = the GAP cache's train split, other labels ="
+        " augmented train caches (`sipe.features.extract`; a unit = one tile copy,"
+        " views share the transform). Units: n = n tiles with one random copy each"
+        " (same tiles in every arm), tiles = every tile once, all = every copy."
+        " Δ vs G0|clean|all (= the G0 of the mixture sweep when α = 1). Explanatory"
+        " ablation: nothing is selected across arms; the PLISM readout uses the"
+        " saved `map_<estimator>_<data>_<units>.pt`. Other rows (raw, reference, V0-S,"
+        " ...) are map files evaluated in the same run."
+    )
+
+
+def cgm_select_table(root: Path, opts: dict[str, list[str]]) -> str:
+    header = [
+        "model", "arm", "seed", "config", "val top-1", "val Δtop-1 vs G0",
+        "val region probe", "test top-1", "test top-5",
+        "test scanner probe logreg / MLP", "test region probe", "note",
+        "bench run dir", "SIPE commit",
+    ]  # fmt: skip
+    rows = []
+    for run in _bench_runs(root, "scorpion_cgm_select", opts.get("exclude", [])):
+        source = [f"`{_rel(run.dir)}`", run.source_cells()[2]]
+        if not (run.dir / "summary_val.csv").exists():
+            rows.append(["no results", *["–"] * (len(header) - 3), *source])
+            continue
+        selected = _read_json(run.dir / "selected.json")
+        test = {}
+        if (run.dir / "summary_test.csv").exists():
+            test = {
+                r["name"]: r
+                for _, r in pd.read_csv(run.dir / "summary_test.csv").iterrows()
+            }
+        summary = pd.read_csv(run.dir / "summary_val.csv")
+        g0 = summary.loc[summary["name"] == "G0", "top_1_accuracy"]
+        for _, r in summary.iterrows():
+            t = test.get(r["name"], {})
+            note = []
+            if r["name"] in selected.get("fits", []) or (
+                r["name"] == "G0" and selected.get("fallback_to_g0")
+            ):
+                note.append("selected")
+                if selected.get("region_guard_violated"):
+                    note.append("region guard violated")
+            delta = (
+                f"{r['top_1_accuracy'] - float(g0.iloc[0]):+.4f}"
+                if len(g0) and r["name"] not in ("raw", "reference")
+                else "–"
+            )
+            seed = r.get("seed")
+            rows.append(
+                [
+                    r["name"],
+                    _fmt(r.get("arm")) if isinstance(r.get("arm"), str) else "–",
+                    "–" if pd.isna(seed) else str(int(seed)),
+                    r["config_id"] if isinstance(r.get("config_id"), str) else "–",
+                    _fmt(r["top_1_accuracy"], 4),
+                    delta,
+                    _fmt(r["region_probe_acc"]),
+                    _fmt(t.get("top_1_accuracy"), 4),
+                    _fmt(t.get("top_5_accuracy"), 4),
+                    _probes(t),
+                    _fmt(t.get("region_probe_acc")),
+                    ", ".join(note) or "–",
+                    *source,
+                ]
+            )
+    return (
+        _table(header, rows)
+        + "\n\nCGM fits (`map_cgm.pt`) on the shared SCORPION-proxy protocol"
+        " (`sipe.eval.cgm_select`), clean features. Val: probes trained on train"
+        " (`summary_val.csv`); selection = the simplest configuration (arm, then larger"
+        " ρ) whose mean val top-1 gain over G0 (fitted in the run, α = 1) reaches 95%"
+        " of the best gain (`selected.json`, `candidates.csv`). Test: read once after"
+        " the selection, probes trained on val (`summary_test.csv`). Config = fits"
+        " that differ only by seed share an id."
+    )
+
+
 # --- training runs (local W&B history) -----------------------------------------
 
 
@@ -926,6 +1059,8 @@ TABLES = {
     "offsets": offsets_table,
     "mixture": mixture_table,
     "quadratic": quadratic_table,
+    "augattr": aug_attribution_table,
+    "cgm": cgm_select_table,
     "training": training_table,
 }
 

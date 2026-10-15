@@ -49,8 +49,13 @@ from sipe.estimators.mixture import (
     heldout_likelihoods,
 )
 from sipe.eval.content_dependence import paired_views
-from sipe.eval.scorpion_retrieval import TOPK, retrieval
-from sipe.eval.soft_shrinkage_sweep import evaluate, select_lambda, subsample
+from sipe.eval.proxy import (  # noqa: F401 (apply_map, retrieval_metrics re-exported)
+    apply_map,
+    evaluate,
+    retrieval_metrics,
+    select_lambda,
+    subsample,
+)
 
 log = logging.getLogger(__name__)
 
@@ -62,24 +67,6 @@ DEFAULT_REFERENCE = (
     "/eraser_gap_lam0.5.pt"
 )
 SETTING = "tile_all"
-
-
-@torch.no_grad()
-def apply_map(
-    fmap: torch.nn.Module, x: np.ndarray, device: torch.device, batch: int = 4096
-) -> np.ndarray:
-    fmap = fmap.to(device).float()
-    out = [
-        fmap(torch.from_numpy(x[i : i + batch]).to(device).float()).cpu().numpy()
-        for i in range(0, len(x), batch)
-    ]
-    return np.concatenate(out)
-
-
-def retrieval_metrics(x: np.ndarray, meta: pd.DataFrame, device) -> dict[str, float]:
-    pairs = retrieval(x, meta, device)
-    cols = ["cosine_similarity", *(f"top_{k}_accuracy" for k in TOPK)]
-    return {c: float(pairs[c].mean()) for c in cols}
 
 
 @torch.no_grad()

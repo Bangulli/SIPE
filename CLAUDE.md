@@ -81,6 +81,11 @@ W&B), and each row must name the run dir it came from.
   provenance in that dir). Reuse them for post-hoc estimators (`--features-from`) instead of
   re-extracting, so every method sees identical inputs. If you need new features (e.g. CLS,
   token grids), extract once into a new run dir and record it here.
+- **Augmented train caches** (CGM augmentation study): `uv run python -m sipe.features.extract
+  --tag <tag> --policy none|geo|dihedral|zoom --copies K` (train split by default; meta
+  column `aug` = copy; the scanner views of a tile copy share the transform; every view goes
+  through the whole encoder). `sipe.features.extract.extract` is the one backbone pass behind
+  every cache. Record the run dirs here once extracted.
 
 # Post-hoc estimators
 
@@ -133,7 +138,7 @@ W&B), and each row must name the run dir it came from.
     float32 buffers; the module is the map that is evaluated *and* saved, so `--posthoc`
     benchmarks exactly what was screened);
   - driver `sipe.eval.<name>_sweep --features-from <cache>`: hyperparameters on val only
-    (reuse `soft_shrinkage_sweep.evaluate` / `select_lambda`), the eraser λ=0.5 evaluated
+    (reuse `sipe.eval.proxy`: `evaluate` / `summarize` / `select_by_gain`), the eraser λ=0.5 evaluated
     in the same run as `reference` (`--reference-map`), test read once;
   - run dir outputs: `sweep_val.csv`, `summary_val.csv` (probes trained on train),
     `summary_test.csv` (probes trained on val), `selected.json`, `map_<...>.pt` (module
@@ -148,6 +153,16 @@ W&B), and each row must name the run dir it came from.
   (decision 2026-10-14): γ = inf is exactly G0 (in-run G0 row). Pairing unit: tile-level
   pairs. γ = ridge on the quadratic block, largest γ reaching 95% of the best val gain
   over G0. Table block `quadratic`.
+- Experiment 7 CGM on the shared protocol: `uv run python -m sipe.eval.cgm_select --tag <tag>
+  --features-from <feature cache> --runs runs/<fit> ... [--test selected|all|none]`. Scores
+  each fit's `map_cgm.pt` on clean features next to raw, the eraser and an in-run G0 (α=1);
+  fits that differ only by seed form one candidate (mean val top-1); simplest candidate
+  (arm, then larger ρ) at 95% of the best gain over G0. Table block `cgm`.
+- CGM augmentation attribution (no training): `uv run python -m sipe.eval.aug_attribution
+  --tag <tag> --features-from <feature cache> --aug-caches geo=<cache> ... [--maps
+  label=<map>] [--retrieval-only]`. Closed-form {G0, CGM-init (= the V0-S init)} ×
+  {clean, augmented caches} × sizes (5120 tiles = the CGM init, `tiles`, `all`); val only,
+  nothing selected across arms; PLISM on the saved maps is the readout. Table block `augattr`.
 
 # Benchmarks and commands
 

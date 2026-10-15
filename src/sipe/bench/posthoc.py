@@ -124,7 +124,7 @@ class PosthocFeatures(nn.Module):
         self.output_dim = output_dim
 
     def gap(self, images: torch.Tensor) -> torch.Tensor:
-        # As soft_shrinkage_sweep.extract (the SCORPION feature cache).
+        # As sipe.features.extract.extract (the SCORPION feature cache).
         tokens = self.backbone.forward_features(images)
         return tokens[:, self.backbone.num_prefix_tokens :].mean(dim=1).float()
 

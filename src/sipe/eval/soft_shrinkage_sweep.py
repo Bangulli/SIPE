@@ -42,12 +42,12 @@ from torch.utils.data import DataLoader
 from sipe.baselines.soft_delta_legacy import DeltaSourceSpec, PairedDeltaFitter
 from sipe.bench.provenance import new_bench_run_dir, write_run_info
 from sipe.data.scorpion import SCORPIONDataModule
-from sipe.eval.scorpion_retrieval import TOPK, region_probe, retrieval, scanner_probes
+from sipe.eval.proxy import evaluate, select_lambda, subsample  # noqa: F401 (re-export)
+from sipe.features.extract import POOLINGS, extract
 from sipe.model.encoders import build_encoder
 
 log = logging.getLogger(__name__)
 
-POOLINGS = ("gap", "cls")
 DEFAULT_LAMBDAS = (0.0, 0.1, 0.3, 1.0, 3.0, 10.0, 30.0, 100.0, 300.0, 1000.0)
 SPLITS = ("train", "val", "test")
 # vfm-geom-xai configs/fitting/chained_soft*.yaml, stage "scanner".
@@ -66,41 +66,6 @@ DELTA_LEVELS = {"slide": "slide_id", "region": "region_id", "tile": "pair_id"}
 SOURCE = DeltaSourceSpec(
     name="scanner", moment="second_moment", shrinkage=False, normalization="trace"
 )
-
-
-@torch.no_grad()
-def extract(
-    backbone: torch.nn.Module,
-    loader: DataLoader,
-    device: torch.device,
-    mixed_precision: bool,
-) -> tuple[dict[str, np.ndarray], pd.DataFrame]:
-    """One backbone pass -> {"gap", "cls"} features and the proxy's tile metadata."""
-    out: dict[str, list[np.ndarray]] = {name: [] for name in POOLINGS}
-    rows: list[pd.DataFrame] = []
-    for batch in loader:
-        images = batch["image"].to(device, non_blocking=True)
-        # float16 autocast as plismbench's PrecisionModule (and the proxy).
-        with torch.autocast(device.type, dtype=torch.float16, enabled=mixed_precision):
-            tokens = backbone.forward_features(images)
-        out["gap"].append(
-            tokens[:, backbone.num_prefix_tokens :].mean(dim=1).float().cpu().numpy()
-        )
-        out["cls"].append(tokens[:, 0].float().cpu().numpy())
-        rows.append(
-            pd.DataFrame(
-                {
-                    "pair_id": batch["pair_id"],
-                    "scanner": batch["domain_name"],
-                    "domain": batch["domain"].numpy(),
-                }
-            )
-        )
-    meta = pd.concat(rows, ignore_index=True)
-    meta["slide_id"] = meta["pair_id"].str.split("-").str[0]
-    meta["region_id"] = meta["pair_id"].str.partition("-tile_")[0]
-    meta["row"] = np.arange(len(meta))
-    return {k: np.concatenate(v) for k, v in out.items()}, meta
 
 
 def slide_to_mean_deltas(feats: np.ndarray, meta: pd.DataFrame) -> np.ndarray:
@@ -164,45 +129,6 @@ def fit_family(
 
 def apply(eraser, feats: np.ndarray, device: torch.device) -> np.ndarray:
     return eraser(torch.from_numpy(feats).to(device)).cpu().numpy()
-
-
-def subsample(meta: pd.DataFrame, n: int | None, seed: int) -> np.ndarray:
-    if n is None or n >= len(meta):
-        return np.arange(len(meta))
-    rng = np.random.default_rng(seed)
-    return np.sort(rng.choice(len(meta), size=n, replace=False))
-
-
-def evaluate(
-    eval_x: np.ndarray,
-    eval_meta: pd.DataFrame,
-    probe_x: np.ndarray,
-    probe_y: np.ndarray,
-    raw_eval_x: np.ndarray,
-    device: torch.device,
-) -> dict[str, float]:
-    pairs = retrieval(eval_x, eval_meta, device)
-    diff = eval_x.astype(np.float64) - raw_eval_x
-    return {
-        **{
-            c: float(pairs[c].mean())
-            for c in ["cosine_similarity", *(f"top_{k}_accuracy" for k in TOPK)]
-        },
-        **scanner_probes(probe_x, probe_y, eval_x, eval_meta["domain"].to_numpy()),
-        "region_probe_acc": region_probe(eval_x, eval_meta)["region_probe_acc"],
-        "relative_change": float(
-            np.mean(np.linalg.norm(diff, axis=1) / np.linalg.norm(raw_eval_x, axis=1))
-        ),
-    }
-
-
-def select_lambda(rows: pd.DataFrame, gain_frac: float) -> pd.Series:
-    """Smallest lambda whose val top-1 gain over lambda = 0 is >= gain_frac x best."""
-    rows = rows.sort_values("lambda")
-    raw = float(rows.loc[rows["lambda"] == 0.0, "top_1_accuracy"].iloc[0])
-    gain = rows["top_1_accuracy"] - raw
-    # Tolerance so that gain_frac = 1 keeps the best row despite float rounding.
-    return rows.loc[gain >= gain_frac * gain.max() - 1e-12].iloc[0]
 
 
 def main(argv: list[str] | None = None) -> Path:
