@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import yaml
 
@@ -88,6 +89,39 @@ def merge_runs(runs: list[tuple[str, pd.DataFrame]]) -> pd.DataFrame:
             out[f"{label}__top_1"] - out[f"{ref_label}__top_1"]
         )
     return out
+
+
+def slide_bootstrap_weights(
+    pairs: pd.DataFrame, n_boot: int = 2000, seed: int = 0
+) -> np.ndarray:
+    """Pair weights [n_boot, n_pairs] of a slide-level bootstrap.
+
+    Pairs share slides, so pairs are not independent. Each replicate draws the slides
+    with replacement; a pair (a, b) then counts c_a * c_b times (c = how often each
+    slide was drawn), i.e. every pair of drawn slides. A weighted mean of per-pair
+    values under these weights is one bootstrap replicate of the pair mean.
+    """
+    slides = pd.Index(sorted(set(pairs["slide_a"]) | set(pairs["slide_b"])))
+    ia = slides.get_indexer(pairs["slide_a"])
+    ib = slides.get_indexer(pairs["slide_b"])
+    rng = np.random.default_rng(seed)
+    n = len(slides)
+    counts = np.stack(
+        [np.bincount(rng.integers(0, n, n), minlength=n) for _ in range(n_boot)]
+    ).astype(float)
+    return counts[:, ia] * counts[:, ib]
+
+
+def bootstrap_mean_ci(
+    values: np.ndarray, weights: np.ndarray, level: float = 0.95
+) -> tuple[float, float]:
+    """Percentile interval of the weighted mean of `values` over bootstrap `weights`."""
+    totals = weights.sum(1)
+    keep = totals > 0
+    means = (weights[keep] @ values) / totals[keep]
+    tail = 100 * (1 - level) / 2
+    lo, hi = np.percentile(means, [tail, 100 - tail])
+    return float(lo), float(hi)
 
 
 def shortlist(pairs: pd.DataFrame, labels: list[str], k: int) -> pd.DataFrame:

@@ -2,6 +2,8 @@
 
 Sources, all under runs/ (gitignored, so every row names the dir it came from):
   - PLISM: runs/bench/*/metrics/<n>_tiles/<tag>/results.csv (top-1, mean part)
+  - PLISM per pair vs a reference: runs/bench/*/metrics/<n>_tiles/<tag>/metrics.csv
+    (plismbench per-pair metrics, merged as in sipe.eval.plism_pairs)
   - HEST: runs/bench/*/results/*/dataset_results.json
   - SCORPION proxy: runs/bench/*/summary.csv (sipe.eval.scorpion_retrieval)
   - soft-shrinkage sweep: runs/bench/*/summary_test.csv + selected.json
@@ -27,6 +29,8 @@ Options on the opening marker (space-separated key=value):
   module=<Class>[,<Class>]  training only: keep runs of these SIPEModule classes
   cols=<key>[,<key>]        training only: val/ metrics to show (last-10-val mean)
   min_steps=<n>             training only: skip runs that stopped before step n
+  ref=<tag>                 plism_pairs only: reference PLISM run (by tag)
+  tags=<tag>[,<tag>]        plism_pairs only: methods compared with ref
 
   uv run python -m sipe.eval.results_tables          # print every table
   uv run python -m sipe.eval.results_tables --write  # refresh the blocks in progress.md
@@ -240,6 +244,93 @@ def plism_table(root: Path, opts: dict[str, list[str]]) -> str:
     return (
         _table(header, rows)
         + "\n\nTop-1 accuracy, mean over slide pairs (PLISM `results.csv`)."
+    )
+
+
+# --- PLISM per pair vs a reference ----------------------------------------------
+
+PAIR_GROUPS = (
+    ("inter-scanner", "inter-scanner", False),
+    ("inter-staining", "inter-staining", False),
+    ("scanner + staining", "joint", False),
+    ("all", None, False),
+    ("inter-scanner, HR", "inter-scanner", True),
+    ("all, HR", None, True),
+)
+PAIR_BOOTSTRAPS = 2000
+
+
+def _plism_run_by_tag(
+    root: Path, tag: str, exclude: list[str]
+) -> tuple[BenchRun, Path]:
+    """Newest PLISM run with this tag and its per-pair metrics.csv."""
+    found = [
+        (run, path)
+        for run in _bench_runs(root, "plism", exclude)
+        if str(run.config.get("tag")) == tag
+        for path in sorted(run.dir.glob(f"metrics/*_tiles/{tag}/metrics.csv"))
+    ]
+    if not found:
+        raise FileNotFoundError(f"no finished PLISM run with tag {tag!r} under {root}")
+    return found[-1]
+
+
+def plism_pairs_table(root: Path, opts: dict[str, list[str]]) -> str:
+    from sipe.eval.plism_pairs import (
+        bootstrap_mean_ci,
+        merge_runs,
+        slide_bootstrap_weights,
+    )
+
+    if not opts.get("ref"):
+        return "(needs `ref=<tag>` and `tags=<tag>,...` on the block marker)"
+    exclude = opts.get("exclude", [])
+    (ref,) = opts["ref"]
+    tags = opts.get("tags", [])
+    loaded = [_plism_run_by_tag(root, tag, exclude) for tag in (ref, *tags)]
+    pairs = merge_runs(
+        [(str(run.config["tag"]), pd.read_csv(path)) for run, path in loaded]
+    )
+    weights = slide_bootstrap_weights(pairs, PAIR_BOOTSTRAPS)
+    header = [
+        "method", "pairs", "n", "top-1", "ref top-1", "Δ top-1", "95% CI",
+        "pairs better", "bench run dir",
+    ]  # fmt: skip
+    rows = []
+    for run, _ in loaded[1:]:
+        tag = str(run.config["tag"])
+        delta = (pairs[f"{tag}__top_1"] - pairs[f"{ref}__top_1"]).to_numpy()
+        for label, shift, hr in PAIR_GROUPS:
+            mask = pd.Series(True, index=pairs.index)
+            if shift is not None:
+                mask &= pairs["shift"] == shift
+            if hr:
+                mask &= pairs["hr"].astype(bool)
+            mask = mask.to_numpy()
+            lo, hi = bootstrap_mean_ci(delta[mask], weights[:, mask])
+            rows.append(
+                [
+                    tag,
+                    label,
+                    str(int(mask.sum())),
+                    _fmt(float(pairs.loc[mask, f"{tag}__top_1"].mean())),
+                    _fmt(float(pairs.loc[mask, f"{ref}__top_1"].mean())),
+                    f"{delta[mask].mean():+.3f}",
+                    f"[{lo:+.3f}, {hi:+.3f}]",
+                    f"{(delta[mask] > 0).mean():.0%}",
+                    f"`{_rel(run.dir)}`",
+                ]
+            )
+    return (
+        _table(header, rows)
+        + f"\n\nReference: `{ref}` (`{_rel(loaded[0][0].dir)}`). Per slide pair"
+        " top-1 (plismbench `metrics.csv`, mean of both directions); Δ = method"
+        " minus reference, mean over the pairs of the group; 95% CI = percentile"
+        f" interval of a slide-level bootstrap ({PAIR_BOOTSTRAPS} draws, seed 0;"
+        " pairs share slides, so slides are resampled and a pair counts once per"
+        " drawn copy of each of its slides); pairs better = share of pairs with"
+        " Δ > 0. HR = either slide has the HR stain. One fit per method, so the"
+        " interval covers the slide sample only, not seeds."
     )
 
 
@@ -777,6 +868,7 @@ def training_table(root: Path, opts: dict[str, list[str]]) -> str:
 
 TABLES = {
     "plism": plism_table,
+    "plism_pairs": plism_pairs_table,
     "hest": hest_table,
     "scorpion": scorpion_table,
     "softshrink": softshrink_table,

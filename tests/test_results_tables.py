@@ -116,3 +116,21 @@ def test_content_table_reads_summary(tmp_path):
     line = next(x for x in table.splitlines() if "tile_all" in x)
     assert "| 0.101 ± 0.009 |" in line and "0.113 [0.079, 0.147]" in line
     assert "| 5/5 |" in line and "0.647 (0.993)" in line
+
+
+def test_plism_pairs_table_delta_vs_reference(tmp_path):
+    from test_plism_pairs import fake_metrics
+
+    for name, seed in (("s_ref", 0), ("s_m", 1)):
+        run = bench_dir(tmp_path, name, "plism")
+        out = run / "metrics" / "8139_tiles" / name
+        out.mkdir(parents=True)
+        fake_metrics(seed).to_csv(out / "metrics.csv", index=False)
+    table = rt.plism_pairs_table(tmp_path, {"ref": ["s_ref"], "tags": ["s_m"]})
+    delta = fake_metrics(1)["top_1_accuracy"] - fake_metrics(0)["top_1_accuracy"]
+    row = next(line for line in table.splitlines() if "| all |" in line)
+    cells = [c.strip() for c in row.strip("|").split("|")]
+    assert cells[:3] == ["s_m", "all", "6"]
+    assert cells[5] == f"{delta.mean():+.3f}"
+    assert "bench/s_m" in cells[-1]
+    assert rt.plism_pairs_table(tmp_path, {}).startswith("(needs")

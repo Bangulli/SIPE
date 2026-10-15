@@ -9,7 +9,13 @@ import pandas as pd
 import pytest
 import yaml
 
-from sipe.eval.plism_pairs import main, merge_runs, shortlist
+from sipe.eval.plism_pairs import (
+    bootstrap_mean_ci,
+    main,
+    merge_runs,
+    shortlist,
+    slide_bootstrap_weights,
+)
 
 SLIDES = ["GMH_S60", "GMH_P", "HR_S60", "HR_AT2"]
 
@@ -86,3 +92,27 @@ def test_main(tmp_path, monkeypatch):
     assert len(pd.read_csv(out / "pairs.csv")) == 6
     assert "reason" in pd.read_csv(out / "shortlist.csv")
     assert yaml.safe_load((out / "config.yaml").read_text())["labels"] == ["ref", "m"]
+
+
+def test_slide_bootstrap_weights_are_products_of_slide_counts():
+    pairs = merge_runs([("ref", fake_metrics(0))])
+    w = slide_bootstrap_weights(pairs, n_boot=50, seed=3)
+    assert w.shape == (50, 6)
+    # Rebuild the counts from the same draws and check w = c_a * c_b.
+    slides = pd.Index(sorted(set(pairs["slide_a"]) | set(pairs["slide_b"])))
+    rng = np.random.default_rng(3)
+    for row in w:
+        c = np.bincount(rng.integers(0, 4, 4), minlength=4)
+        expected = c[slides.get_indexer(pairs["slide_a"])] * c[
+            slides.get_indexer(pairs["slide_b"])
+        ]
+        np.testing.assert_array_equal(row, expected)
+
+
+def test_bootstrap_ci_brackets_constant_and_mean():
+    pairs = merge_runs([("ref", fake_metrics(0))])
+    w = slide_bootstrap_weights(pairs, n_boot=200)
+    assert bootstrap_mean_ci(np.full(6, 0.25), w) == pytest.approx((0.25, 0.25))
+    values = pairs["ref__top_1"].to_numpy()
+    lo, hi = bootstrap_mean_ci(values, w)
+    assert values.min() <= lo <= hi <= values.max()
