@@ -99,7 +99,19 @@ untrained init is −0.020 below trained V0-S (augmented, 5120 tiles), and −0.
 (`runs/bench/2026-10-16_14-07-40_lxbelshark_3c28_cgm_v1s_noaug_7e3c`), a seed-sized effect. Geo and zoom
 augmentation even lower the closed-form estimators on clean SCORPION val (G0 0.9765 vs
 0.9787); dihedral is neutral (H0-mini GAP close to dihedral-invariant). Evidence: ablation
-blocks and augmentation-attribution table in `docs/progress.md`.
+blocks and augmentation-attribution table in `docs/progress.md`. The exchangeable linear V0
+(no scanner offsets or per-scanner noise) is +0.022 [+0.018, +0.025] over G0 and only
+−0.003 [−0.003, −0.002] below V0-S (`runs/bench/2026-10-16_22-17-16_lxbelshark_d926_cgm_v0_5ee4`):
+the training, not the per-scanner likelihood, carries the gain.
+
+**10b. A better-specified nuisance likelihood can make the map worse.** Adding a
+content-dependent scanner shift δ_k + D_k z (V1-S+D, rank 128) to the CGM likelihood lowers
+val NLL (0.0867 vs 0.0985) but drops PLISM by −0.005 [−0.006, −0.004] vs V1-S and
+−0.002 [−0.003, −0.001] vs V0-S on all pairs; only the inter-scanner pairs stay at V0-S level
+(+0.001 [+0.000, +0.002]) (`runs/bench/2026-10-16_20-17-12_lxbelshark_d531_cgm_v1s_shift_e3c7`), although the
+diagnostic found real content dependence (finding 6). Plausible, not verified: what the
+likelihood explains as nuisance, the scanner-blind map no longer has to remove. Judge a
+likelihood term by the map it trains, not by the NLL.
 
 **10. Unpaired methods did not remove the scanner; paired supervision did.** CATS-phase
 result (archive): unpaired models stayed at the probe noise floor; PairedVAE's removal comes
