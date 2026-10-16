@@ -61,24 +61,24 @@ general.
 ## 3. Runs in flight and remaining tasks
 
 In flight (host, 2026-10-16):
-- LOSO trained fits (`scripts/loso_fits.sh`): 9 of 10 done (6000 steps, last logged step 5999
+- LOSO trained fits (`scripts/loso_fits.sh`): 10 of 10 done (6000 steps, last logged step 5999
   in each W&B file): V1-S without AT2 `runs/2026-10-16_15-18-37_lxbelshark_31cf`, DP200
   `runs/2026-10-16_16-06-17_lxbelshark_7de8`, GT450 `runs/2026-10-16_16-52-45_lxbelshark_98a6`,
   P1000 `runs/2026-10-16_17-48-06_lxbelshark_a560`, Philips
   `runs/2026-10-16_18-30-10_lxbelshark_d8d4`; V0-S without AT2
   `runs/2026-10-16_15-37-55_lxbelshark_f907`, DP200 `runs/2026-10-16_16-36-44_lxbelshark_73dd`,
   GT450 `runs/2026-10-16_17-32-33_lxbelshark_574e`, P1000
-  `runs/2026-10-16_18-27-40_lxbelshark_4b28`. Running: V0-S without Philips
-  `runs/2026-10-16_19-22-24_lxbelshark_5a6c` (no step logged yet). Its training row makes
-  `results_tables --check` report stale while it runs (expected).
-- Not ISBI: V1-S+D fit (`scripts/cgm_shift_fit.sh`, `docs/experiment-log.md` section 3), to
-  launch.
+  `runs/2026-10-16_18-27-40_lxbelshark_4b28`, Philips `runs/2026-10-16_19-22-24_lxbelshark_5a6c`
+  (map_cgm.pt written).
+- Not ISBI: V1-S+D fit done (`runs/2026-10-16_19-27-29_lxbelshark_e3c7`, map_cgm.pt written);
+  its PLISM run is still writing
+  (`runs/bench/2026-10-16_20-17-12_lxbelshark_d531_cgm_v1s_shift_e3c7`).
 
-When 5a6c finishes: run the `sipe.eval.loso` readout with 7b71, a602 and the 10 fit dirs
-(command in the next list), read claim 8.
+Next: run the `sipe.eval.loso` readout with 7b71, a602 and the 10 fit dirs (command in the
+next list), read claim 8.
 
 To launch (user):
-- LOSO readout, once 5a6c is done (~15 min CPU): `uv run python -m sipe.eval.loso --tag
+- LOSO readout (~15 min CPU): `uv run python -m sipe.eval.loso --tag
   loso --features-from runs/bench/2026-10-13_15-44-35_lxbelshark_d6f7_scorpion_softshrink_h0mini_gap
   --runs runs/2026-10-14_22-30-38_lxbelshark_7b71 runs/2026-10-15_08-50-48_lxbelshark_a602
   runs/2026-10-16_15-18-37_lxbelshark_31cf runs/2026-10-16_15-37-55_lxbelshark_f907
