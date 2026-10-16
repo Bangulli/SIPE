@@ -50,7 +50,7 @@ Inference is one global map on one H0-mini GAP embedding: no scanner ID, no pair
 | 4 | the published eraser is beaten by G0 already | PLISM all pairs: GAP 0.227, eraser λ=0.5 0.281, G0 0.294 (PLISM table) | done |
 | 5 | SCORPION val/test agree (shared protocol) | `runs/bench/2026-10-15_18-22-36_lxbelshark_aae8_scorpion_cgm_select`: V1-S selected; val top-1 0.9852 vs V0-S 0.9807 and G0 0.9787; test 0.9756 vs 0.9682 and 0.9645 (CGM selection table) | done; hyperparameters fixed (ρ = 1e-3, β = 1), the selection is over arms |
 | 6 | most of the gain is the trained linear map | V0-S vs G0 +0.025 [+0.021, +0.028] of the +0.028; V1-S vs V0-S +0.003 [+0.003, +0.004] (7b71) and +0.004 (8ed0), positive in every group; V2-S vs V1-S +0.002 [+0.001, +0.002], about the seed-to-seed +0.001 (ablation blocks) | done |
-| 7 | augmentation is not the driver; training is | V0-S without augmentation vs V0-S: all pairs −0.001 [−0.002, −0.000] (`runs/bench/2026-10-16_11-56-22_lxbelshark_06ac_cgm_v0s_noaug_3fa4`); the untrained init (CGM-init, geo, 5120 tiles) is −0.020 [−0.023, −0.017] below trained V0-S on PLISM (`runs/bench/2026-10-16_11-55-56_lxbelshark_d262_aug_cgminit_geo_5120`), although equal to it on SCORPION val (0.9808 vs 0.9807, augmentation-attribution table); G0 on augmented moments (geo, all copies) vs G0, all pairs −0.001 [−0.002, −0.001] (`runs/bench/2026-10-16_13-09-01_lxbelshark_9a38_aug_g0_geo_all`) | V0-S and closed-form G0 done; V1-S no-aug and `aug_cgminit_clean_all` PLISM in flight |
+| 7 | augmentation is not the driver; training is | V0-S without augmentation vs V0-S: all pairs −0.001 [−0.002, −0.000] (`runs/bench/2026-10-16_11-56-22_lxbelshark_06ac_cgm_v0s_noaug_3fa4`); the untrained init (CGM-init, geo, 5120 tiles) is −0.020 [−0.023, −0.017] below trained V0-S on PLISM (`runs/bench/2026-10-16_11-55-56_lxbelshark_d262_aug_cgminit_geo_5120`), although equal to it on SCORPION val (0.9808 vs 0.9807, augmentation-attribution table); G0 on augmented moments (geo, all copies) vs G0, all pairs −0.001 [−0.002, −0.001] (`runs/bench/2026-10-16_13-09-01_lxbelshark_9a38_aug_g0_geo_all`) ; V1-S without augmentation vs V1-S 7b71, all pairs −0.002 [−0.002, −0.001] (`runs/bench/2026-10-16_14-07-40_lxbelshark_3c28_cgm_v1s_noaug_7e3c`; seed-to-seed +0.001) | done for both trained arms and closed-form G0; `aug_cgminit_clean_all` PLISM in flight |
 | 8 | the map does not depend on having seen the scanner (LOSO) | closed form only: CGM-init^-j above G0^-j on the unseen pairs for every held-out scanner, mean +0.0037 [+0.0008, +0.0069] (`runs/bench/2026-10-16_11-34-36_claude-box_bf0f_scorpion_loso_closed_form`, LOSO table) | trained V1-S^-j / V0-S^-j pending (10 fits) |
 
 Caveats to state in the paper: one SCORPION split (5 val and 5 test WSIs), SCORPION val is
@@ -64,17 +64,18 @@ In flight (host, 2026-10-16):
 - PLISM `aug_cgminit_clean_all` (`runs/bench/2026-10-16_14-32-16_lxbelshark_8ef2_aug_cgminit_clean_all`,
   `scripts/aug_study_4_plism.sh`): the untrained estimator on clean data, the last
   closed-form arm of claim 7 (`aug_g0_geo_all` done 2026-10-16, claim 7).
-- PLISM `cgm_v1s_noaug_7e3c` (`runs/bench/2026-10-16_14-07-40_lxbelshark_3c28_cgm_v1s_noaug_7e3c`)
-  of the V1-S fit without augmentation (`runs/2026-10-16_13-08-26_lxbelshark_7e3c`, W&B
-  pva44z5o).
+- LOSO fits started (host): first one V1-S with AT2 held out,
+  `runs/2026-10-16_15-18-37_lxbelshark_31cf` (`scripts/loso_fits.sh`). Its training row makes
+  `results_tables --check` report stale while it runs (expected).
 
-When they finish: add `aug_cgminit_clean_all` to the per-pair blocks vs G0 (`aug_g0_geo_all`
-is in), and `cgm_v1s_noaug_7e3c` to the block with ref=cgm_v1s_7b71; `results_tables --write`;
-update claim 7.
+When `aug_cgminit_clean_all` finishes: add it to the two per-pair blocks vs G0
+(`aug_g0_geo_all` is in), `results_tables --write`, close claim 7. When the LOSO fits finish:
+run the `sipe.eval.loso` command `loso_fits.sh` prints, read claim 8.
 
 To launch (user):
-- LOSO trained arms (~10 h, one GPU each): `ARM=V1-S CUDA_VISIBLE_DEVICES=0
-  scripts/loso_fits.sh` and `ARM=V0-S CUDA_VISIBLE_DEVICES=1 scripts/loso_fits.sh`, then the
+- LOSO trained arms (~10 h, one GPU each; V1-S started 2026-10-16): `ARM=V1-S
+  CUDA_VISIBLE_DEVICES=0 scripts/loso_fits.sh` and `ARM=V0-S CUDA_VISIBLE_DEVICES=1
+  scripts/loso_fits.sh`, then the
   `sipe.eval.loso` command the script prints (with 7b71, a602 and the 10 fit dirs). Gate:
   V1-S^-j − G0^-j on the unseen pairs not below 0, read next to V0-S^-j.
 - `cgm_select` with every CGM fit (SCORPION val/test rows for V2-S and the no-aug fits):
@@ -129,7 +130,7 @@ Paper writing: not started.
 | aug_cgminit_geo_5120 | posthoc_gap | 0.891 | 0.305 | 0.248 | 0.298 | `runs/bench/2026-10-16_11-55-56_lxbelshark_d262_aug_cgminit_geo_5120` | – | d3cea63 |
 | cgm_v0s_noaug_3fa4 | posthoc_gap | 0.896 | 0.318 | 0.269 | 0.317 | `runs/bench/2026-10-16_11-56-22_lxbelshark_06ac_cgm_v0s_noaug_3fa4` | – | d3cea63 |
 | aug_g0_geo_all | posthoc_gap | 0.885 | 0.303 | 0.241 | 0.292 | `runs/bench/2026-10-16_13-09-01_lxbelshark_9a38_aug_g0_geo_all` | – | d3cea63 |
-| cgm_v1s_noaug_7e3c | posthoc_gap | no results | – | – | – | `runs/bench/2026-10-16_14-07-40_lxbelshark_3c28_cgm_v1s_noaug_7e3c` | – | bd38e7a |
+| cgm_v1s_noaug_7e3c | posthoc_gap | 0.898 | 0.320 | 0.272 | 0.320 | `runs/bench/2026-10-16_14-07-40_lxbelshark_3c28_cgm_v1s_noaug_7e3c` | – | bd38e7a |
 | aug_cgminit_clean_all | posthoc_gap | no results | – | – | – | `runs/bench/2026-10-16_14-32-16_lxbelshark_8ef2_aug_cgminit_clean_all` | – | 27a416e |
 | h0_mini | – | 0.600 | 0.120 | 0.055 | 0.100 | `../plism-benchmark/output/metrics/8139_tiles/h0_mini` | – | – |
 | sipe_h0_mini | – | 0.666 | 0.237 | 0.158 | 0.203 | `../plism-benchmark/output/metrics/8139_tiles/sipe_h0_mini` | – | – |
@@ -274,7 +275,7 @@ Reference: `cgm_v0s_a602` (`runs/bench/2026-10-15_10-03-00_lxbelshark_ae3c_cgm_v
 
 Seed 43 vs seed 42 of V1-S is the seed-to-seed scale for the V2-S row.
 
-<!-- results:plism_pairs exclude=*smoke* ref=cgm_v1s_7b71 tags=cgm_v2s_920f,cgm_v1s_seed43_8ed0 -->
+<!-- results:plism_pairs exclude=*smoke* ref=cgm_v1s_7b71 tags=cgm_v2s_920f,cgm_v1s_seed43_8ed0,cgm_v1s_noaug_7e3c -->
 <!-- generated by `uv run python -m sipe.eval.results_tables --write`; do not edit -->
 
 | method | pairs | n | top-1 | ref top-1 | Δ top-1 | 95% CI | pairs better | bench run dir |
@@ -291,6 +292,12 @@ Seed 43 vs seed 42 of V1-S is the seed-to-seed scale for the V2-S row.
 | cgm_v1s_seed43_8ed0 | all | 4095 | 0.322 | 0.321 | +0.001 | [+0.000, +0.001] | 60% | `runs/bench/2026-10-15_11-30-45_lxbelshark_87d5_cgm_v1s_seed43_8ed0` |
 | cgm_v1s_seed43_8ed0 | inter-scanner, HR | 21 | 0.733 | 0.732 | +0.001 | [-0.001, +0.004] | 71% | `runs/bench/2026-10-15_11-30-45_lxbelshark_87d5_cgm_v1s_seed43_8ed0` |
 | cgm_v1s_seed43_8ed0 | all, HR | 609 | 0.038 | 0.038 | +0.000 | [-0.000, +0.000] | 50% | `runs/bench/2026-10-15_11-30-45_lxbelshark_87d5_cgm_v1s_seed43_8ed0` |
+| cgm_v1s_noaug_7e3c | inter-scanner | 273 | 0.898 | 0.899 | -0.001 | [-0.002, -0.000] | 25% | `runs/bench/2026-10-16_14-07-40_lxbelshark_3c28_cgm_v1s_noaug_7e3c` |
+| cgm_v1s_noaug_7e3c | inter-staining | 546 | 0.320 | 0.321 | -0.001 | [-0.002, -0.001] | 27% | `runs/bench/2026-10-16_14-07-40_lxbelshark_3c28_cgm_v1s_noaug_7e3c` |
+| cgm_v1s_noaug_7e3c | scanner + staining | 3276 | 0.272 | 0.273 | -0.002 | [-0.002, -0.001] | 24% | `runs/bench/2026-10-16_14-07-40_lxbelshark_3c28_cgm_v1s_noaug_7e3c` |
+| cgm_v1s_noaug_7e3c | all | 4095 | 0.320 | 0.321 | -0.002 | [-0.002, -0.001] | 24% | `runs/bench/2026-10-16_14-07-40_lxbelshark_3c28_cgm_v1s_noaug_7e3c` |
+| cgm_v1s_noaug_7e3c | inter-scanner, HR | 21 | 0.735 | 0.732 | +0.003 | [-0.002, +0.008] | 76% | `runs/bench/2026-10-16_14-07-40_lxbelshark_3c28_cgm_v1s_noaug_7e3c` |
+| cgm_v1s_noaug_7e3c | all, HR | 609 | 0.038 | 0.038 | -0.000 | [-0.001, -0.000] | 24% | `runs/bench/2026-10-16_14-07-40_lxbelshark_3c28_cgm_v1s_noaug_7e3c` |
 
 Reference: `cgm_v1s_7b71` (`runs/bench/2026-10-14_23-36-54_lxbelshark_22f4_cgm_v1s_7b71`). Per slide pair top-1 (plismbench `metrics.csv`, mean of both directions); Δ = method minus reference, mean over the pairs of the group; 95% CI = percentile interval of a slide-level bootstrap (2000 draws, seed 0; pairs share slides, so slides are resampled and a pair counts once per drawn copy of each of its slides); pairs better = share of pairs with Δ > 0. HR = either slide has the HR stain. One fit per method, so the interval covers the slide sample only, not seeds.
 
@@ -349,7 +356,7 @@ this reason, never instead of them.
 | aug_cgminit_geo_5120 | posthoc_gap | 0.904 | 0.359 | 0.291 | 0.345 | `runs/bench/2026-10-16_11-55-56_lxbelshark_d262_aug_cgminit_geo_5120` | – | d3cea63 |
 | cgm_v0s_noaug_3fa4 | posthoc_gap | 0.909 | 0.373 | 0.316 | 0.366 | `runs/bench/2026-10-16_11-56-22_lxbelshark_06ac_cgm_v0s_noaug_3fa4` | – | d3cea63 |
 | aug_g0_geo_all | posthoc_gap | 0.899 | 0.356 | 0.284 | 0.338 | `runs/bench/2026-10-16_13-09-01_lxbelshark_9a38_aug_g0_geo_all` | – | d3cea63 |
-| cgm_v1s_noaug_7e3c | posthoc_gap | no results | – | – | – | `runs/bench/2026-10-16_14-07-40_lxbelshark_3c28_cgm_v1s_noaug_7e3c` | – | bd38e7a |
+| cgm_v1s_noaug_7e3c | posthoc_gap | 0.911 | 0.376 | 0.319 | 0.369 | `runs/bench/2026-10-16_14-07-40_lxbelshark_3c28_cgm_v1s_noaug_7e3c` | – | bd38e7a |
 | aug_cgminit_clean_all | posthoc_gap | no results | – | – | – | `runs/bench/2026-10-16_14-32-16_lxbelshark_8ef2_aug_cgminit_clean_all` | – | 27a416e |
 | h0_mini | – | 0.609 | 0.142 | 0.065 | 0.114 | `../plism-benchmark/output/metrics/8139_tiles/h0_mini` | – | – |
 | sipe_h0_mini | – | 0.678 | 0.280 | 0.187 | 0.235 | `../plism-benchmark/output/metrics/8139_tiles/sipe_h0_mini` | – | – |
@@ -475,6 +482,7 @@ CGM fits (`map_cgm.pt`) on the shared SCORPION-proxy protocol (`sipe.eval.cgm_se
 | `runs/2026-10-15_19-42-06_lxbelshark_3fa4` | ryqlwzeu | ConsensusGenModule | d8005ed | 5999/6000 | 0.983 | 0.887 | 0.231 | 0.799 | 0.099 | 0.542 | 0.000 |
 | `runs/2026-10-15_19-48-26_lxbelshark_920f` | d7ih8uaz | ConsensusGenModule | d8005ed | 5999/6000 | 0.985 | 0.887 | 0.258 | 0.799 | 0.120 | 0.504 | 0.192 |
 | `runs/2026-10-16_13-08-26_lxbelshark_7e3c` | pva44z5o | ConsensusGenModule | d3cea63 | 5999/6000 | 0.988 | 0.887 | 0.221 | 0.801 | 0.102 | 0.535 | 0.077 |
+| `runs/2026-10-16_15-18-37_lxbelshark_31cf` | f0456oyl | ConsensusGenModule | 517d9cb | 149/6000 | 0.977 | 0.887 | 0.459 | 0.802 | 0.090 | 0.822 | 0.009 |
 
 Mean of the last 10 validations of `val/<col>`, read from the local `.wandb` file; step = last logged `trainer/global_step` / `max_steps`.
 

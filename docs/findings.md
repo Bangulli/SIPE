@@ -87,11 +87,11 @@ V0-S (linear encoder) has +0.025 of V1-S's +0.028 over G0; the nonlinear encoder
 (+0.001), while moving the map more (nonlinear_rel 0.192 vs 0.072). Without augmentation,
 V0-S loses −0.001 [−0.002, −0.000]; G0 fitted on augmented moments is −0.001
 [−0.002, −0.001] vs G0 (`runs/bench/2026-10-16_13-09-01_lxbelshark_9a38_aug_g0_geo_all`); the
-untrained init is −0.020 below trained V0-S. Geo and zoom
+untrained init is −0.020 below trained V0-S. V1-S without augmentation: −0.002 [−0.002, −0.001] vs V1-S
+(`runs/bench/2026-10-16_14-07-40_lxbelshark_3c28_cgm_v1s_noaug_7e3c`), a seed-sized effect. Geo and zoom
 augmentation even lower the closed-form estimators on clean SCORPION val (G0 0.9765 vs
 0.9787); dihedral is neutral (H0-mini GAP close to dihedral-invariant). Evidence: ablation
-blocks and augmentation-attribution table in `docs/progress.md`. Open: V1-S without
-augmentation (in flight).
+blocks and augmentation-attribution table in `docs/progress.md`.
 
 **10. Unpaired methods did not remove the scanner; paired supervision did.** CATS-phase
 result (archive): unpaired models stayed at the probe noise floor; PairedVAE's removal comes
