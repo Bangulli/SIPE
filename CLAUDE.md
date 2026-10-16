@@ -176,12 +176,13 @@ W&B), and each row must name the run dir it came from.
   each fit's `map_cgm.pt` on clean features next to raw, the eraser and an in-run G0 (α=1);
   fits that differ only by seed form one candidate (mean val top-1); simplest candidate
   (arm, then larger ρ) at 95% of the best gain over G0. Table block `cgm`.
-- Experiment 7 LOSO check (val only, nothing selected): `uv run python -m sipe.eval.loso
-  --tag <tag> --features-from <feature cache> --runs <CGM fit dirs>`. For each held-out
+- Experiment 7 LOSO analysis (nothing selected; an analysis of frozen models, not a gate):
+  `uv run python -m sipe.eval.loso --tag <tag> --features-from <feature cache>
+  [--split val|test] --runs <CGM fit dirs>`; paper numbers on test, read once. For each held-out
   scanner j, G0^-j and CGM-init^-j are fitted in the run on train without j; trained fits
   come from `scripts/loso_fits.sh` (`ARM=V1-S|V0-S`; `--data.init_args.hold_out_scanner=<j>
   --data.init_args.views=4`, which drops j from train only). Fits without a hold-out are the
-  full-data references. Readout: val pairs with j (`unseen`), map^-j - G0^-j and
+  full-data references. Readout: pairs of the split with j (`unseen`), map^-j - G0^-j and
   map^-j - map^full, with slide-bootstrap intervals. `cgm_select` refuses LOSO fits.
   Pairing unit: tile-level pairs over the kept scanners. Table block `loso`.
 - CGM augmentation attribution (no training): `uv run python -m sipe.eval.aug_attribution

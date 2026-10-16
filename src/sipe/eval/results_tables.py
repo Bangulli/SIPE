@@ -23,8 +23,8 @@ Sources, all under runs/ (gitignored, so every row names the dir it came from):
     (sipe.eval.aug_attribution)
   - CGM selection (Experiment 7): runs/bench/*/summary_{val,test}.csv,
     selected.json (sipe.eval.cgm_select)
-  - leave-one-scanner-out (Experiment 7): runs/bench/*/summary_val.csv +
-    contrasts_val.csv (sipe.eval.loso)
+  - leave-one-scanner-out (Experiment 7): runs/bench/*/summary_{val,test}.csv +
+    contrasts_{val,test}.csv (sipe.eval.loso)
   - training: runs/<run>/wandb/*run-*/*.wandb (local W&B history; no API key needed)
 
 The docs (`DOCS`: progress.md for the ISBI paper, experiment-log.md for the rest) hold
@@ -44,6 +44,7 @@ Options on the opening marker (space-separated key=value):
   tags=<tag>[,<tag>]        plism_pairs only: methods compared with ref
   drop_stain=<s>[,<s>]      plism / plism_pairs: drop the slide pairs with one of these
                             stains on either side (e.g. HR), then aggregate as usual
+  split=<val|test>          loso only: show only that split (default: both)
 
   uv run python -m sipe.eval.results_tables          # print every table
   uv run python -m sipe.eval.results_tables --write  # refresh the blocks in every doc
@@ -1001,63 +1002,73 @@ def cgm_select_table(root: Path, opts: dict[str, list[str]]) -> str:
     )
 
 
+def _loso_cell(c: pd.DataFrame, name: str, kind: str, sub: str, ci: bool) -> str:
+    r = c.loc[(c["name"] == name) & (c["contrast"] == kind) & (c["subset"] == sub)]
+    if r.empty:
+        return "–"
+    r = r.iloc[0]
+    text = f"{r['diff']:+.4f}"
+    return text + (f" [{r['ci_low']:+.4f}, {r['ci_high']:+.4f}]" if ci else "")
+
+
+def _loso_rows(run_dir: Path, split: str, source: list[str]) -> list[list[str]]:
+    """Rows of one LOSO run dir for one split (see `loso_table`)."""
+    summary = pd.read_csv(run_dir / f"summary_{split}.csv")
+    c = pd.read_csv(run_dir / f"contrasts_{split}.csv")
+    c = c.loc[c["metric"] == "top_1_accuracy"].copy()
+    c["scanner"] = c["scanner"].astype(str)
+    held = summary.loc[summary["held_out"] != "none"]
+    scanners = list(dict.fromkeys(held["scanner"]))
+    rows = []
+    for j in [*scanners, "mean"]:
+        if j == "mean":
+            names = c.loc[c["scanner"] == "mean", "estimator"].unique()
+            sel = [(f"{e} (mean over j)", e, held.loc[held["estimator"] == e])
+                   for e in names]  # fmt: skip
+        else:
+            sel = [(n, n, g) for n, g in held.loc[held["scanner"] == j].groupby(
+                "name", sort=False)]  # fmt: skip
+        for label, name, g in sel:
+            key = "mean" if j == "mean" else name
+            cj = c.loc[c["scanner"] == j] if j != "mean" else c.loc[
+                (c["scanner"] == "mean") & (c["estimator"] == name)
+            ].assign(name="mean")  # fmt: skip
+            top1 = g.groupby("subset")["top_1_accuracy"].mean()
+            rows.append([
+                split, j, label, _fmt(top1.get("unseen"), 4),
+                _loso_cell(cj, key, "vs_G0", "unseen", True),
+                _loso_cell(cj, key, "vs_full", "unseen", True),
+                _fmt(top1.get("seen"), 4), _loso_cell(cj, key, "vs_G0", "seen", False),
+                *source,
+            ])  # fmt: skip
+    return rows
+
+
 def loso_table(root: Path, opts: dict[str, list[str]]) -> str:
     header = [
-        "held-out scanner", "model", "unseen top-1", "unseen Δ vs G0^-j [95% CI]",
-        "unseen Δ vs full fit [95% CI]", "seen top-1", "seen Δ vs G0^-j",
-        "bench run dir", "SIPE commit",
+        "split", "held-out scanner", "model", "unseen top-1",
+        "unseen Δ vs G0^-j [95% CI]", "unseen Δ vs full fit [95% CI]", "seen top-1",
+        "seen Δ vs G0^-j", "bench run dir", "SIPE commit",
     ]  # fmt: skip
+    splits = opts.get("split", ["val", "test"])
     rows = []
-
-    def cell(c: pd.DataFrame, name: str, kind: str, sub: str, ci: bool) -> str:
-        r = c.loc[(c["name"] == name) & (c["contrast"] == kind) & (c["subset"] == sub)]
-        if r.empty:
-            return "–"
-        r = r.iloc[0]
-        text = f"{r['diff']:+.4f}"
-        return text + (f" [{r['ci_low']:+.4f}, {r['ci_high']:+.4f}]" if ci else "")
-
     for run in _bench_runs(root, "scorpion_loso", opts.get("exclude", [])):
         source = [f"`{_rel(run.dir)}`", run.source_cells()[2]]
-        if not (run.dir / "contrasts_val.csv").exists():
+        if not any(run.dir.glob("contrasts_*.csv")):
             rows.append(["no results", *["–"] * (len(header) - 3), *source])
-            continue
-        summary = pd.read_csv(run.dir / "summary_val.csv")
-        c = pd.read_csv(run.dir / "contrasts_val.csv")
-        c = c.loc[c["metric"] == "top_1_accuracy"].copy()
-        c["scanner"] = c["scanner"].astype(str)
-        held = summary.loc[summary["held_out"] != "none"]
-        scanners = list(dict.fromkeys(held["scanner"]))
-        for j in [*scanners, "mean"]:
-            if j == "mean":
-                names = c.loc[c["scanner"] == "mean", "estimator"].unique()
-                sel = [(f"{e} (mean over j)", e, held.loc[held["estimator"] == e])
-                       for e in names]  # fmt: skip
-            else:
-                sel = [(n, n, g) for n, g in held.loc[held["scanner"] == j].groupby(
-                    "name", sort=False)]  # fmt: skip
-            for label, name, g in sel:
-                key = "mean" if j == "mean" else name
-                cj = c.loc[c["scanner"] == j] if j != "mean" else c.loc[
-                    (c["scanner"] == "mean") & (c["estimator"] == name)
-                ].assign(name="mean")  # fmt: skip
-                top1 = g.groupby("subset")["top_1_accuracy"].mean()
-                rows.append([
-                    j, label, _fmt(top1.get("unseen"), 4),
-                    cell(cj, key, "vs_G0", "unseen", True),
-                    cell(cj, key, "vs_full", "unseen", True),
-                    _fmt(top1.get("seen"), 4), cell(cj, key, "vs_G0", "seen", False),
-                    *source,
-                ])  # fmt: skip
+        for split in splits:
+            if (run.dir / f"contrasts_{split}.csv").exists():
+                rows.extend(_loso_rows(run.dir, split, source))
     return (
         _table(header, rows)
-        + "\n\nLeave-one-scanner-out on SCORPION val (`sipe.eval.loso`): each map^-j is"
-        " fitted on train without scanner j (consensus over the 4 others); unseen ="
-        " val scanner pairs that include j, seen = the other pairs (`summary_val.csv`)."
-        " Δ vs G0^-j = minus G0 fitted the same way (K = 1, α = 1); Δ vs full fit ="
-        " minus the same estimator fitted on all 5 scanners (the cost of not seeing j)."
-        " Intervals: slide bootstrap over the few val WSIs (`contrasts_val.csv`);"
-        " mean rows average the per-j contrasts. Val only; nothing is selected."
+        + "\n\nLeave-one-scanner-out on SCORPION val or test (`sipe.eval.loso`): each"
+        " map^-j is fitted on train without scanner j (consensus over the 4 others);"
+        " unseen = scanner pairs of the split that include j, seen = the other pairs"
+        " (`summary_<split>.csv`). Δ vs G0^-j = minus G0 fitted the same way"
+        " (K = 1, α = 1); Δ vs full fit = minus the same estimator fitted on all 5"
+        " scanners (the cost of not seeing j). Intervals: slide bootstrap over the"
+        " 5 WSIs of the split (`contrasts_<split>.csv`); mean rows average the per-j"
+        " contrasts. An analysis of frozen models: nothing is selected."
     )
 
 

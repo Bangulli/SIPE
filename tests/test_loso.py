@@ -174,4 +174,19 @@ def test_loso_main(tmp_path, monkeypatch):
     from sipe.eval.results_tables import loso_table
 
     table = loso_table(runs, {})
-    assert "| P1000 |" in table and "V0-S_p100" in table
+    assert "| val | P1000 |" in table and "V0-S_p100" in table
+
+    test_dir = lo.main(
+        ["--tag", "loso_test", "--features-from", str(tmp_path), "--runs",
+         str(fits / "x_p100"), "--scanners", "P1000", "--split", "test",
+         "--n-boot", "50", "--device", "-1"]
+    )  # fmt: skip
+    assert (test_dir / "contrasts_test.csv").exists()
+    assert not (test_dir / "contrasts_val.csv").exists()
+    test_slides = set(pd.read_csv(test_dir / "pairs_test.csv")["slide_id"])
+    assert test_slides and all(s.startswith("slide_test") for s in test_slides)
+    assert yaml.safe_load((test_dir / "config.yaml").read_text())["split"] == "test"
+    both = loso_table(runs, {})
+    assert "| test | P1000 |" in both and "| val | P1000 |" in both
+    only = loso_table(runs, {"split": ["test"]})
+    assert "| test |" in only and "| val |" not in only

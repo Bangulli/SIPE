@@ -1,12 +1,14 @@
-"""Leave-one-scanner-out (LOSO) check of the Experiment 7 maps on SCORPION val.
+"""Leave-one-scanner-out (LOSO) analysis of the Experiment 7 maps, SCORPION val or test.
 
 A global map can still behave like a gate when its nonlinear encoder recognizes scanner
 signatures (docs/experiment7.md, section 1). On a scanner never seen at fit time,
 that turns into extrapolation. For each held-out scanner j, the maps are fitted on the
 train split without j: the consensus is then taken over the 4 remaining scanners.
-They are scored by cross-scanner retrieval on the val pairs that include j (`unseen`)
-and on the pairs that do not (`seen`). Gate readout (G-A / G-C): map^-j - G0^-j on
-`unseen` is not below 0.
+They are scored by cross-scanner retrieval on the `--split` pairs that include j
+(`unseen`) and on the pairs that do not (`seen`). Readout: map^-j - G0^-j on `unseen`.
+It is an analysis of a frozen model, not a selection step (decision 2026-10-16): nothing
+here is selected, so test (`--split test`, read once for the selected arm) gives the
+paper numbers; val was the first readout.
 
 Maps per held-out scanner j:
 - `G0^-j`: G0 fitted the same way (K = 1, alpha = 1, as in `cgm_select`);
@@ -21,18 +23,18 @@ per held-out scanner (no seed averaging here).
 
 Contrasts per j and subset: map^-j - G0^-j (`vs_G0`) and map^-j - map^full
 (`vs_full`, the cost of not seeing j). Each comes with a slide-bootstrap interval:
-retrieval pairs are within a slide, so a replicate draws the val slides with
-replacement and weights each pair by its slide's count. Val has few WSIs, so these
-intervals are wide. `scanner = mean` is the mean of the per-j contrasts, with the same
-slide draws for every j. Nothing is selected, and test is not read. Pairing unit:
+retrieval pairs are within a slide, so a replicate draws the slides of the split with
+replacement and weights each pair by its slide's count. Val and test have 5 WSIs each,
+so these intervals are wide. `scanner = mean` is the mean of the per-j contrasts, with
+the same slide draws for every j. Only train and `--split` are read. Pairing unit:
 tile-level pairs.
 
-Outputs (run dir): `pairs_val.csv` (map x slide x scanner pair), `summary_val.csv`
-(map, held-out scanner, subset), `contrasts_val.csv`, `fits.json`,
-`map_{G0,CGM-init}_minus<j>.pt` (posthoc module files).
+Outputs (run dir, <split> = val or test): `pairs_<split>.csv` (map x slide x scanner
+pair), `summary_<split>.csv` (map, held-out scanner, subset), `contrasts_<split>.csv`,
+`fits.json`, `map_{G0,CGM-init}_minus<j>.pt` (posthoc module files).
 
     uv run python -m sipe.eval.loso --tag loso --features-from <GAP cache> \\
-        --runs runs/<V1-S full> runs/<V0-S full> runs/<loso fits> ...
+        [--split val|test] --runs runs/<V1-S full> runs/<V0-S full> runs/<loso fits> ...
 """
 
 from __future__ import annotations
@@ -178,6 +180,8 @@ def main(argv: list[str] | None = None) -> Path:
                         help="Held-out scanners (default: all).")  # fmt: skip
     parser.add_argument("--ridge", type=float, default=1e-4, help="G0 ridge.")
     parser.add_argument("--init-ridge", type=float, default=CGM_INIT_RIDGE)
+    parser.add_argument("--split", choices=("val", "test"), default="val",
+                        help="Split scored (fits always use train).")  # fmt: skip
     parser.add_argument("--n-boot", type=int, default=2000)
     parser.add_argument("--seed", type=int, default=0, help="Bootstrap seed.")
     parser.add_argument("--device", type=int, default=0, help="CUDA index, -1 = CPU.")
@@ -185,7 +189,8 @@ def main(argv: list[str] | None = None) -> Path:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
     device = torch.device("cpu" if args.device < 0 else f"cuda:{args.device}")
 
-    feats, metas = load_cache(args.features_from, ("train", "val"))
+    split = args.split
+    feats, metas = load_cache(args.features_from, ("train", split))
     scanners = args.scanners or sorted(metas["train"]["scanner"].unique())
 
     fits = []
@@ -216,6 +221,7 @@ def main(argv: list[str] | None = None) -> Path:
             **{k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items()},
             "runs": [str(r) for r in args.runs],
             "scanners": scanners,
+            "split": split,
             "pairing_unit": "tile-level matched pairs (pair_id); consensus over the"
             " scanners kept at fit time",
         },
@@ -263,8 +269,8 @@ def main(argv: list[str] | None = None) -> Path:
                     "fits": fits.to_dict("records")}, indent=2) + "\n"
     )  # fmt: skip
 
-    # --- val retrieval per pair --------------------------------------------------
-    val_x, val_meta = feats["val"], metas["val"]
+    # --- retrieval per pair on the split -----------------------------------------
+    val_x, val_meta = feats[split], metas[split]
     pairs, summary = [], []
     for _, e in entries.iterrows():
         fmap = maps[e["name"]]
@@ -286,21 +292,23 @@ def main(argv: list[str] | None = None) -> Path:
                     **{c: float(rows[c].mean()) for c in RETRIEVAL_COLS},
                     "relative_change": float(change[tiles.to_numpy()].mean()),
                 })  # fmt: skip
-        log.info("val %s: top-1 %.4f", e["name"], p["top_1_accuracy"].mean())
+        log.info("%s %s: top-1 %.4f", split, e["name"], p["top_1_accuracy"].mean())
     pairs = pd.concat(pairs, ignore_index=True)
-    pairs.to_csv(run_dir / "pairs_val.csv", index=False, float_format="%.6g")
+    pairs.to_csv(run_dir / f"pairs_{split}.csv", index=False, float_format="%.6g")
     summary = pd.DataFrame(summary)
-    summary.to_csv(run_dir / "summary_val.csv", index=False, float_format="%.4f")
+    summary.to_csv(run_dir / f"summary_{split}.csv", index=False, float_format="%.4f")
 
     counts = slide_counts(sorted(val_meta["slide_id"].unique()), args.n_boot, args.seed)
     contrast = contrasts(pairs, entries, scanners, counts)
-    contrast.to_csv(run_dir / "contrasts_val.csv", index=False, float_format="%.5f")
+    contrast.to_csv(
+        run_dir / f"contrasts_{split}.csv", index=False, float_format="%.5f"
+    )
     print(summary.to_string(float_format="%.4f"))
     if len(contrast):
         top1 = contrast.loc[contrast["metric"] == "top_1_accuracy"]
         print(top1.drop(columns="metric").to_string(float_format="%.4f"))
-    log.info("LOSO results (%d val slides; slide-bootstrap intervals are wide): %s",
-             counts.shape[1], run_dir)  # fmt: skip
+    log.info("LOSO results (%d %s slides; slide-bootstrap intervals are wide): %s",
+             counts.shape[1], split, run_dir)  # fmt: skip
     return run_dir
 
 
