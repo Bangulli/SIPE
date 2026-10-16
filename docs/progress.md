@@ -483,8 +483,12 @@ CGM fits (`map_cgm.pt`) on the shared SCORPION-proxy protocol (`sipe.eval.cgm_se
 | `runs/2026-10-15_19-48-26_lxbelshark_920f` | d7ih8uaz | ConsensusGenModule | d8005ed | 5999/6000 | 0.985 | 0.887 | 0.258 | 0.799 | 0.120 | 0.504 | 0.192 |
 | `runs/2026-10-16_13-08-26_lxbelshark_7e3c` | pva44z5o | ConsensusGenModule | d3cea63 | 5999/6000 | 0.988 | 0.887 | 0.221 | 0.801 | 0.102 | 0.535 | 0.077 |
 | `runs/2026-10-16_15-18-37_lxbelshark_31cf` | f0456oyl | ConsensusGenModule | 517d9cb | 5999/6000 | 0.983 | 0.887 | 0.397 | 0.801 | 0.173 | 0.550 | 0.059 |
-| `runs/2026-10-16_15-37-55_lxbelshark_f907` | 986mgsq7 | ConsensusGenModule | cf398dd | 2899/6000 | 0.978 | 0.887 | 0.405 | 0.803 | 0.151 | 0.624 | 0.000 |
-| `runs/2026-10-16_16-06-17_lxbelshark_7de8` | 07l2d54w | ConsensusGenModule | cf398dd* | 144/6000 | 0.979 | 0.887 | 0.434 | 0.802 | 0.060 | 0.780 | 0.009 |
+| `runs/2026-10-16_15-37-55_lxbelshark_f907` | 986mgsq7 | ConsensusGenModule | cf398dd | 5999/6000 | 0.979 | 0.887 | 0.386 | 0.799 | 0.169 | 0.556 | 0.000 |
+| `runs/2026-10-16_16-06-17_lxbelshark_7de8` | 07l2d54w | ConsensusGenModule | cf398dd* | 5999/6000 | 0.985 | 0.887 | 0.353 | 0.801 | 0.163 | 0.511 | 0.064 |
+| `runs/2026-10-16_16-36-44_lxbelshark_73dd` | f3mcyyh3 | ConsensusGenModule | cf398dd* | 5999/6000 | 0.980 | 0.887 | 0.360 | 0.799 | 0.158 | 0.520 | 0.000 |
+| `runs/2026-10-16_16-52-45_lxbelshark_98a6` | 2m7tly7x | ConsensusGenModule | cf398dd* | 5999/6000 | 0.984 | 0.887 | 0.399 | 0.801 | 0.164 | 0.530 | 0.063 |
+| `runs/2026-10-16_17-32-33_lxbelshark_574e` | vk53xoed | ConsensusGenModule | 1630ac2 | 1799/6000 | 0.980 | 0.887 | 0.374 | 0.801 | 0.128 | 0.675 | 0.000 |
+| `runs/2026-10-16_17-48-06_lxbelshark_a560` | 2t7crhg5 | ConsensusGenModule | 1630ac2 | 149/6000 | 0.979 | 0.887 | 0.397 | 0.802 | 0.092 | 0.843 | 0.007 |
 
 Mean of the last 10 validations of `val/<col>`, read from the local `.wandb` file; step = last logged `trainer/global_step` / `max_steps`.
 

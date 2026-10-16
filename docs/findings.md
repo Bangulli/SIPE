@@ -65,6 +65,14 @@ one on val by 0.157 [0.140, 0.174] nats/dim; not driven by P1000
 (`runs/bench/2026-10-14_11-45-49_claude-box_f4c9_scorpion_scanner_offsets_gap`). This is why
 the CGM's per-scanner likelihood (offsets as a random effect at inference) helps: the
 CGM-init estimator is above G0 on the same data in every arm (+0.0019 to +0.0022 val).
+The offsets also depend on the content: per scanner pair, a linear function of the other
+views' content (top-128 PCs) predicts 0.158 raw / 0.057 whitened of the val energy that the
+constant offsets leave (Δll +0.123 [0.114, 0.133] nats/dim, 5/5 WSIs; clusters reach only
+0.054; not P1000; largest for AT2 and Philips;
+`runs/bench/2026-10-16_17-07-06_lxbelshark_90b7_scorpion_content_offsets_gap`). Protocol:
+test this with pair differences and content from the *other* views; regressing residuals
+to the full consensus on the consensus finds content dependence where there is none when
+the scanners' noise covariances differ.
 
 **7. Content dependence is real on SCORPION but did not transfer.** Content-conditioned
 residual models beat the global one on held-out WSIs (tile_all K=4 val +0.113 nats/dim,
