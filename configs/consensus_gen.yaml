@@ -32,7 +32,7 @@ trainer:
     - class_path: lightning.pytorch.callbacks.LearningRateMonitor
       init_args:
         logging_interval: step
-# Experiment 7 (docs/experiment7-draft.md, Step 3), main arm V1-S, backbone in the
+# Experiment 7 (docs/experiment7.md), main arm V1-S, backbone in the
 # loop: frozen H0-mini GAP -> consensus generative model. Per-scanner likelihood at
 # fit time only; the evaluated map f(x) = g(m(x)) is global (no scanner ID, no gate).
 # Init: linear-Gaussian solution from 40 train batches (~ G0). Pairing unit: tile.

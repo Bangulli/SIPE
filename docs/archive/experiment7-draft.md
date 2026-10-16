@@ -1,8 +1,8 @@
 # Draft plan: Experiment 7: generative consensus estimator, acquisition-aware, with an augmentation study
 
-> **Status:** draft, on hold since 2026-10-14. Discussed in the session that added
-> `sipe.eval.scanner_offsets` (commit 6c7f634). Not started; restart from here.
-> The roadmap and progress log are not updated yet (Step 0 is part of the restart).
+> **Status: archived 2026-10-16.** The plan as written on 2026-10-14, before anything was
+> built. The model as built, its fits, gates and the departures from this plan:
+> `docs/experiment7.md`. Paths below (e.g. `docs/progress.md` sections) are as of 2026-10-14.
 
 ## Context
 

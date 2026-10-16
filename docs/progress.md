@@ -1,7 +1,7 @@
 # ISBI paper progress (as of 2026-10-16)
 
 Working state of the 4-page ISBI submission (deadline 2026-10-26; plan: `docs/roadmap.md`,
-CGM design: `docs/experiment7-draft.md`). This file only holds what the paper needs: scope,
+CGM as built: `docs/experiment7.md`). This file only holds what the paper needs: scope,
 claims with their evidence, runs in flight and the paper tables.
 - `docs/experiment-log.md`: every roadmap experiment (status table, decisions D0–D4 with
   evidence, readings, open points outside the paper, the other generated tables).
@@ -28,7 +28,9 @@ Inference is one global map on one H0-mini GAP embedding: no scanner ID, no pair
 - Framing: most of the PLISM gain over G0 is already in the *trained linear* arm V0-S; the
   nonlinear encoder adds a small, consistent amount. The contribution is the generative
   training (per-scanner likelihood, ELBO through the backbone), the nonlinearity is an
-  ablation.
+  ablation. Caveat: every fit so far is per-scanner ("-S"), so nothing yet isolates the
+  per-scanner likelihood; until the exchangeable V1 fit is read (section 3), the paper
+  can credit the training but not that ingredient.
 - Decisions behind the scope (evidence in `docs/experiment-log.md`, section 1): D0 eraser =
   bar to beat (2026-10-13); D3 no Gaussian mixtures (2026-10-14); D2 pairing fixed at tile
   level (2026-10-15); D4 no quadratic correction (2026-10-15). D5/D6 not taken.
@@ -48,7 +50,7 @@ Inference is one global map on one H0-mini GAP embedding: no scanner ID, no pair
 | 4 | the published eraser is beaten by G0 already | PLISM all pairs: GAP 0.227, eraser λ=0.5 0.281, G0 0.294 (PLISM table) | done |
 | 5 | SCORPION val/test agree (shared protocol) | `runs/bench/2026-10-15_18-22-36_lxbelshark_aae8_scorpion_cgm_select`: V1-S selected; val top-1 0.9852 vs V0-S 0.9807 and G0 0.9787; test 0.9756 vs 0.9682 and 0.9645 (CGM selection table) | done; hyperparameters fixed (ρ = 1e-3, β = 1), the selection is over arms |
 | 6 | most of the gain is the trained linear map | V0-S vs G0 +0.025 [+0.021, +0.028] of the +0.028; V1-S vs V0-S +0.003 [+0.003, +0.004] (7b71) and +0.004 (8ed0), positive in every group; V2-S vs V1-S +0.002 [+0.001, +0.002], about the seed-to-seed +0.001 (ablation blocks) | done |
-| 7 | augmentation is not the driver; training is | V0-S without augmentation vs V0-S: all pairs −0.001 [−0.002, −0.000] (`runs/bench/2026-10-16_11-56-22_lxbelshark_06ac_cgm_v0s_noaug_3fa4`); the untrained init (CGM-init, geo, 5120 tiles) is −0.020 [−0.023, −0.017] below trained V0-S on PLISM (`runs/bench/2026-10-16_11-55-56_lxbelshark_d262_aug_cgminit_geo_5120`), although equal to it on SCORPION val (0.9808 vs 0.9807, augmentation-attribution table) | V0-S done; V1-S no-aug and two closed-form PLISM runs in flight |
+| 7 | augmentation is not the driver; training is | V0-S without augmentation vs V0-S: all pairs −0.001 [−0.002, −0.000] (`runs/bench/2026-10-16_11-56-22_lxbelshark_06ac_cgm_v0s_noaug_3fa4`); the untrained init (CGM-init, geo, 5120 tiles) is −0.020 [−0.023, −0.017] below trained V0-S on PLISM (`runs/bench/2026-10-16_11-55-56_lxbelshark_d262_aug_cgminit_geo_5120`), although equal to it on SCORPION val (0.9808 vs 0.9807, augmentation-attribution table); G0 on augmented moments (geo, all copies) vs G0, all pairs −0.001 [−0.002, −0.001] (`runs/bench/2026-10-16_13-09-01_lxbelshark_9a38_aug_g0_geo_all`) | V0-S and closed-form G0 done; V1-S no-aug and `aug_cgminit_clean_all` PLISM in flight |
 | 8 | the map does not depend on having seen the scanner (LOSO) | closed form only: CGM-init^-j above G0^-j on the unseen pairs for every held-out scanner, mean +0.0037 [+0.0008, +0.0069] (`runs/bench/2026-10-16_11-34-36_claude-box_bf0f_scorpion_loso_closed_form`, LOSO table) | trained V1-S^-j / V0-S^-j pending (10 fits) |
 
 Caveats to state in the paper: one SCORPION split (5 val and 5 test WSIs), SCORPION val is
@@ -59,15 +61,15 @@ general.
 ## 3. Runs in flight and remaining tasks
 
 In flight (host, 2026-10-16):
-- PLISM `aug_g0_geo_all` (`runs/bench/2026-10-16_13-09-01_lxbelshark_9a38_aug_g0_geo_all`),
-  then `aug_cgminit_clean_all` (`scripts/aug_study_4_plism.sh`): G0 on augmented moments and
-  the untrained estimator on clean data, to close claim 7 for the closed-form side.
+- PLISM `aug_cgminit_clean_all` (`runs/bench/2026-10-16_14-32-16_lxbelshark_8ef2_aug_cgminit_clean_all`,
+  `scripts/aug_study_4_plism.sh`): the untrained estimator on clean data, the last
+  closed-form arm of claim 7 (`aug_g0_geo_all` done 2026-10-16, claim 7).
 - PLISM `cgm_v1s_noaug_7e3c` (`runs/bench/2026-10-16_14-07-40_lxbelshark_3c28_cgm_v1s_noaug_7e3c`)
   of the V1-S fit without augmentation (`runs/2026-10-16_13-08-26_lxbelshark_7e3c`, W&B
   pva44z5o).
 
-When they finish: add `aug_g0_geo_all` and `aug_cgminit_clean_all` to the per-pair block vs
-G0, and `cgm_v1s_noaug_7e3c` to the block with ref=cgm_v1s_7b71; `results_tables --write`;
+When they finish: add `aug_cgminit_clean_all` to the per-pair blocks vs G0 (`aug_g0_geo_all`
+is in), and `cgm_v1s_noaug_7e3c` to the block with ref=cgm_v1s_7b71; `results_tables --write`;
 update claim 7.
 
 To launch (user):
@@ -84,6 +86,13 @@ To launch (user):
   Open question before running it: aug and no-aug fits of one arm tie in the simplicity
   order (the tie is broken by `--runs` order); make "no augmentation" an explicit
   simplicity key first, or accept the order.
+- Remaining CGM arms, each + PLISM (`scripts/cgm_arms_fits.sh`; `docs/experiment7.md`,
+  section 3): `CUDA_VISIBLE_DEVICES=0 ARMS="V0 V1" scripts/cgm_arms_fits.sh` and
+  `CUDA_VISIBLE_DEVICES=1 ARMS="V1-S_s44" scripts/cgm_arms_fits.sh` (~1 h per fit + PLISM).
+  V1 (exchangeable) vs V1-S is the only test of the per-scanner likelihood (see the framing
+  caveat in section 1); V0 is the sanity check that the linear exchangeable CGM is close
+  to G0; seed 44 is the third seed of the selected arm (the draft asked for 3). They share
+  GPUs with the LOSO fits, so queue them after or before those.
 - Optional: HEST for V1-S seed 8ed0 if the paper's HEST row shows both seeds.
 
 Paper writing: not started.
@@ -119,8 +128,9 @@ Paper writing: not started.
 | cgm_v2s_920f | posthoc_gap | 0.898 | 0.322 | 0.275 | 0.323 | `runs/bench/2026-10-15_21-23-35_lxbelshark_60b4_cgm_v2s_920f` | – | 7986f9b |
 | aug_cgminit_geo_5120 | posthoc_gap | 0.891 | 0.305 | 0.248 | 0.298 | `runs/bench/2026-10-16_11-55-56_lxbelshark_d262_aug_cgminit_geo_5120` | – | d3cea63 |
 | cgm_v0s_noaug_3fa4 | posthoc_gap | 0.896 | 0.318 | 0.269 | 0.317 | `runs/bench/2026-10-16_11-56-22_lxbelshark_06ac_cgm_v0s_noaug_3fa4` | – | d3cea63 |
-| aug_g0_geo_all | posthoc_gap | no results | – | – | – | `runs/bench/2026-10-16_13-09-01_lxbelshark_9a38_aug_g0_geo_all` | – | d3cea63 |
+| aug_g0_geo_all | posthoc_gap | 0.885 | 0.303 | 0.241 | 0.292 | `runs/bench/2026-10-16_13-09-01_lxbelshark_9a38_aug_g0_geo_all` | – | d3cea63 |
 | cgm_v1s_noaug_7e3c | posthoc_gap | no results | – | – | – | `runs/bench/2026-10-16_14-07-40_lxbelshark_3c28_cgm_v1s_noaug_7e3c` | – | bd38e7a |
+| aug_cgminit_clean_all | posthoc_gap | no results | – | – | – | `runs/bench/2026-10-16_14-32-16_lxbelshark_8ef2_aug_cgminit_clean_all` | – | 27a416e |
 | h0_mini | – | 0.600 | 0.120 | 0.055 | 0.100 | `../plism-benchmark/output/metrics/8139_tiles/h0_mini` | – | – |
 | sipe_h0_mini | – | 0.666 | 0.237 | 0.158 | 0.203 | `../plism-benchmark/output/metrics/8139_tiles/sipe_h0_mini` | – | – |
 
@@ -130,7 +140,7 @@ Top-1 accuracy, mean over slide pairs (PLISM `results.csv`).
 
 ### PLISM per slide pair vs G0 (slide-bootstrap intervals)
 
-<!-- results:plism_pairs exclude=*smoke* ref=mixture_G0_K1 tags=h0_mini_gap_ref,softshrink_gap_lam0.5,softshrink_gap_tile_lam0.4,softshrink_gap_region_lam0.7,cgm_v1s_7b71,cgm_v1s_seed43_8ed0,cgm_v0s_a602,cgm_v2s_920f,quadratic_Q2_m16,quadratic_Q2-rand_m16,paired_vae_ysltwjoj,paired_vae_geometric_aug_lazztzda -->
+<!-- results:plism_pairs exclude=*smoke* ref=mixture_G0_K1 tags=h0_mini_gap_ref,softshrink_gap_lam0.5,softshrink_gap_tile_lam0.4,softshrink_gap_region_lam0.7,cgm_v1s_7b71,cgm_v1s_seed43_8ed0,cgm_v0s_a602,cgm_v2s_920f,aug_g0_geo_all,quadratic_Q2_m16,quadratic_Q2-rand_m16,paired_vae_ysltwjoj,paired_vae_geometric_aug_lazztzda -->
 <!-- generated by `uv run python -m sipe.eval.results_tables --write`; do not edit -->
 
 | method | pairs | n | top-1 | ref top-1 | Δ top-1 | 95% CI | pairs better | bench run dir |
@@ -183,6 +193,12 @@ Top-1 accuracy, mean over slide pairs (PLISM `results.csv`).
 | cgm_v2s_920f | all | 4095 | 0.323 | 0.294 | +0.029 | [+0.025, +0.034] | 98% | `runs/bench/2026-10-15_21-23-35_lxbelshark_60b4_cgm_v2s_920f` |
 | cgm_v2s_920f | inter-scanner, HR | 21 | 0.726 | 0.731 | -0.005 | [-0.018, +0.008] | 24% | `runs/bench/2026-10-15_21-23-35_lxbelshark_60b4_cgm_v2s_920f` |
 | cgm_v2s_920f | all, HR | 609 | 0.038 | 0.032 | +0.006 | [+0.003, +0.010] | 97% | `runs/bench/2026-10-15_21-23-35_lxbelshark_60b4_cgm_v2s_920f` |
+| aug_g0_geo_all | inter-scanner | 273 | 0.885 | 0.887 | -0.002 | [-0.003, -0.001] | 23% | `runs/bench/2026-10-16_13-09-01_lxbelshark_9a38_aug_g0_geo_all` |
+| aug_g0_geo_all | inter-staining | 546 | 0.303 | 0.303 | -0.000 | [-0.001, +0.000] | 43% | `runs/bench/2026-10-16_13-09-01_lxbelshark_9a38_aug_g0_geo_all` |
+| aug_g0_geo_all | scanner + staining | 3276 | 0.241 | 0.243 | -0.001 | [-0.002, -0.001] | 35% | `runs/bench/2026-10-16_13-09-01_lxbelshark_9a38_aug_g0_geo_all` |
+| aug_g0_geo_all | all | 4095 | 0.292 | 0.294 | -0.001 | [-0.002, -0.001] | 35% | `runs/bench/2026-10-16_13-09-01_lxbelshark_9a38_aug_g0_geo_all` |
+| aug_g0_geo_all | inter-scanner, HR | 21 | 0.724 | 0.731 | -0.007 | [-0.013, -0.001] | 5% | `runs/bench/2026-10-16_13-09-01_lxbelshark_9a38_aug_g0_geo_all` |
+| aug_g0_geo_all | all, HR | 609 | 0.032 | 0.032 | -0.000 | [-0.000, +0.000] | 37% | `runs/bench/2026-10-16_13-09-01_lxbelshark_9a38_aug_g0_geo_all` |
 | quadratic_Q2_m16 | inter-scanner | 273 | 0.883 | 0.887 | -0.003 | [-0.005, -0.003] | 10% | `runs/bench/2026-10-15_00-34-59_lxbelshark_01e9_quadratic_Q2_m16` |
 | quadratic_Q2_m16 | inter-staining | 546 | 0.299 | 0.303 | -0.004 | [-0.005, -0.003] | 10% | `runs/bench/2026-10-15_00-34-59_lxbelshark_01e9_quadratic_Q2_m16` |
 | quadratic_Q2_m16 | scanner + staining | 3276 | 0.237 | 0.243 | -0.006 | [-0.007, -0.005] | 2% | `runs/bench/2026-10-15_00-34-59_lxbelshark_01e9_quadratic_Q2_m16` |
@@ -332,8 +348,9 @@ this reason, never instead of them.
 | cgm_v2s_920f | posthoc_gap | 0.913 | 0.378 | 0.323 | 0.373 | `runs/bench/2026-10-15_21-23-35_lxbelshark_60b4_cgm_v2s_920f` | – | 7986f9b |
 | aug_cgminit_geo_5120 | posthoc_gap | 0.904 | 0.359 | 0.291 | 0.345 | `runs/bench/2026-10-16_11-55-56_lxbelshark_d262_aug_cgminit_geo_5120` | – | d3cea63 |
 | cgm_v0s_noaug_3fa4 | posthoc_gap | 0.909 | 0.373 | 0.316 | 0.366 | `runs/bench/2026-10-16_11-56-22_lxbelshark_06ac_cgm_v0s_noaug_3fa4` | – | d3cea63 |
-| aug_g0_geo_all | posthoc_gap | no results | – | – | – | `runs/bench/2026-10-16_13-09-01_lxbelshark_9a38_aug_g0_geo_all` | – | d3cea63 |
+| aug_g0_geo_all | posthoc_gap | 0.899 | 0.356 | 0.284 | 0.338 | `runs/bench/2026-10-16_13-09-01_lxbelshark_9a38_aug_g0_geo_all` | – | d3cea63 |
 | cgm_v1s_noaug_7e3c | posthoc_gap | no results | – | – | – | `runs/bench/2026-10-16_14-07-40_lxbelshark_3c28_cgm_v1s_noaug_7e3c` | – | bd38e7a |
+| aug_cgminit_clean_all | posthoc_gap | no results | – | – | – | `runs/bench/2026-10-16_14-32-16_lxbelshark_8ef2_aug_cgminit_clean_all` | – | 27a416e |
 | h0_mini | – | 0.609 | 0.142 | 0.065 | 0.114 | `../plism-benchmark/output/metrics/8139_tiles/h0_mini` | – | – |
 | sipe_h0_mini | – | 0.678 | 0.280 | 0.187 | 0.235 | `../plism-benchmark/output/metrics/8139_tiles/sipe_h0_mini` | – | – |
 
@@ -343,7 +360,7 @@ Top-1 accuracy, mean over slide pairs without the stain(s) HR on either side (re
 
 ### PLISM per slide pair vs G0, without the HR stain
 
-<!-- results:plism_pairs exclude=*smoke* drop_stain=HR ref=mixture_G0_K1 tags=h0_mini_gap_ref,softshrink_gap_lam0.5,softshrink_gap_tile_lam0.4,softshrink_gap_region_lam0.7,cgm_v1s_7b71,cgm_v1s_seed43_8ed0,cgm_v0s_a602,cgm_v2s_920f,quadratic_Q2_m16,quadratic_Q2-rand_m16,paired_vae_ysltwjoj,paired_vae_geometric_aug_lazztzda -->
+<!-- results:plism_pairs exclude=*smoke* drop_stain=HR ref=mixture_G0_K1 tags=h0_mini_gap_ref,softshrink_gap_lam0.5,softshrink_gap_tile_lam0.4,softshrink_gap_region_lam0.7,cgm_v1s_7b71,cgm_v1s_seed43_8ed0,cgm_v0s_a602,cgm_v2s_920f,aug_g0_geo_all,quadratic_Q2_m16,quadratic_Q2-rand_m16,paired_vae_ysltwjoj,paired_vae_geometric_aug_lazztzda -->
 <!-- generated by `uv run python -m sipe.eval.results_tables --write`; do not edit -->
 
 | method | pairs | n | top-1 | ref top-1 | Δ top-1 | 95% CI | pairs better | bench run dir |
@@ -380,6 +397,10 @@ Top-1 accuracy, mean over slide pairs without the stain(s) HR on either side (re
 | cgm_v2s_920f | inter-staining | 462 | 0.378 | 0.357 | +0.021 | [+0.017, +0.026] | 94% | `runs/bench/2026-10-15_21-23-35_lxbelshark_60b4_cgm_v2s_920f` |
 | cgm_v2s_920f | scanner + staining | 2772 | 0.323 | 0.285 | +0.037 | [+0.033, +0.042] | 100% | `runs/bench/2026-10-15_21-23-35_lxbelshark_60b4_cgm_v2s_920f` |
 | cgm_v2s_920f | all | 3486 | 0.373 | 0.339 | +0.034 | [+0.030, +0.038] | 98% | `runs/bench/2026-10-15_21-23-35_lxbelshark_60b4_cgm_v2s_920f` |
+| aug_g0_geo_all | inter-scanner | 252 | 0.899 | 0.900 | -0.001 | [-0.002, -0.001] | 24% | `runs/bench/2026-10-16_13-09-01_lxbelshark_9a38_aug_g0_geo_all` |
+| aug_g0_geo_all | inter-staining | 462 | 0.356 | 0.357 | -0.000 | [-0.001, +0.000] | 44% | `runs/bench/2026-10-16_13-09-01_lxbelshark_9a38_aug_g0_geo_all` |
+| aug_g0_geo_all | scanner + staining | 2772 | 0.284 | 0.285 | -0.002 | [-0.003, -0.001] | 34% | `runs/bench/2026-10-16_13-09-01_lxbelshark_9a38_aug_g0_geo_all` |
+| aug_g0_geo_all | all | 3486 | 0.338 | 0.339 | -0.001 | [-0.002, -0.001] | 35% | `runs/bench/2026-10-16_13-09-01_lxbelshark_9a38_aug_g0_geo_all` |
 | quadratic_Q2_m16 | inter-scanner | 252 | 0.897 | 0.900 | -0.003 | [-0.005, -0.003] | 10% | `runs/bench/2026-10-15_00-34-59_lxbelshark_01e9_quadratic_Q2_m16` |
 | quadratic_Q2_m16 | inter-staining | 462 | 0.353 | 0.357 | -0.004 | [-0.005, -0.003] | 12% | `runs/bench/2026-10-15_00-34-59_lxbelshark_01e9_quadratic_Q2_m16` |
 | quadratic_Q2_m16 | scanner + staining | 2772 | 0.279 | 0.285 | -0.007 | [-0.008, -0.006] | 3% | `runs/bench/2026-10-15_00-34-59_lxbelshark_01e9_quadratic_Q2_m16` |

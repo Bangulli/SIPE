@@ -85,7 +85,9 @@ the full fit), not P1000 (−0.0029)
 V0-S (linear encoder) has +0.025 of V1-S's +0.028 over G0; the nonlinear encoder adds
 +0.003 / +0.004 (two seeds); a nonlinear generator (V2-S) adds +0.002, about a seed change
 (+0.001), while moving the map more (nonlinear_rel 0.192 vs 0.072). Without augmentation,
-V0-S loses −0.001 [−0.002, −0.000]; the untrained init is −0.020 below. Geo and zoom
+V0-S loses −0.001 [−0.002, −0.000]; G0 fitted on augmented moments is −0.001
+[−0.002, −0.001] vs G0 (`runs/bench/2026-10-16_13-09-01_lxbelshark_9a38_aug_g0_geo_all`); the
+untrained init is −0.020 below trained V0-S. Geo and zoom
 augmentation even lower the closed-form estimators on clean SCORPION val (G0 0.9765 vs
 0.9787); dihedral is neutral (H0-mini GAP close to dihedral-invariant). Evidence: ablation
 blocks and augmentation-attribution table in `docs/progress.md`. Open: V1-S without

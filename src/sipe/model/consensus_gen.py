@@ -1,4 +1,4 @@
-"""Consensus generative model (CGM, Experiment 7 in docs/experiment7-draft.md), backbone
+"""Consensus generative model (CGM, Experiment 7, docs/experiment7.md), backbone
 in the loop: frozen H0-mini GAP x [768] -> one global map f(x) = g(m(x)).
 
 Generative model (fit time), tile i seen by scanners k, in standardized coordinates

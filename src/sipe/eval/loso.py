@@ -1,7 +1,7 @@
 """Leave-one-scanner-out (LOSO) check of the Experiment 7 maps on SCORPION val.
 
 A global map can still behave like a gate when its nonlinear encoder recognizes scanner
-signatures (docs/experiment7-draft.md, Step 3). On a scanner never seen at fit time,
+signatures (docs/experiment7.md, section 1). On a scanner never seen at fit time,
 that turns into extrapolation. For each held-out scanner j, the maps are fitted on the
 train split without j: the consensus is then taken over the 4 remaining scanners.
 They are scored by cross-scanner retrieval on the val pairs that include j (`unseen`)

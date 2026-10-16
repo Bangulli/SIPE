@@ -1,5 +1,5 @@
 """Training module for the consensus generative model (Experiment 7, backbone in the
-loop; docs/experiment7-draft.md, Step 3). Mirrors PairedVAEModule.
+loop; docs/experiment7.md). Mirrors PairedVAEModule.
 
 Batches come from PairedSCORPIONDataModule: locations × scanner views, views of a
 location contiguous, all views with the same augmentation. Per tile and per source

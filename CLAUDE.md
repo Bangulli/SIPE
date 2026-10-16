@@ -160,6 +160,8 @@ W&B), and each row must name the run dir it came from.
   (decision 2026-10-14): γ = inf is exactly G0 (in-run G0 row). Pairing unit: tile-level
   pairs. γ = ridge on the quadratic block, largest γ reaching 95% of the best val gain
   over G0. Table block `quadratic`.
+- Experiment 7 CGM (model, arms, recipe, gates, departures from the plan): `docs/experiment7.md`;
+  original plan archived in `docs/archive/experiment7-draft.md`.
 - Experiment 7 CGM on the shared protocol: `uv run python -m sipe.eval.cgm_select --tag <tag>
   --features-from <feature cache> --runs runs/<fit> ... [--test selected|all|none]`. Scores
   each fit's `map_cgm.pt` on clean features next to raw, the eraser and an in-run G0 (α=1);
