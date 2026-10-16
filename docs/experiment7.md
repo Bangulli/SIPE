@@ -67,7 +67,7 @@ plus the arm overrides below. Hyperparameters are fixed, not selected on val.
 | **V1-S** nonlinear encoder, per-scanner (selected) | – | seed 42 `runs/2026-10-14_22-30-38_lxbelshark_7b71`, seed 43 `runs/2026-10-15_08-51-41_lxbelshark_8ed0`, seed 44 queued; no aug `runs/2026-10-16_13-08-26_lxbelshark_7e3c` |
 | V2-S + nonlinear generator h | `generator_hidden_dim=1024` | `runs/2026-10-15_19-48-26_lxbelshark_920f` |
 | V1-S+D content-dependent scanner shift (follow-up, not ISBI) | `--config configs/consensus_gen_shift.yaml` (`ContentShiftCGM`, `shift_rank: 128`) | pending (`scripts/cgm_shift_fit.sh`) |
-| LOSO, per held-out scanner j | `--data.init_args.hold_out_scanner=<j> --data.init_args.views=4` | V1-S and V0-S × 5 scanners pending (`scripts/loso_fits.sh`) |
+| LOSO, per held-out scanner j | `--data.init_args.hold_out_scanner=<j> --data.init_args.views=4` | V1-S and V0-S × 5 scanners, done 2026-10-16 (`scripts/loso_fits.sh`) |
 
 Overrides are under `--model.init_args.network.init_args.`; no-aug = `--data.init_args.
 augmentations=[] --data.init_args.horizontal_flip=false --data.init_args.vertical_flip=false`.
@@ -83,16 +83,20 @@ Host scripts (gitignored): `scripts/cgm_arms_fits.sh`, `cgm_v2s_fit.sh`,
   95% of the best val gain over G0; test read once. Table block `cgm`.
 - **Augmentation attribution (no training):** `sipe.eval.aug_attribution` + augmented caches
   (`sipe.features.extract`); block `augattr`.
-- **LOSO:** `sipe.eval.loso`, closed-form G0^-j / CGM-init^-j in the run plus the trained
-  LOSO fits; block `loso`.
+- **LOSO:** `sipe.eval.loso [--split val|test]`, closed-form G0^-j / CGM-init^-j in the
+  run plus the trained LOSO fits; block `loso`.
 - **External:** PLISM / HEST with `--posthoc runs/<fit>/map_cgm.pt`; per-pair blocks
   (`plism_pairs`) against G0, V0-S and V1-S.
 
 Gates (from the draft; status in `docs/progress.md`, section 2):
-- **G-C (= roadmap D6):** CGM > G0 on PLISM with similar HEST, and LOSO not below G0 →
-  keep it and report the ablations; CGM ≈ the best closed-form model → report the simpler
-  one. PLISM and HEST pass; LOSO pending for the trained arms.
-- **LOSO gate:** V1-S^-j − G0^-j on the unseen pairs not below 0, read next to V0-S^-j.
+- **G-C (= roadmap D6):** CGM > G0 on PLISM with similar HEST → keep it and report the
+  ablations; CGM ≈ the best closed-form model → report the simpler one. PLISM and HEST
+  pass. The draft also required "LOSO not below G0"; dropped (decision 2026-10-16, see
+  below).
+- **LOSO is an analysis, not a gate** (decision 2026-10-16): V1-S was selected and run on
+  PLISM before LOSO, and nothing depends on it. Readout: V1-S^-j − G0^-j on the unseen
+  pairs, next to V0-S^-j; first read on val, paper numbers on test (`sipe.eval.loso
+  --split test`, read once).
 
 ## 5. Departures from the draft (`docs/archive/experiment7-draft.md`)
 

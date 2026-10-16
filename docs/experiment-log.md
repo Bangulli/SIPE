@@ -266,9 +266,13 @@ The ISBI-facing summary of these items is in `docs/progress.md` (section 2, clai
   (W&B pva44z5o, then its PLISM `cgm_v1s_noaug_7e3c`); then `cgm_select_all` (command in the
   item above, user). To do when done: add `aug_g0_geo_all`, `aug_cgminit_clean_all` to the
   G0 per-pair block and `cgm_v1s_noaug_7e3c` to a block with ref=cgm_v1s_7b71.
-- LOSO check for the selected CGM (V1-S), IMPLEMENTED 2026-10-16. It is mandatory per
-  `docs/archive/experiment7-draft.md` (gates G-A/G-C): the nonlinear encoder could recognize scanner
-  signatures (an implicit gate), which means extrapolation on an unseen scanner. Code:
+- LOSO analysis of the selected CGM (V1-S), IMPLEMENTED 2026-10-16. Motivation: the
+  nonlinear encoder could recognize scanner signatures (an implicit gate), which means
+  extrapolation on an unseen scanner. `docs/archive/experiment7-draft.md` made it a gate
+  (G-A/G-C); decision 2026-10-16 (user): LOSO is an analysis of the frozen model, not a
+  decision step. V1-S was selected and run on PLISM before LOSO, nothing depends on it, so
+  the paper numbers come from SCORPION test (`--split test`, read once); the val run below
+  was the first readout. Code:
   `sipe.eval.loso` (LOSO table), with `SCORPIONDataModule(hold_out_scanner=...)` dropping
   scanner j from train only (views=4), and `scripts/loso_fits.sh` for the trained arms.
   Arms (user decision 2026-10-16): G0^-j and CGM-init^-j (closed form, in the run), plus
@@ -281,7 +285,7 @@ The ISBI-facing summary of these items is in `docs/progress.md` (section 2, clai
     full fits). The largest costs are AT2 and Philips (G0 −0.0113 / −0.0090); P1000 does not
     stand out (−0.0029).
   Trained readout, 2026-10-16 (`runs/bench/2026-10-16_23-59-47_lxbelshark_b8e2_scorpion_loso`; the closed-form rows are identical to bf0f, so
-  the table now shows b8e2 only): gate passed. V1-S^-j − G0^-j on the unseen pairs is
+  the table now shows b8e2 only): expectation met. V1-S^-j − G0^-j on the unseen pairs is
   positive with the CI above 0 for every j (AT2 +0.0155, Philips +0.0105, P1000 +0.0051,
   GT450 +0.0047, DP200 +0.0042), mean +0.0080 [+0.0019, +0.0148], larger than on the seen
   pairs (+0.0064). The linear control V0-S^-j is about the closed-form CGM-init (+0.0040 vs
@@ -292,9 +296,10 @@ The ISBI-facing summary of these items is in `docs/progress.md` (section 2, clai
   Done (was: host, ~10 h): `ARM=V1-S CUDA_VISIBLE_DEVICES=0 scripts/loso_fits.sh` and
   `ARM=V0-S CUDA_VISIBLE_DEVICES=1 scripts/loso_fits.sh`, then `sipe.eval.loso` with 7b71,
   a602 and the 10 fit dirs (the script prints the command), then `results_tables --write`.
-  Gate: V1-S^-j − G0^-j on the unseen pairs not below 0, and compare it with V0-S^-j (the
-  linear control). Roadmap section 10 frames LOSO as optional, the draft as mandatory for a
-  nonlinear winner; PLISM scanner stratification is not a substitute.
+  Readout (an expectation, not a gate): V1-S^-j − G0^-j on the unseen pairs not below 0,
+  next to V0-S^-j (the linear control). Roadmap section 10 frames LOSO as optional; PLISM
+  scanner stratification is not a substitute.
+  Test readout pending (user): the same command with `--split test --tag loso_test`.
 - PLISM without HR (2026-10-15): HR = overnight Harris hematoxylin (checked on the images),
   so every PLISM table now has a `drop_stain=HR` twin (section 1). The ranking does not
   change: on all pairs without HR, CGM 7b71 0.371 and seed 43 0.372 > V0-S 0.367 > region
@@ -418,6 +423,25 @@ The ISBI-facing summary of these items is in `docs/progress.md` (section 2, clai
     explain more of the val pair differences than the leak-free diagnostic (self pair
     in the loss + scanner-blind encoder → possible noise fitting). V1-S + D is the
     informative arm; with a linear encoder D_s may leave the map unchanged.
+- Scanner-count analysis (proposed 2026-10-16, not built; user: after the ISBI results are
+  final, into the paper only if time allows). Question: how many training scanners each
+  estimator needs; LOSO (`sipe.eval.loso`) is its 5 → 4 point (G0 −0.0057 vs the full fit
+  on val). Confound: with m of 5 scanners each tile gives m views, so fewer scanners also
+  means less data. Design:
+  - two arms per m = 2..5: all views of the m kept scanners, and a fixed budget where
+    every train tile gives exactly 2 views, a scanner pair drawn per tile from the m kept
+    scanners (tiles, view count and content fixed; only scanner diversity varies). The gap
+    between the two curves is the data-count effect;
+  - average over all C(5, m) subsets (which scanners are kept matters: AT2 / Philips
+    cost the most in LOSO), per-subset rows in the supplement;
+  - readout: SCORPION retrieval on pairs between kept scanners and on pairs with at least
+    one unseen scanner; nothing selected; val first, test once for paper numbers;
+  - closed form first (G0, CGM-init; 26 subsets x 2 arms, minutes on CPU; within-tile
+    moments work from pairs); trained V1-S / V0-S only at a point or two (e.g. m = 3 fixed
+    budget), the full trained curve belongs to the follow-up paper;
+  - a G0 curve that saturates at m = 2–3 is a result too (scanner diversity does not limit
+    linear maps).
+  Planned code: `sipe.eval.scanner_count` + table block `scanner_count`.
 - Future work (discussed 2026-10-16, not implemented): test the noise-independence
   assumption of the `content_offsets` pair design. The design is unbiased only if the
   acquisition noise of the target scanners (k, j) is independent of the noise of the
