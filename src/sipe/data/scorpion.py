@@ -158,6 +158,10 @@ class SCORPIONDataModule(L.LightningDataModule):
     data are split deterministically by ``group_column`` (``slide_id`` by
     default), preventing scanner views or tiles from the same WSI from leaking
     across splits.
+
+    ``hold_out_scanner`` (leave-one-scanner-out, `sipe.eval.loso`) drops that
+    scanner's rows from the train split only, after the split, so the WSI split and
+    the domain indices (built from all scanners) are unchanged; val/test keep it.
     """
 
     def __init__(
@@ -183,6 +187,7 @@ class SCORPIONDataModule(L.LightningDataModule):
         pin_memory: bool = True,
         persistent_workers: bool = True,
         drop_last: bool = True,
+        hold_out_scanner: str | None = None,
     ) -> None:
         super().__init__()
         self.save_hyperparameters()
@@ -234,6 +239,7 @@ class SCORPIONDataModule(L.LightningDataModule):
         self.pin_memory = bool(pin_memory)
         self.persistent_workers = bool(persistent_workers)
         self.drop_last = bool(drop_last)
+        self.hold_out_scanner = hold_out_scanner
 
         self.domain_names: tuple[str, ...] = ()
         self.domain_to_index: dict[str, int] = {}
@@ -412,6 +418,15 @@ class SCORPIONDataModule(L.LightningDataModule):
         }
 
         train, val, test = self._split_metadata(metadata)
+        if self.hold_out_scanner is not None:
+            if self.hold_out_scanner not in self.domain_to_index:
+                raise ValueError(
+                    f"hold_out_scanner {self.hold_out_scanner!r} is not a known "
+                    f"domain: {self.domain_names}."
+                )
+            train = train.loc[
+                train[self.domain_column].astype(str) != self.hold_out_scanner
+            ]
 
         self._prepared_metadata = metadata
         self.train_metadata = train.reset_index(drop=True)
@@ -513,7 +528,11 @@ class PairedSCORPIONDataset(Dataset):
             if len(rows) >= (views or 2):
                 self.locations.append(rows)
         if not self.locations:
-            raise RuntimeError("No location has enough scanner views.")
+            raise RuntimeError(
+                f"No location has {views or 2} scanner views (with a held-out "
+                "scanner, set views to the number of remaining scanners, e.g. "
+                "--data.init_args.views=4)."
+            )
 
     def __len__(self) -> int:
         return len(self.locations)

@@ -82,6 +82,9 @@ def fit_info(run_dir: Path) -> dict[str, Any]:
         "seed": config.get("seed_everything"),
         "residual_penalty": float(model.get("residual_penalty", 0.0)),
         "kl_weight": float(model.get("kl_weight", 1.0)),
+        "hold_out_scanner": (config.get("data") or {}).get("init_args", {}).get(
+            "hold_out_scanner"
+        ),
         "config_key": key,
     }
 
@@ -139,6 +142,9 @@ def main(argv: list[str] | None = None) -> Path:
         if not (run / MAP_FILENAME).exists():
             raise FileNotFoundError(f"{run / MAP_FILENAME} (not a CGM fit dir?)")
         info = fit_info(run)
+        if info["hold_out_scanner"] is not None:
+            raise ValueError(f"{run} is a leave-one-scanner-out fit (sipe.eval.loso), "
+                             "not a selection candidate.")  # fmt: skip
         fits.append({"name": f"{info['arm']}_{run.name.rsplit('_', 1)[-1]}",
                      "run_dir": str(run), **info})  # fmt: skip
     fits = pd.DataFrame(fits)
