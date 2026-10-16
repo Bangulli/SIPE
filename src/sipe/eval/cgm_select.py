@@ -12,7 +12,8 @@ Selection (val only, never test or PLISM):
 - fits with the same configuration (config.yaml without `seed_everything`, logger,
   callbacks and `default_root_dir`) form one candidate; its val top-1 is the mean
   over its seeds;
-- candidates are ordered by simplicity: arm V0 < V0-S < V1 < V1-S < V2 < V2-S, then a
+- candidates are ordered by simplicity: arm V0 < V0-S < V0-S+D < V1 < V1-S < V1-S+D <
+  V2 < V2-S < V2-S+D (+D = ContentShiftCGM), then a
   larger residual penalty rho first (closer to the linear limit), then a smaller
   beta;
 - the 95% rule of the sweeps (`proxy.select_by_gain`), with G0 as the base and the
@@ -55,7 +56,12 @@ from sipe.training.consensus_gen_module import MAP_FILENAME
 
 log = logging.getLogger(__name__)
 
-ARM_ORDER = ("V0", "V0-S", "V1", "V1-S", "V2", "V2-S")
+# "+D": ContentShiftCGM (content-dependent scanner shift in the likelihood), after the
+# same arm without it (more fit-time parameters, the same map family).
+ARM_ORDER = (
+    "V0", "V0-S", "V0-S+D", "V1", "V1-S", "V1-S+D", "V2", "V2-S", "V2-S+D",
+)  # fmt: skip
+CONTENT_SHIFT_CLASS = "sipe.model.consensus_gen.ContentShiftCGM"
 FIXED = ("raw", "reference", "G0")
 
 
@@ -68,6 +74,8 @@ def fit_info(run_dir: Path) -> dict[str, Any]:
         "V1" if net.get("encoder_hidden_dim", 0) else "V0"
     )  # fmt: skip
     arm += "-S" if net.get("per_scanner", True) else ""
+    if model["network"].get("class_path") == CONTENT_SHIFT_CLASS:
+        arm += "+D"
     trainer = {
         k: v for k, v in config.get("trainer", {}).items()
         if k not in ("logger", "callbacks", "default_root_dir")

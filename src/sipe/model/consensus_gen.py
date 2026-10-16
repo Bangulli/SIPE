@@ -21,6 +21,8 @@ predicts the 5-scanner mean instead).
 
 Arms (draft, Step 3): `per_scanner` (V*-S vs exchangeable), `encoder_hidden_dim` (0:
 linear encoder, V0; >0: V1), `generator_hidden_dim` (>0: nonlinear h, V2).
+`ContentShiftCGM` / `ContentShiftHead` (arm "+D"): content-dependent scanner shift
+delta_k + D_k z in the likelihood, D_k of rank `shift_rank`; the map is unchanged.
 """
 
 from __future__ import annotations
@@ -223,6 +225,21 @@ class ConsensusGenerativeHead(nn.Module):
             "init/num_views": float(x.shape[0]),
         }
 
+    def likelihood_mean(
+        self, g: torch.Tensor, z: torch.Tensor, scanners: torch.Tensor
+    ) -> torch.Tensor:
+        """Mean of the view likelihood before delta_k, i.e. g(z) here.
+
+        Hook for ContentShiftHead (adds delta_k(z) - delta_k); z and scanners are
+        unused in this model.
+        """
+        del z, scanners
+        return g
+
+    def fit_metadata(self) -> dict[str, object]:
+        """Fit-time model facts written into the map file (not used by the map)."""
+        return {"per_scanner": self.per_scanner}
+
     def sample(self, m: torch.Tensor) -> torch.Tensor:
         """z ~ q(z|x) = N(m, A A^T)."""
         return m + torch.randn_like(m) @ self.posterior_factor()[0].T
@@ -289,7 +306,7 @@ class ConsensusGenModel(nn.Module):
         self.encoder_meta = bundle.meta
         self.eval_transform = bundle.transform
         self.feature_dim = self.encoder_meta.embed_dim
-        self.head = ConsensusGenerativeHead(
+        self.head = self._build_head(
             dim=self.feature_dim,
             num_scanners=num_scanners,
             per_scanner=per_scanner,
@@ -301,6 +318,9 @@ class ConsensusGenModel(nn.Module):
             "encoder_hidden_dim": int(encoder_hidden_dim),
             "generator_hidden_dim": int(generator_hidden_dim),
         }
+
+    def _build_head(self, **kwargs) -> ConsensusGenerativeHead:
+        return ConsensusGenerativeHead(**kwargs)
 
     def freeze_backbone(self) -> None:
         self.backbone.requires_grad_(False)
@@ -314,3 +334,123 @@ class ConsensusGenModel(nn.Module):
         x = self.backbone_gap(images)
         with torch.autocast(x.device.type, enabled=False):
             return self.head.map(x)
+
+
+# --- content-dependent scanner shift (Experiment 7 follow-up) ---------------------
+
+
+class ContentShiftHead(ConsensusGenerativeHead):
+    """ConsensusGenerativeHead with a content-dependent scanner shift:
+
+        u_{i,k} = g(z_i) + delta_k + D_k z_i + B_k eps,   D_k = A_k P^T  (rank r)
+
+    with sum_k w_k D_k = 0 (w = the scanner frequencies of the init batches): A_k is
+    centered over scanners in the forward pass, so g stays the consensus. Fit-time
+    only: the evaluated map f = g(m(u)) and the map file are those of the base model.
+
+    Init: A_k = 0 (D_k = 0: the init is exactly the base init, and the map at init
+    is identical); P = top-r eigenvectors of the init L = C^(1/2) (the content
+    directions in z, as the top content PCs of `sipe.eval.content_offsets`). P gets
+    gradients once A moves. The rho penalty also covers sum_k ||D_k||_F^2 (invariant
+    to the A / P factorization).
+    """
+
+    def __init__(
+        self,
+        shift_rank: int,
+        dim: int = 768,
+        num_scanners: int = 5,
+        per_scanner: bool = True,
+        encoder_hidden_dim: int = 1024,
+        generator_hidden_dim: int = 0,
+    ) -> None:
+        if not per_scanner:
+            raise ValueError("A content-dependent scanner shift needs per_scanner.")
+        if not 0 < shift_rank <= dim:
+            raise ValueError(f"shift_rank must be in [1, {dim}], got {shift_rank}.")
+        super().__init__(
+            dim, num_scanners, per_scanner, encoder_hidden_dim, generator_hidden_dim
+        )
+        self.shift_rank = int(shift_rank)
+        self.shift_A = nn.Parameter(torch.zeros(num_scanners, dim, shift_rank))
+        self.shift_P = nn.Parameter(torch.zeros(dim, shift_rank))
+        self.register_buffer(
+            "scanner_weight", torch.full((num_scanners,), 1.0 / num_scanners)
+        )
+
+    @torch.no_grad()
+    def init_from_moments(
+        self,
+        x: torch.Tensor,
+        scanners: torch.Tensor,
+        locations: torch.Tensor,
+        ridge: float = 1e-3,
+    ) -> dict[str, float]:
+        stats = super().init_from_moments(x, scanners, locations, ridge)
+        weights = torch.bincount(scanners, minlength=self.num_scanners).double()
+        self.scanner_weight.copy_(weights / weights.sum())
+        # L = C^(1/2) is symmetric with the eigenvectors of C.
+        _, evecs = torch.linalg.eigh(self.map.L.double())
+        self.shift_P.copy_(evecs[:, -self.shift_rank :].flip(-1))
+        self.shift_A.zero_()
+        return stats
+
+    def shift_factors(self) -> torch.Tensor:
+        """Centered A_k [S, dim, r]: sum_k w_k A_k = 0, hence sum_k w_k D_k = 0."""
+        mean = torch.einsum("s,sdr->dr", self.scanner_weight.to(self.shift_A),
+                            self.shift_A)  # fmt: skip
+        return self.shift_A - mean
+
+    def shift(self, z: torch.Tensor, scanners: torch.Tensor) -> torch.Tensor:
+        """D_k z per row [B, dim] (k = the row's scanner)."""
+        zp = z @ self.shift_P  # [B, r]
+        factors = self.shift_factors()
+        out = zp.new_zeros(z.shape[0], self.dim)
+        for k in range(self.num_scanners):
+            mask = scanners == k
+            if bool(mask.any()):
+                out[mask] = zp[mask] @ factors[k].T
+        return out
+
+    def likelihood_mean(
+        self, g: torch.Tensor, z: torch.Tensor, scanners: torch.Tensor
+    ) -> torch.Tensor:
+        return g + self.shift(z, scanners)
+
+    def residual_penalty(self) -> torch.Tensor:
+        """Base rho term + sum_k ||D_k||_F^2 = sum_k tr(A_k (P^T P) A_k^T)."""
+        factors = self.shift_factors()
+        gram = self.shift_P.T @ self.shift_P
+        d_norm = torch.einsum("sdr,rq,sdq->", factors, gram, factors)
+        return super().residual_penalty() + d_norm
+
+    def fit_metadata(self) -> dict[str, object]:
+        return {**super().fit_metadata(), "shift_rank": self.shift_rank}
+
+
+class ContentShiftCGM(ConsensusGenModel):
+    """ConsensusGenModel with a ContentShiftHead (configs/consensus_gen_shift.yaml).
+
+    The evaluated map is the base CGMMap (same map_init_args, same map file class).
+    """
+
+    def __init__(
+        self,
+        shift_rank: int,
+        encoder: str = "h0-mini",
+        num_scanners: int = 5,
+        per_scanner: bool = True,
+        encoder_hidden_dim: int = 1024,
+        generator_hidden_dim: int = 0,
+        pretrained: bool = True,
+    ) -> None:
+        # Read by _build_head during the base __init__ (a plain int may be set before
+        # nn.Module.__init__); this way only one head is built and seeded.
+        self._shift_rank = int(shift_rank)
+        super().__init__(
+            encoder, num_scanners, per_scanner, encoder_hidden_dim,
+            generator_hidden_dim, pretrained,
+        )  # fmt: skip
+
+    def _build_head(self, **kwargs) -> ContentShiftHead:
+        return ContentShiftHead(self._shift_rank, **kwargs)

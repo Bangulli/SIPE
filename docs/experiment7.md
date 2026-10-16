@@ -23,6 +23,13 @@ consensus_gen_module.py` (loss, init, validation), `configs/consensus_gen.yaml`.
     Cholesky factor per scanner);
   - the scanner label k is used only in this likelihood. Exchangeable arms: δ = 0 and one
     shared factor.
+- **V1-S+D** (`ContentShiftCGM` / `ContentShiftHead`, 2026-10-16): the shift becomes
+  δ_k + D_k z, D_k = A_k Pᵀ of rank `shift_rank`, A_k centered over the scanners
+  (Σ_k w_k D_k = 0, w = scanner frequencies of the init batches). Init A_k = 0 (the init
+  is exactly V1-S's) and P = top-r eigenvectors of the init L; ρ also covers Σ‖D_k‖²_F;
+  A, P in the linear optimizer group. Fit-time only: the map and `map_cgm.pt` are the
+  V1-S ones. Logged: `shift_rel` = mean ‖D_k z‖ / mean ‖u − g − δ_k‖. Motivation and
+  caveats: `docs/experiment-log.md`, section 3 (content-dependent scanner offsets).
 - **Encoder (single view):** q(z|u) = N(m(u), A Aᵀ), m(u) = M u + r(u).
 - **Inference map:** f(x) = center + scale · g(m(u)) (`CGMMap`, saved as `map_cgm.pt`, a
   `--posthoc` module map file).
@@ -59,6 +66,7 @@ plus the arm overrides below. Hyperparameters are fixed, not selected on val.
 | V1 nonlinear encoder, exchangeable (isolates the per-scanner likelihood) | `per_scanner=false` | queued (`scripts/cgm_arms_fits.sh`) |
 | **V1-S** nonlinear encoder, per-scanner (selected) | – | seed 42 `runs/2026-10-14_22-30-38_lxbelshark_7b71`, seed 43 `runs/2026-10-15_08-51-41_lxbelshark_8ed0`, seed 44 queued; no aug `runs/2026-10-16_13-08-26_lxbelshark_7e3c` |
 | V2-S + nonlinear generator h | `generator_hidden_dim=1024` | `runs/2026-10-15_19-48-26_lxbelshark_920f` |
+| V1-S+D content-dependent scanner shift (follow-up, not ISBI) | `--config configs/consensus_gen_shift.yaml` (`ContentShiftCGM`, `shift_rank: 128`) | pending (`scripts/cgm_shift_fit.sh`) |
 | LOSO, per held-out scanner j | `--data.init_args.hold_out_scanner=<j> --data.init_args.views=4` | V1-S and V0-S × 5 scanners pending (`scripts/loso_fits.sh`) |
 
 Overrides are under `--model.init_args.network.init_args.`; no-aug = `--data.init_args.

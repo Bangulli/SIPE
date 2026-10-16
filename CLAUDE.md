@@ -167,6 +167,10 @@ W&B), and each row must name the run dir it came from.
   over G0. Table block `quadratic`.
 - Experiment 7 CGM (model, arms, recipe, gates, departures from the plan): `docs/experiment7.md`;
   original plan archived in `docs/archive/experiment7-draft.md`.
+- Experiment 7 follow-up V1-S+D (content-dependent scanner shift δ_k + D_k z in the
+  likelihood, low rank, map unchanged): `sipe.model.consensus_gen.ContentShiftCGM`,
+  `configs/consensus_gen_shift.yaml` (= `consensus_gen.yaml` except the network; a test
+  enforces it); `cgm_select` labels it `V1-S+D`.
 - Experiment 7 CGM on the shared protocol: `uv run python -m sipe.eval.cgm_select --tag <tag>
   --features-from <feature cache> --runs runs/<fit> ... [--test selected|all|none]`. Scores
   each fit's `map_cgm.pt` on clean features next to raw, the eraser and an in-run G0 (α=1);

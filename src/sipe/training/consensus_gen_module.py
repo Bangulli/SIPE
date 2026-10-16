@@ -6,6 +6,7 @@ location contiguous, all views with the same augmentation. Per tile and per sour
 view s (u = standardized backbone GAP):
 
 loss = mean_{s, t in tile(s)} -log N(u_t; g(z_s) + delta_{k_t}, B_{k_t} B_{k_t}^T) / D
+       (ContentShiftHead: mean g(z_s) + delta_{k_t} + D_{k_t} z_s)
      + beta * KL(q(z|u_s) || N(0, I)) / D
      + rho  * ||r, h output layers||^2,          z_s ~ q(z|u_s)
 
@@ -31,7 +32,7 @@ from typing import Any
 import torch
 import torch.nn.functional as F
 
-from sipe.model.consensus_gen import ConsensusGenModel
+from sipe.model.consensus_gen import ConsensusGenModel, ContentShiftHead
 from sipe.training.base import FrozenBackboneModule
 from sipe.training.paired_vae_module import cross_scanner_top1, partner_index
 from sipe.training.scanner_vae_module import ramp
@@ -181,7 +182,7 @@ class ConsensusGenModule(FrozenBackboneModule):
                 "encoder": network.encoder_name,
                 "pooling": "gap",
                 "pairing_unit": "tile",
-                "per_scanner": bool(network.head.per_scanner),
+                **network.head.fit_metadata(),
                 "kl_weight": float(hp.kl_weight),
                 "residual_penalty": float(hp.residual_penalty),
                 "global_step": int(self.global_step),
@@ -206,7 +207,9 @@ class ConsensusGenModule(FrozenBackboneModule):
             z = head.sample(m) if stage == "train" else m
             g = fmap.generate(z)
             source, target = tile_view_pairs(location)
-            nll = head.nll(u[target], g[source], domains[target]).mean() / dim
+            # g(z_s); g(z_s) + D_k z_s for ContentShiftHead (delta_k is in nll).
+            mean = head.likelihood_mean(g[source], z[source], domains[target])
+            nll = head.nll(u[target], mean, domains[target]).mean() / dim
             kl = head.kl(m).mean() / dim
             beta = hp.kl_weight * ramp(step, hp.kl_warmup_steps)
             penalty = head.residual_penalty()
@@ -232,6 +235,12 @@ class ConsensusGenModule(FrozenBackboneModule):
             "noise_sigma_mean": head.noise_factor.log_diag.exp().mean(),
             "delta_norm": head.delta.norm(dim=1).mean(),
         }
+        if isinstance(head, ContentShiftHead):
+            # Size of D_k z relative to the residual after the constant offsets.
+            with torch.no_grad():
+                shift = (mean - g[source]).norm(dim=1).mean()
+                resid = u[target] - g[source] - head.delta[domains[target]]
+                metrics["shift_rel"] = shift / resid.norm(dim=1).mean().clamp_min(1e-12)
         on_step = stage == "train"
         batch_size = images.shape[0]
         self.log_dict(
