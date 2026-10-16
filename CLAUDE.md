@@ -133,6 +133,11 @@ W&B), and each row must name the run dir it came from.
   sipe.eval.scanner_offsets --tag <tag> --features-from <feature cache>`; tile-level
   pairs, train/val only, writes `summary.csv`, `energy.csv`, `likelihood.csv`,
   `scanner_stats.csv` (table block `offsets`).
+- Content-dependent scanner offsets (does δ_k depend on content? no map): `uv run python -m
+  sipe.eval.content_offsets --tag <tag> --features-from <feature cache>`; per scanner pair,
+  target x_k − x_j, content from the other views (no shared noise); train/val only, writes
+  `summary.csv`, `per_scanner.csv`, `per_cluster.csv`, `ridge.csv` (table block
+  `content_offsets`).
 - PLISM retrieval diagnostics (no new metric; `docs/benchmarks.md`):
   `uv run python -m sipe.eval.plism_pairs --runs <ref run> <method runs> --tag <tag>`
   merges the runs' per-pair `metrics.csv` into `pairs.csv` + `shortlist.csv`; then

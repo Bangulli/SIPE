@@ -24,6 +24,7 @@ Where to write what:
 | Exp 2: consensus covariance (2A), affine regression (2B), pairing-scale control (2C) | 2A covered by G0 of Exp 3 (α grid; 2A=2B at α=1 is a unit test); 2C implemented (`soft_shrinkage_sweep --deltas slide|region|tile`, 2026-10-14); tile sweep done (`runs/bench/2026-10-14_09-21-09_lxbelshark_c54b_scorpion_softshrink_gap_tile`, λ=0.4) and region sweep done (`runs/bench/2026-10-14_19-02-29_lxbelshark_71bb_scorpion_softshrink_gap_region`, λ=0.7), both with val selection + test (softshrink table, refreshed 2026-10-14); not yet read against G0 | `runs/bench/2026-10-13_21-47-56_claude-box_6fdf_scorpion_mixture_gap` (mixture table, G0 row) | D2 pending: G0 (tile-level consensus target) beats the eraser on SCORPION and on PLISM (all four rows; PLISM `runs/bench/2026-10-14_07-10-49_lxbelshark_0721_mixture_G0_K1`, one fit, no intervals yet) and keeps the HEST average (0.363 vs eraser 0.364 and GAP 0.364, `runs/bench/2026-10-14_10-08-10_lxbelshark_41cf_mixture_G0_K1`); needs 2C before calling it 2026-10-15: on SCORPION (val selection, `selected.json` of each sweep) the tile eraser almost matches G0 (val top-1 0.978 vs 0.979) and the region eraser is above it (0.981), so most of G0's lead over the slide eraser is pairing scale; D2 is defined on external retrieval → waiting for PLISM of the tile (λ=0.4) and region (λ=0.7) eraser maps (user, `scripts/bench_d2_pairing_scale.sh`, gitignored; tags `softshrink_gap_tile_lam0.4`, `softshrink_gap_region_lam0.7`), then add them to the `plism_pairs` block. PLISM done 2026-10-15: region eraser (`runs/bench/2026-10-15_09-13-06_lxbelshark_0810_softshrink_gap_region_lam0.7`) 0.896 / 0.321 / 0.261 / 0.311, tile eraser (`runs/bench/2026-10-15_11-29-11_lxbelshark_06c6_softshrink_gap_tile_lam0.4`) 0.889 / 0.310 / 0.254 / 0.304 (PLISM table). Per pair vs the region eraser (generated block): G0 −0.017 [−0.020, −0.015] on all pairs and below in every group; tile eraser −0.007 [−0.009, −0.005]. Order on PLISM: region eraser > tile eraser > G0 > slide eraser; the eraser objective at tile level is not worse than the consensus objective at the same level | D2 TAKEN 2026-10-15 (user), for the ISBI paper: pairing is fixed at tile level (the pairing unit of G0 and CGM). At that level the eraser objective is about equal to G0 on PLISM (tile eraser +0.010 over G0 on all pairs), so G0 stays the linear base because it is CGM's linear limit; the original eraser is reported as published (slide-level pairing) as the external baseline. The pairing-scale result (region eraser 0.311 on all pairs, above G0 and the tile eraser) is out of the ISBI scope and will be re-evaluated in the broader experimental setup of the follow-up paper |
 | Exp 3: Gaussian mixture G0/G1/G2-scale/G2, K=2/4/8 | SCORPION val + test done (`sipe.eval.mixture_sweep`); PLISM G0 done (`runs/bench/2026-10-14_07-10-49_lxbelshark_0721_mixture_G0_K1`; its git.txt says 9ee82ff dirty with the mixture code untracked = code of 099e76e): above the eraser in all four PLISM rows (PLISM table); PLISM G2_K8 done (`runs/bench/2026-10-14_08-02-19_lxbelshark_2d27_mixture_G2_K8`): below G0 in all four PLISM rows, about at the eraser's level; PLISM G2_K4 done (`runs/bench/2026-10-14_08-54-57_lxbelshark_38d3_mixture_G2_K4`): also below G0 in all four rows; HEST G0 done (`runs/bench/2026-10-14_10-08-10_lxbelshark_41cf_mixture_G0_K1`): average 0.363, the eraser and GAP 0.364; HEST G2_K8 done (`runs/bench/2026-10-14_11-53-10_lxbelshark_d3bf_mixture_G2_K8`): average 0.364 | `runs/bench/2026-10-13_21-47-56_claude-box_6fdf_scorpion_mixture_gap` (mixture table) | D3 taken 2026-10-14 (user): G2 > G1 ≈ G2-scale on SCORPION, but G2 − G0 is small there and G2_K8 and G2_K4 are both below G0 on PLISM → don't promote G2, no Exp 5; G0 is the candidate linear bar (HEST done 2026-10-14; intervals pending); next = Exp 4 |
 | Diagnostic: scanner offsets / exchangeability (for Exp 6 design) | done 2026-10-14 (`sipe.eval.scanner_offsets`) | `runs/bench/2026-10-14_11-45-49_claude-box_f4c9_scorpion_scanner_offsets_gap` (offsets table) | – (informs Exp 6; no gate) |
+| Diagnostic: content-dependent scanner offsets (does δ_k depend on the tissue? for a per-scanner generator L_k = L + D_k in the CGM) | implemented 2026-10-16 (`sipe.eval.content_offsets`); smoke run (tile_all, p=8, K=4) done; full run pending (user) | smoke `runs/bench/2026-10-16_13-59-16_claude-box_42ad_scorpion_content_offsets_smoke` (`summary.csv`) | – (gate for a "V0-S + D_k" CGM arm; no ISBI decision) |
 | Exp 4: quadratic correction Q1/Q2 | full sweep done (`runs/bench/2026-10-14_11-53-58_lxbelshark_687d_scorpion_quadratic_gap`; val selection, probes, test; quadratic table). Val gate passed for Q2: Q2 m=16 val Δtop-1 vs G0 +0.0043 vs Q2-rand m=16 +0.0019 (Q2 m=8 +0.0024 vs rand +0.0008); Q1 ≈ G0 (+0.0001/+0.0002); selected γ=0.01 not at the grid edge (`selected.json`). Test agrees in order: Q2 m=16 0.971, Q2-rand m=16 0.968, G0 0.965 (quadratic table). PLISM done 2026-10-15: Q2 m=16 (`runs/bench/2026-10-15_00-34-59_lxbelshark_01e9_quadratic_Q2_m16`) 0.883 / 0.299 / 0.237 / 0.288, *below* G0 (0.887 / 0.303 / 0.243 / 0.294) in all four rows; Q2-rand m=16 (`runs/bench/2026-10-15_01-47-42_lxbelshark_5dd4_quadratic_Q2-rand_m16`) 0.888 / 0.306 / 0.246 / 0.297, slightly above G0 (PLISM table). Per pair vs G0 (PLISM per-pair table, slide-bootstrap 95% CI): Q2 all-pairs Δtop-1 −0.005 [−0.006, −0.004], better on 4% of pairs; Q2-rand +0.004 [+0.003, +0.004]. Base = consensus regression (user decision 2026-10-14). One fit, one split | `runs/bench/2026-10-14_11-53-58_lxbelshark_687d_scorpion_quadratic_gap` (quadratic table) | D4 TAKEN 2026-10-15 (user): Q2 below G0 on PLISM in every row → the quadratic SCORPION gain does not transfer; keep G0, Q2 not promoted, no HEST for Q2. To be re-evaluated in the broader experimental setup of the follow-up paper |
 | Exp 5/6: conditional covariance / constrained VAE | gated by D3/D4 | – | – |
 | Exp 7: consensus generative model (CGM, `docs/archive/experiment7-draft.md` Step 3), V1-S arm, backbone in the loop | implemented 2026-10-14 (`sipe.model.consensus_gen`, `sipe.training.consensus_gen_module`, `configs/consensus_gen.yaml`); first full fit done 2026-10-14 (`runs/2026-10-14_22-30-38_lxbelshark_7b71`, W&B o2snd9bm, 6000 steps, commit dd32d0a clean; CGM table). In-loop val top-1 0.985 (last-10 mean) vs backbone 0.887; first validation (step 99, `wandb_history`) 0.9795, so training added about +0.006 over the near-linear start. For orientation only (different protocol): G0 val 0.979 and Q2 m=16 0.983 in the quadratic table. `val/nll` rose from 0.040 (step 99) to 0.0985 while `val/kl` fell; train nll steps 0.02–0.08 → likelihood generalization gap. hyperparameters not selected on val; one seed. PLISM done 2026-10-15 (`runs/bench/2026-10-14_23-36-54_lxbelshark_22f4_cgm_v1s_7b71`, `--posthoc map_cgm.pt`): 0.899 / 0.321 / 0.273 / 0.321, above G0 (0.887 / 0.303 / 0.243 / 0.294) in all four rows and the best PLISM row so far (PLISM table). Per pair vs G0 (PLISM per-pair table, slide-bootstrap 95% CI): all pairs Δtop-1 +0.028 [+0.024, +0.032], better on 98% of pairs; inter-scanner +0.012 [+0.007, +0.020]; inter-staining +0.018 [+0.015, +0.022]; joint +0.031 [+0.026, +0.035]; HR inter-scanner +0.001 [−0.007, +0.012] (21 pairs). Caveats: val selection done 2026-10-15 (`cgm_select`, V1-S selected; CGM selection table), trained on augmented images rather than the shared feature cache, one seed. HEST done 2026-10-15 (`runs/bench/2026-10-15_07-47-25_lxbelshark_8823_cgm_v1s_7b71`; git.txt: only docs/progress.md modified, code = dd7e212): average 0.363, same as G0 (0.363) and the eraser / GAP (0.364) → preservation holds on average (HEST table). Per task it moves more than G0: COAD 0.285 vs GAP 0.256, PRAD 0.389 vs 0.371, but READ 0.167 vs 0.202, SKCM 0.573 vs 0.594, HCC 0.060 vs 0.074 (fold stds 0.01–0.09, one fit). Ablation fits done 2026-10-15 (6000 steps each; git.txt dd7e212 with only docs/progress.md and the eval module `plism_pairs.py` modified, training code unchanged; CGM table): V0-S linear encoder `runs/2026-10-15_08-50-48_lxbelshark_a602` (nbeqfgol), in-loop val top-1 0.981 (last-10 mean), nonlinear_rel 0.000; V1-S seed 43 `runs/2026-10-15_08-51-41_lxbelshark_8ed0` (prb6pqng), 0.985, the same as 7b71 (0.985). First validation (step 99, `wandb_history`): 0.9796 (V0-S), 0.9795 (seed 43), 0.9795 (7b71) → training adds about +0.006 with the nonlinear encoder (both seeds) and about +0.001 with the linear one. PLISM done 2026-10-15 (PLISM table; per-pair blocks vs G0, vs the region eraser and V1-S vs V0-S): seed 43 (`runs/bench/2026-10-15_11-30-45_lxbelshark_87d5_cgm_v1s_seed43_8ed0`) 0.899 / 0.322 / 0.274 / 0.322 reproduces 7b71 (0.899 / 0.321 / 0.273 / 0.321). V0-S (`runs/bench/2026-10-15_10-03-00_lxbelshark_ae3c_cgm_v0s_a602`) 0.897 / 0.319 / 0.270 / 0.318: the linear CGM already gets +0.025 [+0.021, +0.028] of the +0.028 over G0; the nonlinear encoder adds +0.003 [+0.003, +0.004] (7b71) and +0.004 [+0.003, +0.004] (seed 43) on all pairs vs V0-S, small but positive in every group for both seeds. Against the region eraser (the D2 anchor candidate): 7b71 +0.011 [+0.008, +0.013] on all pairs, mostly from scanner + staining pairs (+0.013); inter-scanner +0.004 [−0.000, +0.007]; inter-staining +0.001 [−0.002, +0.003]; HR inter-scanner −0.013 [−0.030, −0.000] (21 pairs). V0-S vs the region eraser: +0.007 [+0.005, +0.010] on all pairs. Reading: most of CGM's PLISM gain is a better *linear* map (trained on augmented images through the backbone with the per-scanner likelihood), not the nonlinearity; the gain over the strongest linear eraser sits in the joint scanner + staining shift. Draft Steps 0–2 skipped | `runs/2026-10-14_22-30-38_lxbelshark_7b71` (CGM table) | – |
@@ -322,6 +323,53 @@ The ISBI-facing summary of these items is in `docs/progress.md` (section 2, clai
 
 ## 3. Open points outside the ISBI scope
 
+- Content-dependent scanner offsets (2026-10-16, `sipe.eval.content_offsets`; motivation:
+  the CGM's shift δ_k is constant per scanner). Design: per scanner pair (k, j), target
+  x_k − x_j, content = mean of the other three views, so target and predictor share no
+  acquisition noise (regressing r_k on the full consensus is biased under scanner-specific
+  noise covariances: on null synthetic data it found a spurious gain of up to 0.041,
+  the pair design about 0; scratch check, not a run). Smoke reading, tile_all, small grid
+  (`runs/bench/2026-10-16_13-59-16_claude-box_42ad_scorpion_content_offsets_smoke`,
+  `summary.csv`): global (constant) explains 0.259 of the val pair-difference energy
+  (the same 0.259 as `val_offset_explained_raw` in the offsets table: consistency check);
+  linear on the top-8 content PCs adds val gain 0.091 raw / 0.017 whitened of what the
+  constant leaves (CV 0.093), Δll +0.069 [0.067, 0.072] nats/dim, 5/5 WSIs; 0.283 of the
+  content part lies in the offset span; cluster K=4 gain 0.043; shuffled control −0.000.
+  So the shift does depend on content, mostly in high-energy residual directions (small
+  whitened gain) and mostly outside the constant-offset span. Not read yet: p = 32 / 128,
+  per scanner, per cluster (glass / edge cluster), noP1000. Full run (user, ~10+ min in
+  claude-box under load; faster on the host):
+  `uv run python -m sipe.eval.content_offsets --tag content_offsets_gap --features-from
+  runs/bench/2026-10-13_15-44-35_lxbelshark_d6f7_scorpion_softshrink_h0mini_gap`.
+  Then: `results_tables --write` (block `content_offsets`), read `per_cluster.csv`
+  (does the gain sit in the glass cluster?) and `per_scanner.csv`. A CGM arm with a
+  per-scanner linear generator is worth building only if the gain holds at p = 32 / 128,
+  outside the glass cluster, and in the whitened metric.
+- Future work (discussed 2026-10-16, not implemented): test the noise-independence
+  assumption of the `content_offsets` pair design. The design is unbiased only if the
+  acquisition noise of the target scanners (k, j) is independent of the noise of the
+  predictor views. Noise shared by *all* scanners is not identifiable from one scan per
+  scanner (it is indistinguishable from content) and cancels in x_k − x_j, so it is
+  harmless. Noise shared by a *subset* of scanners would leak into the predictor and
+  look like content dependence. Suspects: AT2 and GT450 (both Leica Aperio), and a
+  common registration reference. From second moments alone, this cannot be separated
+  from scanner-specific content gains D_k; a definitive test needs repeat scans on the
+  same scanner, which SCORPION does not have. Proposed checks (as `--predictor
+  all|drop1` + `noise_dependence.csv` in `sipe.eval.content_offsets`, with a synthetic
+  test where two scanners share noise):
+  1. Drop one view: for each pair, predict from 2 of the 3 other views (3 choices). Real
+     content dependence holds for every choice (up to attenuation); noise shared between
+     k and l makes the gain collapse when l is dropped, only for pairs containing k.
+  2. Covariance between disjoint pairs, e.g. (AT2 − DP200) vs (GT450 − Philips), after
+     removing the content prediction: top canonical correlation per disjoint pair with
+     WSI bootstrap intervals. Null: residuals of different tiles of the same slide (keeps
+     slide effects, breaks within-tile sharing). Concentrated on one scanner pair →
+     correlated noise; diffuse → inadequate content model.
+  3. If 1 or 2 flags AT2 + GT450: rerun the content diagnostic with the other Leica view
+     excluded from the predictor for Leica pairs.
+  Reading: a stable drop-one gain and disjoint-pair covariance at the null support
+  independence as far as this design allows. Noise shared by all scanners remains
+  untestable; state it as a caveat.
 - Exp 6 design (discussed 2026-10-14, not started): consensus VAE whose linear limit is
   G0 (content latent shared by the views, acquisition latent marginalized analytically,
   decoder outputs the consensus). The offset diagnostic rejects exchangeable scanner
@@ -484,6 +532,22 @@ consensus-VAE sketch for Exp 6. Cached GAP features, tile-level pairs, test neve
 Tile-level residuals to the consensus over scanners (`summary.csv`). Energy shares (train) of E||r||^2 = N_0 split into nested scanner offsets: global per scanner, slide × scanner, region × scanner, tile; raw = identity metric, whitened = train N_0^-1. Val explained = residual energy removed by subtracting the train offsets per scanner. Δll = held-out val log-likelihood minus the exchangeable N(0, N_0) model (nats/dim, top residual subspace of train, > 0 favors scanner-aware): offset = per-scanner mean, cov = per-scanner covariance, offset+cov = both (these use the scanner label); mixture = equal-weight mixture of the offset+cov components, label marginalized. Resid. scanner acc = argmax component on val residuals (given the paired consensus). Offset span = span of the train global offsets: offset fraction = share of the residual energy there explained by the offsets; content share = share of the consensus variance there (what suppressing the span loses).
 
 <!-- /results:offsets -->
+
+### Content-dependent scanner offsets (SCORPION train CV + val)
+
+Does a scanner's offset depend on the tissue? Per scanner pair, target = view difference,
+content = the other views (leak-free design, module docstring). Cached GAP features,
+tile-level pairs, test never read. `sipe.eval.content_offsets`.
+
+<!-- results:content_offsets exclude=*smoke* -->
+<!-- generated by `uv run python -m sipe.eval.results_tables --write`; do not edit -->
+
+| setting | scanners | model | CV gain raw | val explained raw / whitened | val gain over global raw / whitened | val Δll vs global [WSI 95% CI] | WSIs > 0 | content part in offset span | bench run dir | SIPE commit |
+|---|---|---|---|---|---|---|---|---|---|---|
+
+Does a scanner's offset depend on the content? Per scanner pair (k, j), target x_k − x_j, content = the mean of the other views (no shared noise with the target); `summary.csv`, train and val only. global = constant δ_k − δ_j; linear_p = constant + ridge on the top-p content PCs (λ per pair by grouped CV on train); cluster_K = one mean per content cluster; shuffled = linear fitted on permuted content (control). Explained = share of the val pair-difference energy removed; gain = share of what the constant offsets leave that the content predicts (CV = out-of-fold on train WSIs); whitened = train N_0^-1 metric. Δll = val Gaussian log-likelihood minus the global model, top residual subspace (nats/dim). Offset span = share of the content-dependent part lying in the span of the global offsets.
+
+<!-- /results:content_offsets -->
 
 ### Gaussian-mixture shrinkage (Experiment 3, SCORPION val selection + test)
 

@@ -15,6 +15,8 @@ Sources, all under runs/ (gitignored, so every row names the dir it came from):
     likelihood.csv, gating.csv (sipe.eval.mixture_sweep)
   - scanner offsets (exchangeability diagnostic): runs/bench/*/summary.csv
     (sipe.eval.scanner_offsets)
+  - content-dependent scanner offsets: runs/bench/*/summary.csv
+    (sipe.eval.content_offsets)
   - quadratic sweep (Experiment 4): runs/bench/*/summary_{val,test}.csv,
     selected.json, sweep_val.csv (sipe.eval.quadratic_sweep)
   - CGM augmentation attribution: runs/bench/*/summary_val.csv + arms.json
@@ -641,6 +643,56 @@ def offsets_table(root: Path, opts: dict[str, list[str]]) -> str:
     )
 
 
+# --- content-dependent scanner offsets -------------------------------------------
+
+
+def content_offsets_table(root: Path, opts: dict[str, list[str]]) -> str:
+    header = [
+        "setting", "scanners", "model", "CV gain raw", "val explained raw / whitened",
+        "val gain over global raw / whitened", "val Δll vs global [WSI 95% CI]",
+        "WSIs > 0", "content part in offset span", "bench run dir", "SIPE commit",
+    ]  # fmt: skip
+    rows = []
+    for run in _bench_runs(root, "scorpion_content_offsets", opts.get("exclude", [])):
+        source = [f"`{_rel(run.dir)}`", run.source_cells()[2]]
+        summary = run.dir / "summary.csv"
+        if not summary.exists():
+            rows.append(["no results", *["–"] * (len(header) - 3), *source])
+            continue
+        for _, r in pd.read_csv(summary).iterrows():
+            rows.append(
+                [
+                    str(r["setting"]),
+                    str(r["n_scanners"]),
+                    str(r["model"]),
+                    _fmt(r["cv_gain_raw"]),
+                    f"{r['val_explained_raw']:.3f} / {r['val_explained_whitened']:.3f}",
+                    f"{r['val_gain_raw']:.3f} / {r['val_gain_whitened']:.3f}",
+                    f"{r['val_dll']:.3f} [{r['val_dll_ci_lo']:.3f},"
+                    f" {r['val_dll_ci_hi']:.3f}]",
+                    f"{r['val_dll_wsi_pos']}/{r['n_wsi']}",
+                    "–"
+                    if pd.isna(r["offset_span_share"])
+                    else _fmt(r["offset_span_share"]),
+                    *source,
+                ]
+            )
+    return (
+        _table(header, rows)
+        + "\n\nDoes a scanner's offset depend on the content? Per scanner pair (k, j),"
+        " target x_k − x_j, content = the mean of the other views (no shared noise"
+        " with the target); `summary.csv`, train and val only. global = constant"
+        " δ_k − δ_j; linear_p = constant + ridge on the top-p content PCs (λ per pair"
+        " by grouped CV on train); cluster_K = one mean per content cluster; shuffled"
+        " = linear fitted on permuted content (control). Explained = share of the"
+        " val pair-difference energy removed; gain = share of what the constant"
+        " offsets leave that the content predicts (CV = out-of-fold on train WSIs);"
+        " whitened = train N_0^-1 metric. Δll = val Gaussian log-likelihood minus the"
+        " global model, top residual subspace (nats/dim). Offset span = share of the"
+        " content-dependent part lying in the span of the global offsets."
+    )
+
+
 # --- mixture sweep (Experiment 3) ----------------------------------------------
 
 
@@ -1122,6 +1174,7 @@ TABLES = {
     "softshrink": softshrink_table,
     "content": content_table,
     "offsets": offsets_table,
+    "content_offsets": content_offsets_table,
     "mixture": mixture_table,
     "quadratic": quadratic_table,
     "augattr": aug_attribution_table,

@@ -131,7 +131,7 @@ Paper writing: not started.
 | cgm_v0s_noaug_3fa4 | posthoc_gap | 0.896 | 0.318 | 0.269 | 0.317 | `runs/bench/2026-10-16_11-56-22_lxbelshark_06ac_cgm_v0s_noaug_3fa4` | – | d3cea63 |
 | aug_g0_geo_all | posthoc_gap | 0.885 | 0.303 | 0.241 | 0.292 | `runs/bench/2026-10-16_13-09-01_lxbelshark_9a38_aug_g0_geo_all` | – | d3cea63 |
 | cgm_v1s_noaug_7e3c | posthoc_gap | 0.898 | 0.320 | 0.272 | 0.320 | `runs/bench/2026-10-16_14-07-40_lxbelshark_3c28_cgm_v1s_noaug_7e3c` | – | bd38e7a |
-| aug_cgminit_clean_all | posthoc_gap | no results | – | – | – | `runs/bench/2026-10-16_14-32-16_lxbelshark_8ef2_aug_cgminit_clean_all` | – | 27a416e |
+| aug_cgminit_clean_all | posthoc_gap | 0.892 | 0.306 | 0.249 | 0.300 | `runs/bench/2026-10-16_14-32-16_lxbelshark_8ef2_aug_cgminit_clean_all` | – | 27a416e |
 | h0_mini | – | 0.600 | 0.120 | 0.055 | 0.100 | `../plism-benchmark/output/metrics/8139_tiles/h0_mini` | – | – |
 | sipe_h0_mini | – | 0.666 | 0.237 | 0.158 | 0.203 | `../plism-benchmark/output/metrics/8139_tiles/sipe_h0_mini` | – | – |
 
@@ -357,7 +357,7 @@ this reason, never instead of them.
 | cgm_v0s_noaug_3fa4 | posthoc_gap | 0.909 | 0.373 | 0.316 | 0.366 | `runs/bench/2026-10-16_11-56-22_lxbelshark_06ac_cgm_v0s_noaug_3fa4` | – | d3cea63 |
 | aug_g0_geo_all | posthoc_gap | 0.899 | 0.356 | 0.284 | 0.338 | `runs/bench/2026-10-16_13-09-01_lxbelshark_9a38_aug_g0_geo_all` | – | d3cea63 |
 | cgm_v1s_noaug_7e3c | posthoc_gap | 0.911 | 0.376 | 0.319 | 0.369 | `runs/bench/2026-10-16_14-07-40_lxbelshark_3c28_cgm_v1s_noaug_7e3c` | – | bd38e7a |
-| aug_cgminit_clean_all | posthoc_gap | no results | – | – | – | `runs/bench/2026-10-16_14-32-16_lxbelshark_8ef2_aug_cgminit_clean_all` | – | 27a416e |
+| aug_cgminit_clean_all | posthoc_gap | 0.905 | 0.360 | 0.293 | 0.346 | `runs/bench/2026-10-16_14-32-16_lxbelshark_8ef2_aug_cgminit_clean_all` | – | 27a416e |
 | h0_mini | – | 0.609 | 0.142 | 0.065 | 0.114 | `../plism-benchmark/output/metrics/8139_tiles/h0_mini` | – | – |
 | sipe_h0_mini | – | 0.678 | 0.280 | 0.187 | 0.235 | `../plism-benchmark/output/metrics/8139_tiles/sipe_h0_mini` | – | – |
 
@@ -482,7 +482,9 @@ CGM fits (`map_cgm.pt`) on the shared SCORPION-proxy protocol (`sipe.eval.cgm_se
 | `runs/2026-10-15_19-42-06_lxbelshark_3fa4` | ryqlwzeu | ConsensusGenModule | d8005ed | 5999/6000 | 0.983 | 0.887 | 0.231 | 0.799 | 0.099 | 0.542 | 0.000 |
 | `runs/2026-10-15_19-48-26_lxbelshark_920f` | d7ih8uaz | ConsensusGenModule | d8005ed | 5999/6000 | 0.985 | 0.887 | 0.258 | 0.799 | 0.120 | 0.504 | 0.192 |
 | `runs/2026-10-16_13-08-26_lxbelshark_7e3c` | pva44z5o | ConsensusGenModule | d3cea63 | 5999/6000 | 0.988 | 0.887 | 0.221 | 0.801 | 0.102 | 0.535 | 0.077 |
-| `runs/2026-10-16_15-18-37_lxbelshark_31cf` | f0456oyl | ConsensusGenModule | 517d9cb | 149/6000 | 0.977 | 0.887 | 0.459 | 0.802 | 0.090 | 0.822 | 0.009 |
+| `runs/2026-10-16_15-18-37_lxbelshark_31cf` | f0456oyl | ConsensusGenModule | 517d9cb | 5999/6000 | 0.983 | 0.887 | 0.397 | 0.801 | 0.173 | 0.550 | 0.059 |
+| `runs/2026-10-16_15-37-55_lxbelshark_f907` | 986mgsq7 | ConsensusGenModule | cf398dd | 2899/6000 | 0.978 | 0.887 | 0.405 | 0.803 | 0.151 | 0.624 | 0.000 |
+| `runs/2026-10-16_16-06-17_lxbelshark_7de8` | 07l2d54w | ConsensusGenModule | cf398dd* | 144/6000 | 0.979 | 0.887 | 0.434 | 0.802 | 0.060 | 0.780 | 0.009 |
 
 Mean of the last 10 validations of `val/<col>`, read from the local `.wandb` file; step = last logged `trainer/global_step` / `max_steps`.
 
