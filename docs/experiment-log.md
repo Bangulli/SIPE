@@ -280,8 +280,16 @@ The ISBI-facing summary of these items is in `docs/progress.md` (section 2, clai
   - holding a scanner out costs both estimators (G0 mean −0.0057, CGM-init −0.0041 vs the
     full fits). The largest costs are AT2 and Philips (G0 −0.0113 / −0.0090); P1000 does not
     stand out (−0.0029).
-  Not a verdict yet: the trained V1-S^-j are the readout.
-  To do (host, ~10 h): `ARM=V1-S CUDA_VISIBLE_DEVICES=0 scripts/loso_fits.sh` and
+  Trained readout, 2026-10-16 (`runs/bench/2026-10-16_23-59-47_lxbelshark_b8e2_scorpion_loso`; the closed-form rows are identical to bf0f, so
+  the table now shows b8e2 only): gate passed. V1-S^-j − G0^-j on the unseen pairs is
+  positive with the CI above 0 for every j (AT2 +0.0155, Philips +0.0105, P1000 +0.0051,
+  GT450 +0.0047, DP200 +0.0042), mean +0.0080 [+0.0019, +0.0148], larger than on the seen
+  pairs (+0.0064). The linear control V0-S^-j is about the closed-form CGM-init (+0.0040 vs
+  +0.0037; GT450 CI crosses 0). Holding j out costs V1-S −0.0042 vs the full fit, the same
+  order as G0 (−0.0057), so the gap over G0 survives. Biggest gains where G0 loses most
+  (AT2, Philips). Caveats: one fit per j, 5 val WSIs (wide intervals), val near ceiling,
+  SCORPION scanners only (not unseen-scanner generalization in general).
+  Done (was: host, ~10 h): `ARM=V1-S CUDA_VISIBLE_DEVICES=0 scripts/loso_fits.sh` and
   `ARM=V0-S CUDA_VISIBLE_DEVICES=1 scripts/loso_fits.sh`, then `sipe.eval.loso` with 7b71,
   a602 and the 10 fit dirs (the script prints the command), then `results_tables --write`.
   Gate: V1-S^-j − G0^-j on the unseen pairs not below 0, and compare it with V0-S^-j (the
