@@ -6,9 +6,9 @@ plismbench's PrecisionModule, GAP = mean of the patch tokens without prefix toke
 (= `backbone_gap`), CLS = token 0.
 
 The CLI writes augmented train caches for the CGM augmentation study
-(docs/experiment7-draft.md, Step 2b; docs/progress.md, open points). Every augmented
-view goes through the whole encoder (image -> augmentation -> H0-mini -> GAP), never
-through a transformed token grid of a clean pass. `--copies` K: each tile is
+(docs/experiment7-draft.md, Step 2b; docs/experiment-log.md, Exp 7 history). Every
+augmented view goes through the whole encoder (image -> augmentation -> H0-mini ->
+GAP), never through a transformed token grid of a clean pass. `--copies` K: each tile is
 extracted K times (meta column `aug` = copy index). All scanner views of a tile share
 the transform of a copy (seed = crc32(pair_id | copy | seed), the same idea as
 `PairedSCORPIONDataset`'s seed replay), so views differ only by scanner.

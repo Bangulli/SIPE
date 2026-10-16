@@ -92,6 +92,23 @@ def test_render_replaces_block_and_check_detects_staleness(tmp_path):
     assert rt.main(["--check", "--doc", str(doc), "--runs", str(tmp_path)]) == 0
 
 
+def test_write_and_check_cover_every_doc(tmp_path):
+    run = bench_dir(tmp_path, "s_proxy", "scorpion_retrieval")
+    (run / "summary.csv").write_text(
+        "representation,top_1_accuracy,probe_logreg_acc\nz_gap,0.9,0.85\n"
+    )
+    block = "<!-- results:scorpion -->\nstale\n<!-- /results:scorpion -->\n"
+    docs = [tmp_path / "a.md", tmp_path / "b.md"]
+    for doc in docs:
+        doc.write_text(block)
+    args = ["--doc", *map(str, docs), "--runs", str(tmp_path)]
+
+    assert rt.main(["--write", *args]) == 0
+    assert all("| s_proxy | z_gap | 0.900 |" in d.read_text() for d in docs)
+    docs[1].write_text(block)  # one stale doc is enough to fail the check
+    assert rt.main(["--check", *args]) == 1
+
+
 def test_last_val_mean_uses_last_n():
     history = [{"val/a": float(i)} for i in range(20)] + [{"train/b": 1.0}]
     assert rt.last_val_mean(history, "val/a", n=10) == sum(range(10, 20)) / 10

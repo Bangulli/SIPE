@@ -25,19 +25,23 @@ are small or unstable.
   unseen-scanner generalization from SCORPION WSI-disjoint tests alone.
 - Report order: SCORPION val (selection) → SCORPION test → PLISM → HEST.
 
-**Progress log: `docs/progress.md`.** Whenever you check or interpret runs (fits, sweeps,
-SCORPION proxy, PLISM/HEST bench runs), update it in the same turn:
-- add or update the run's row: run dir, config/tag, key metrics, verdict;
-- mark runs still in progress;
-- record each roadmap decision (D0–D6) when it is taken, with the evidence;
-- adjust "Open points / next steps" and the "as of" date.
-Say in your reply that you updated it.
+**Progress docs.** Whenever you check or interpret runs (fits, sweeps, SCORPION proxy,
+PLISM/HEST bench runs), update them in the same turn:
+- `docs/progress.md` = the ISBI paper only: scope, claims with evidence, runs in flight and
+  remaining tasks, the paper tables. Update a claim's evidence/status, the in-flight list and
+  the "as of" date.
+- `docs/experiment-log.md` = everything else: the roadmap status table (one row per step,
+  run dirs, verdict), each roadmap decision (D0–D6) with its evidence, per-experiment
+  readings, open points outside the paper, the other tables. Mark runs still in progress.
+- `docs/findings.md` = lessons that change how to run or read experiments (protocols,
+  benchmark quirks, negative results), each with its evidence; not every run.
+Say in your reply which of them you updated.
 
 **Never type a metric by hand.** Every value must be read from a file under `runs/` (or from
 W&B), and each row must name the run dir it came from.
 - Results tables are generated: `uv run python -m sipe.eval.results_tables --write` refreshes
-  the `<!-- results:… -->` blocks in `docs/progress.md`, and `--check` exits 1 if they are
-  stale. Never edit inside a block. Block options (`exclude=`, `extra=`, `cols=`, `min_steps=`,
+  the `<!-- results:… -->` blocks in `docs/progress.md` and `docs/experiment-log.md`, and
+  `--check` exits 1 if one is stale. Never edit inside a block. Block options (`exclude=`, `extra=`, `cols=`, `min_steps=`,
   `module=`) are listed in the module docstring.
 - A new benchmark output, estimator output or metric goes into a parser in
   `sipe.eval.results_tables`, not into a hand-typed table.
@@ -55,7 +59,7 @@ W&B), and each row must name the run dir it came from.
   CATS and MathieuGAN stay below GAP on PLISM, but the unpaired
   DistMatchVAE `sr40r1h1` beats GAP in every PLISM row (one seed;
   `runs/bench/2026-10-13_20-17-04_lxbelshark_244b_dist_match_vae_sr40r1h1`; `g7fkiwbp` pending,
-  see `docs/progress.md`). PairedVAE beats GAP on PLISM, and its removal comes from the
+  see `docs/experiment-log.md`). PairedVAE beats GAP on PLISM, and its removal comes from the
   pair-alignment loss.
 - Implementation reference for that code (legacy behavior, curriculum, intentional
   differences, architecture): `docs/cats-reference.md`. Read it before changing anything under

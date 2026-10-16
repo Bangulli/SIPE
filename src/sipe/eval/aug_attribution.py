@@ -5,7 +5,7 @@ through the backbone (flips, rot90, zoom) vs the clean cache, (b) its estimator 
 init: the linear-Gaussian posterior with per-scanner offsets as a random effect
 (`ConsensusGenerativeHead.init_from_moments`, the V0-S init), (c) the number of views
 (40 batches = 5,120 tiles x 5 views), (d) ELBO training. This driver isolates (a)-(c)
-without training (docs/progress.md, open points, 2026-10-15):
+without training (docs/experiment-log.md, Exp 7 history, 2026-10-15):
 
 - estimators: `G0` (consensus shrinkage of `sipe.estimators.mixture`, K = 1;
   alpha by the 95% rule on val, as `mixture_sweep`) and `CGM-init` (the V0-S init map,

@@ -1,4 +1,5 @@
-"""Results tables for docs/progress.md, read from run dirs (no metric typed by hand).
+"""Results tables for docs/progress.md and docs/experiment-log.md, read from run dirs
+(no metric typed by hand).
 
 Sources, all under runs/ (gitignored, so every row names the dir it came from):
   - PLISM: runs/bench/*/metrics/<n>_tiles/<tag>/results.csv (top-1, mean part); with
@@ -24,7 +25,8 @@ Sources, all under runs/ (gitignored, so every row names the dir it came from):
     contrasts_val.csv (sipe.eval.loso)
   - training: runs/<run>/wandb/*run-*/*.wandb (local W&B history; no API key needed)
 
-progress.md holds generated blocks:
+The docs (`DOCS`: progress.md for the ISBI paper, experiment-log.md for the rest) hold
+generated blocks; the same block may appear in both:
 
   <!-- results:plism exclude=*smoke* -->
   ...table written by this tool...
@@ -42,8 +44,8 @@ Options on the opening marker (space-separated key=value):
                             stains on either side (e.g. HR), then aggregate as usual
 
   uv run python -m sipe.eval.results_tables          # print every table
-  uv run python -m sipe.eval.results_tables --write  # refresh the blocks in progress.md
-  uv run python -m sipe.eval.results_tables --check  # exit 1 if progress.md is stale
+  uv run python -m sipe.eval.results_tables --write  # refresh the blocks in every doc
+  uv run python -m sipe.eval.results_tables --check  # exit 1 if a doc is stale
 """
 
 from __future__ import annotations
@@ -66,6 +68,7 @@ import yaml
 SIPE_ROOT = Path(__file__).resolve().parents[3]
 RUNS = SIPE_ROOT / "runs"
 PROGRESS = SIPE_ROOT / "docs" / "progress.md"
+DOCS = (PROGRESS, SIPE_ROOT / "docs" / "experiment-log.md")
 
 PLISM_ROWS = {
     "inter-scanner": "inter-scanner",
@@ -1128,7 +1131,7 @@ TABLES = {
 }
 
 
-# --- progress.md blocks ---------------------------------------------------------
+# --- doc blocks ---------------------------------------------------------
 
 
 def parse_opts(text: str) -> dict[str, list[str]]:
@@ -1160,10 +1163,10 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument(
-        "--write", action="store_true", help="refresh the blocks in --doc"
+        "--write", action="store_true", help="refresh the blocks in every --doc"
     )
-    mode.add_argument("--check", action="store_true", help="exit 1 if --doc is stale")
-    parser.add_argument("--doc", type=Path, default=PROGRESS)
+    mode.add_argument("--check", action="store_true", help="exit 1 if a --doc is stale")
+    parser.add_argument("--doc", type=Path, nargs="+", default=list(DOCS))
     parser.add_argument("--runs", type=Path, default=RUNS)
     args = parser.parse_args(argv)
 
@@ -1172,16 +1175,18 @@ def main(argv: list[str] | None = None) -> int:
             print(f"## {name}\n\n{make(args.runs, {})}\n")
         return 0
 
-    text = args.doc.read_text()
-    new = render(text, args.runs)
-    if args.check:
-        if new != text:
-            print(f"{_rel(args.doc)} is stale: run with --write", file=sys.stderr)
-            return 1
-        return 0
-    args.doc.write_text(new)
-    print(f"refreshed {len(BLOCK_RE.findall(text))} blocks in {_rel(args.doc)}")
-    return 0
+    stale = False
+    for doc in args.doc:
+        text = doc.read_text()
+        new = render(text, args.runs)
+        if args.check:
+            if new != text:
+                print(f"{_rel(doc)} is stale: run with --write", file=sys.stderr)
+                stale = True
+            continue
+        doc.write_text(new)
+        print(f"refreshed {len(BLOCK_RE.findall(text))} blocks in {_rel(doc)}")
+    return int(stale)
 
 
 if __name__ == "__main__":
