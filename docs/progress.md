@@ -84,15 +84,11 @@ LOSO val readout done (`runs/bench/2026-10-16_23-59-47_lxbelshark_b8e2_scorpion_
 read on val; the test readout gives the paper numbers (next list).
 
 To launch (user):
-- LOSO on test (~15 min CPU, read once; nothing is changed afterwards): `uv run python -m
-  sipe.eval.loso --tag loso_test --split test --features-from
-  runs/bench/2026-10-13_15-44-35_lxbelshark_d6f7_scorpion_softshrink_h0mini_gap --runs
-  runs/2026-10-14_22-30-38_lxbelshark_7b71 runs/2026-10-15_08-50-48_lxbelshark_a602
-  runs/2026-10-16_15-18-37_lxbelshark_31cf runs/2026-10-16_15-37-55_lxbelshark_f907
-  runs/2026-10-16_16-06-17_lxbelshark_7de8 runs/2026-10-16_16-36-44_lxbelshark_73dd
-  runs/2026-10-16_16-52-45_lxbelshark_98a6 runs/2026-10-16_17-32-33_lxbelshark_574e
-  runs/2026-10-16_17-48-06_lxbelshark_a560 runs/2026-10-16_18-27-40_lxbelshark_4b28
-  runs/2026-10-16_18-30-10_lxbelshark_d8d4 runs/2026-10-16_19-22-24_lxbelshark_5a6c`.
+- LOSO on test (read once; nothing is changed afterwards):
+  `CUDA_VISIBLE_DEVICES=1 scripts/loso_test.sh 2>&1 | tee loso_test.log` (gitignored; runs
+  `sipe.eval.loso --tag loso_test --split test` on 7b71, a602 and the 10 LOSO fits, refuses
+  if a test readout exists, then `results_tables --write`; ~20 min). Afterwards: claim 8
+  from the test rows, the paper LOSO block in section 4 to `split=test`.
 - `cgm_select` with every CGM fit (SCORPION val/test rows for V2-S and the no-aug fits):
   `uv run python -m sipe.eval.cgm_select --tag cgm_select_all --features-from
   runs/bench/2026-10-13_15-44-35_lxbelshark_d6f7_scorpion_softshrink_h0mini_gap --runs
