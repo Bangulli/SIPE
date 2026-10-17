@@ -61,12 +61,12 @@ plus the arm overrides below. Hyperparameters are fixed, not selected on val.
 
 | arm | overrides | fits |
 |---|---|---|
-| V0 linear, exchangeable (sanity: should reproduce G0) | `per_scanner=false encoder_hidden_dim=0` | queued (`scripts/cgm_arms_fits.sh`) |
+| V0 linear, exchangeable (sanity: should reproduce G0) | `per_scanner=false encoder_hidden_dim=0` | `runs/2026-10-16_21-22-07_lxbelshark_5ee4` |
 | V0-S linear, per-scanner | `encoder_hidden_dim=0` | `runs/2026-10-15_08-50-48_lxbelshark_a602`; no aug `runs/2026-10-15_19-42-06_lxbelshark_3fa4` |
-| V1 nonlinear encoder, exchangeable (isolates the per-scanner likelihood) | `per_scanner=false` | queued (`scripts/cgm_arms_fits.sh`) |
-| **V1-S** nonlinear encoder, per-scanner (selected) | – | seed 42 `runs/2026-10-14_22-30-38_lxbelshark_7b71`, seed 43 `runs/2026-10-15_08-51-41_lxbelshark_8ed0`, seed 44 queued; no aug `runs/2026-10-16_13-08-26_lxbelshark_7e3c` |
+| V1 nonlinear encoder, exchangeable (isolates the per-scanner likelihood) | `per_scanner=false` | `runs/2026-10-16_23-19-54_lxbelshark_73af` |
+| **V1-S** nonlinear encoder, per-scanner (selected) | – | seed 42 `runs/2026-10-14_22-30-38_lxbelshark_7b71`, seed 43 `runs/2026-10-15_08-51-41_lxbelshark_8ed0`, seed 44 `runs/2026-10-16_21-25-30_lxbelshark_ac94`; no aug `runs/2026-10-16_13-08-26_lxbelshark_7e3c` |
 | V2-S + nonlinear generator h | `generator_hidden_dim=1024` | `runs/2026-10-15_19-48-26_lxbelshark_920f` |
-| V1-S+D content-dependent scanner shift (follow-up, not ISBI) | `--config configs/consensus_gen_shift.yaml` (`ContentShiftCGM`, `shift_rank: 128`) | pending (`scripts/cgm_shift_fit.sh`) |
+| V1-S+D content-dependent scanner shift (follow-up, not ISBI) | `--config configs/consensus_gen_shift.yaml` (`ContentShiftCGM`, `shift_rank: 128`) | rank 128 `runs/2026-10-16_19-27-29_lxbelshark_e3c7`, rank 32 `runs/2026-10-17_00-06-04_lxbelshark_aa1c`; not pursued |
 | LOSO, per held-out scanner j | `--data.init_args.hold_out_scanner=<j> --data.init_args.views=4` | V1-S and V0-S × 5 scanners, done 2026-10-16 (`scripts/loso_fits.sh`) |
 
 Overrides are under `--model.init_args.network.init_args.`; no-aug = `--data.init_args.
@@ -112,5 +112,5 @@ Gates (from the draft; status in `docs/progress.md`, section 2):
   well below the trained map (`docs/findings.md`, finding 9). Gate G-B is moot.
 - **Selection is over arms, not ρ:** hyperparameters are fixed (section 2). The draft's ρ
   selection by the 95% rule was not run.
-- **Seeds:** the draft asks for 3 seeds of the selected configuration; V1-S has 2, the third
-  is queued.
+- **Seeds:** the draft asks for 3 seeds of the selected configuration; V1-S has 3 (7b71,
+  8ed0, ac94).

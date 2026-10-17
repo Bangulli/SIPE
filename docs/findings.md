@@ -101,7 +101,9 @@ augmentation even lower the closed-form estimators on clean SCORPION val (G0 0.9
 0.9787); dihedral is neutral (H0-mini GAP close to dihedral-invariant). Evidence: ablation
 blocks and augmentation-attribution table in `docs/progress.md`. The exchangeable linear V0
 (no scanner offsets or per-scanner noise) is +0.022 [+0.018, +0.025] over G0 and only
-−0.003 [−0.003, −0.002] below V0-S (`runs/bench/2026-10-16_22-17-16_lxbelshark_d926_cgm_v0_5ee4`):
+−0.003 [−0.003, −0.002] below V0-S (`runs/bench/2026-10-16_22-17-16_lxbelshark_d926_cgm_v0_5ee4`),
+and the exchangeable nonlinear V1 is −0.001 [−0.002, −0.000] below V1-S, about the seed
+spread (`runs/bench/2026-10-17_00-15-28_lxbelshark_7a78_cgm_v1_73af`):
 the training, not the per-scanner likelihood, carries the gain.
 
 **10b. A better-specified nuisance likelihood can make the map worse.** Adding a
@@ -110,7 +112,9 @@ val NLL (0.0867 vs 0.0985) but drops PLISM by −0.005 [−0.006, −0.004] vs V
 −0.002 [−0.003, −0.001] vs V0-S on all pairs; only the inter-scanner pairs stay at V0-S level
 (+0.001 [+0.000, +0.002]) (`runs/bench/2026-10-16_20-17-12_lxbelshark_d531_cgm_v1s_shift_e3c7`), although the
 diagnostic found real content dependence (finding 6). Plausible, not verified: what the
-likelihood explains as nuisance, the scanner-blind map no longer has to remove. Judge a
+likelihood explains as nuisance, the scanner-blind map no longer has to remove. Rank 32
+does not fix it: −0.004 [−0.004, −0.003] vs V1-S
+(`runs/bench/2026-10-17_01-16-13_lxbelshark_1a37_cgm_v1s_shift_aa1c`). Judge a
 likelihood term by the map it trains, not by the NLL.
 
 **10. Unpaired methods did not remove the scanner; paired supervision did.** CATS-phase
