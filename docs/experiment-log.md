@@ -229,6 +229,20 @@ The ISBI-facing summary of these items is in `docs/progress.md` (section 2, clai
   V0-S 0.9682 and G0 0.9645, test region probe 0.987 vs G0 0.986. So on the shared SCORPION
   protocol the nonlinear encoder carries most of the gain over G0 (+0.0065 val, V0-S
   +0.0020), unlike PLISM where V0-S has most of it; one V0-S seed.
+  All fits, 2026-10-17 (`runs/bench/2026-10-17_11-24-40_lxbelshark_e198_scorpion_cgm_select_all`, commit 147c205 clean; 12 maps; the G0, reference, 7b71, 8ed0
+  and a602 rows equal the aae8 run): V1-S without augmentation (7e3c) selected, val 0.9876,
+  the only candidate at ≥ 95% of the best gain over G0 (threshold 0.9872). Others on val:
+  V0 0.9809, V0-S 0.9807 (no aug 0.9832), V1 0.9850, V1-S 0.9852 (7b71, 8ed0) and 0.9855
+  (ac94), V2-S 0.9848. Test agrees in order: 7e3c 0.9780, augmented V1-S 0.9756 / 0.9756 /
+  0.9758, V1 0.9754, V0-S no-aug 0.9706, V0-S / V0 0.9682, G0 0.9645. No augmentation also
+  gives much lower scanner probes (test logreg 0.258 vs 0.460 for 7b71; V0-S 0.326 vs 0.497).
+  On PLISM the order flips: 7e3c −0.002 [−0.002, −0.001] vs 7b71 (finding 1). Grouping
+  bug: ac94 is its own candidate (c1) because configs written after the LOSO change carry
+  `data.init_args.hold_out_scanner: null`; pooling it with c0 gives 0.9853, no change in
+  the selection. Not fixed yet (`sipe.eval.cgm_select.fit_info` config key).
+  Decision 2026-10-18 (user): the paper keeps the augmented V1-S (augmentation is part of
+  the recipe, fixed before selection; the selection is over arms); the no-aug fit is an
+  ablation reported next to claim 7 (`docs/progress.md`).
   Step 2 done 2026-10-15 (`runs/bench/2026-10-15_19-36-05_lxbelshark_eda5_scorpion_aug_attribution`,
   augmentation-attribution table, val retrieval only): CGM-init|clean|all 0.9808 = V0-S_a602
   0.9807, i.e. the V0-S estimator on clean data, without training and without augmentation,
