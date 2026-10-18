@@ -107,7 +107,9 @@ configs carry `hold_out_scanner: null` (added with LOSO); pooled mean 0.9853 < t
 threshold. Only the candidates table is affected. Fixed 2026-10-18; rerun pending (user):
 `CUDA_VISIBLE_DEVICES=0 scripts/cgm_select_all.sh 2>&1 | tee cgm_select_all.log`.
 
-- Optional: HEST for V1-S seed 8ed0 if the paper's HEST row shows both seeds.
+- HEST for V1-S seeds 8ed0 and ac94 (3-seed HEST row), optionally no-aug 7e3c and V1 73af:
+  `CUDA_VISIBLE_DEVICES=1 ABLATIONS=1 scripts/hest_cgm_seeds.sh 2>&1 | tee hest_cgm_seeds.log`
+  (gitignored; ~35 min per fit). Launched by the user 2026-10-18.
 - Optional analysis, only after the results above are final and if time allows:
   scanner-count curve (how many training scanners G0 / CGM need, with a fixed-view-budget
   arm to separate scanner diversity from data size); design in `docs/experiment-log.md`,
