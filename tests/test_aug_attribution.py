@@ -211,6 +211,22 @@ def test_fit_info_groups_seeds(tmp_path):
     assert a["config_key"] == b["config_key"] != c["config_key"]
 
 
+def test_fit_info_ignores_default_hold_out_scanner(tmp_path):
+    """Configs written after the LOSO change carry hold_out_scanner: null."""
+    from sipe.model.consensus_gen import CGMMap
+
+    _write_fit(tmp_path / "a_1111", 8, 42, 1e-3, CGMMap(4, 8))
+    _write_fit(tmp_path / "b_2222", 8, 44, 1e-3, CGMMap(4, 8))
+    _write_fit(tmp_path / "c_3333", 8, 44, 1e-3, CGMMap(4, 8))
+    for name, value in (("b_2222", None), ("c_3333", "AT2")):
+        path = tmp_path / name / "config.yaml"
+        config = yaml.safe_load(path.read_text())
+        config["data"]["init_args"]["hold_out_scanner"] = value
+        path.write_text(yaml.dump(config))
+    a, b, c = (fit_info(tmp_path / n) for n in ("a_1111", "b_2222", "c_3333"))
+    assert a["config_key"] == b["config_key"] != c["config_key"]
+
+
 def test_select_simplest_reaching_gain_and_fallback():
     fits = pd.DataFrame({
         "name": ["V1-S_a", "V1-S_b", "V0-S_c", "V1-S_d"],

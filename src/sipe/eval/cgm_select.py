@@ -36,6 +36,7 @@ Outputs (run dir): `summary_val.csv` (probes trained on train), `candidates.csv`
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import logging
 from pathlib import Path
@@ -80,8 +81,13 @@ def fit_info(run_dir: Path) -> dict[str, Any]:
         k: v for k, v in config.get("trainer", {}).items()
         if k not in ("logger", "callbacks", "default_root_dir")
     }  # fmt: skip
+    # `hold_out_scanner` (LOSO) was added later, default None: configs written before
+    # it lack the key, so drop the default to keep seeds of one configuration together.
+    data = copy.deepcopy(config.get("data") or {})
+    if (data.get("init_args") or {}).get("hold_out_scanner", "") is None:
+        del data["init_args"]["hold_out_scanner"]
     key = json.dumps(
-        {"model": model, "data": config.get("data"), "trainer": trainer},
+        {"model": model, "data": data, "trainer": trainer},
         sort_keys=True,
         default=str,
     )

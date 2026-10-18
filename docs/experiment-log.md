@@ -239,7 +239,9 @@ The ISBI-facing summary of these items is in `docs/progress.md` (section 2, clai
   On PLISM the order flips: 7e3c −0.002 [−0.002, −0.001] vs 7b71 (finding 1). Grouping
   bug: ac94 is its own candidate (c1) because configs written after the LOSO change carry
   `data.init_args.hold_out_scanner: null`; pooling it with c0 gives 0.9853, no change in
-  the selection. Not fixed yet (`sipe.eval.cgm_select.fit_info` config key).
+  the selection. Fixed 2026-10-18 (`sipe.eval.cgm_select.fit_info` drops a null
+  `hold_out_scanner` from the config key; test in `tests/test_aug_attribution.py`); rerun
+  pending (user): `scripts/cgm_select_all.sh` (gitignored), then drop e198 from the `cgm` block.
   Decision 2026-10-18 (user): the paper keeps the augmented V1-S (augmentation is part of
   the recipe, fixed before selection; the selection is over arms); the no-aug fit is an
   ablation reported next to claim 7 (`docs/progress.md`).

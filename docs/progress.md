@@ -104,7 +104,8 @@ the backbone-in-the-loop training (the likelihood has a train/val gap). No stain
 augmentation was used.
 Known issue, selection unchanged: `cgm_select` splits ac94 from 7b71/8ed0 because later
 configs carry `hold_out_scanner: null` (added with LOSO); pooled mean 0.9853 < the 0.9872
-threshold. Only the candidates table is affected.
+threshold. Only the candidates table is affected. Fixed 2026-10-18; rerun pending (user):
+`CUDA_VISIBLE_DEVICES=0 scripts/cgm_select_all.sh 2>&1 | tee cgm_select_all.log`.
 
 - Optional: HEST for V1-S seed 8ed0 if the paper's HEST row shows both seeds.
 - Optional analysis, only after the results above are final and if time allows:
