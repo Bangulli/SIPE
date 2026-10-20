@@ -194,3 +194,13 @@ cython_debug/
 /paper/
 /models/
 .claude-box.mounts
+
+# Latex
+*.aux
+*.log
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.out
+*.blg
+*.bbl
