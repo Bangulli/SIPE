@@ -53,6 +53,7 @@ Inference is one global map on one H0-mini GAP embedding: no scanner ID, no pair
 | 6 | most of the gain is the trained linear map | V0-S vs G0 +0.025 [+0.021, +0.028] of the +0.028; V1-S vs V0-S +0.003 [+0.003, +0.004] (7b71) and +0.004 (8ed0), positive in every group; V2-S vs V1-S +0.002 [+0.001, +0.002], about the seed-to-seed +0.001; V1-S seed 44 vs V0-S +0.003 [+0.002, +0.003]. Exchangeable linear V0 (`runs/bench/2026-10-16_22-17-16_lxbelshark_d926_cgm_v0_5ee4`): +0.022 [+0.018, +0.025] over G0, −0.003 [−0.003, −0.002] below V0-S (8% of pairs better), so the per-scanner likelihood is worth about 0.003 in the linear arm and the trained exchangeable model already has most of the gain (ablation blocks). Exchangeable nonlinear V1 (`runs/bench/2026-10-17_00-15-28_lxbelshark_7a78_cgm_v1_73af`): +0.027 [+0.023, +0.031] over G0 (98% of pairs), +0.002 [+0.002, +0.003] over V0-S, −0.001 [−0.002, −0.000] below V1-S 7b71 (36% of pairs better), i.e. about the seed-to-seed spread: in the nonlinear arm the per-scanner likelihood is worth ≤ 0.001 | done (2026-10-17); one seed for V0, V1 |
 | 7 | augmentation is not the driver; training is | V0-S without augmentation vs V0-S: all pairs −0.001 [−0.002, −0.000] (`runs/bench/2026-10-16_11-56-22_lxbelshark_06ac_cgm_v0s_noaug_3fa4`); the untrained init (CGM-init, geo, 5120 tiles) is −0.020 [−0.023, −0.017] below trained V0-S on PLISM (`runs/bench/2026-10-16_11-55-56_lxbelshark_d262_aug_cgminit_geo_5120`), although equal to it on SCORPION val (0.9808 vs 0.9807, augmentation-attribution table); G0 on augmented moments (geo, all copies) vs G0, all pairs −0.001 [−0.002, −0.001] (`runs/bench/2026-10-16_13-09-01_lxbelshark_9a38_aug_g0_geo_all`) ; V1-S without augmentation vs V1-S 7b71, all pairs −0.002 [−0.002, −0.001] (`runs/bench/2026-10-16_14-07-40_lxbelshark_3c28_cgm_v1s_noaug_7e3c`; seed-to-seed +0.001); the untrained init on clean data, all train tiles, is +0.006 [+0.005, +0.007] over G0 and −0.019 [−0.021, −0.016] below trained V0-S on all pairs (`runs/bench/2026-10-16_14-32-16_lxbelshark_8ef2_aug_cgminit_clean_all`), the same gap as the augmented 5120-tile init (−0.020): neither augmentation nor the number of init tiles explains it. HEST: no-aug V1-S 7e3c average 0.361 (`runs/bench/2026-10-18_15-24-25_lxbelshark_df79_cgm_v1s_noaug_7e3c`) vs 0.363 for each augmented V1-S seed, mostly PRAD 0.378 vs 0.385–0.390 (HEST table); one fit, no intervals | done (2026-10-16; HEST 2026-10-20) |
 | 8 | the map's advantage over G0 does not depend on having seen the scanner (LOSO, an analysis, not a gate) | test (paper numbers, read once), `runs/bench/2026-10-17_01-00-45_lxbelshark_1684_scorpion_loso_test`: V1-S^-j above G0^-j on the unseen pairs for every held-out scanner, CI above 0 in each (AT2 +0.0234, DP200 +0.0089, GT450 +0.0090, P1000 +0.0093, Philips +0.0176), mean +0.0136 [+0.0082, +0.0210], vs +0.0109 on the seen pairs; V0-S^-j mean +0.0074 [+0.0029, +0.0119] (DP200 and P1000 CIs cross 0), CGM-init^-j +0.0057 [+0.0039, +0.0079]. Not seeing j costs V1-S −0.0122 [−0.0163, −0.0084] vs the full fit, about as much as G0 (−0.0147) and V0-S (−0.0109) (LOSO table, split=test). Val, `runs/bench/2026-10-16_23-59-47_lxbelshark_b8e2_scorpion_loso` (LOSO val table in `docs/experiment-log.md`), agrees: trained V1-S^-j above G0^-j on the unseen pairs for every held-out scanner, CI above 0 in each (AT2 +0.0155, DP200 +0.0042, GT450 +0.0047, P1000 +0.0051, Philips +0.0105), mean +0.0080 [+0.0019, +0.0148], vs +0.0064 on the seen pairs; V0-S^-j mean +0.0040 [+0.0008, +0.0081] (GT450 CI crosses 0), CGM-init^-j +0.0037. Not seeing j costs V1-S −0.0042 [−0.0071, −0.0012] vs the full fit, about as much as G0 (−0.0057) and V0-S (−0.0037) (LOSO table) | done (test 2026-10-17); one fit per j, 5 WSIs per split, SCORPION only |
+| 9 | (analysis, oracle row, not a method) a label-using per-condition translation is no better than V1-S | PLISM condition-mean oracle, x − mean of its slide + mean of the slide means (uses the condition label; `runs/bench/2026-10-20_14-40-47_lxbelshark_8d2c_plism_oracle_condmean_gap`, center global): all pairs 0.326 vs V1-S 7b71 0.321, oracle − V1-S +0.004 [−0.002, +0.011], 50% of pairs; inter-scanner −0.007 [−0.017, +0.009] (oracle better on 21% of pairs), inter-staining +0.013 [+0.006, +0.020], joint +0.004 [−0.002, +0.010]; its edge is the HR stain: inter-scanner HR +0.086 [+0.013, +0.156], all HR pairs +0.036 [+0.028, +0.043]. Without HR: oracle 0.370 vs V1-S 0.371 on all pairs, 0.899 vs 0.913 inter-scanner, 0.386 vs 0.377 inter-staining (PLISM without HR table; no per-pair block vs V1-S without HR). Vs G0: +0.032 [+0.027, +0.037] (per-pair vs G0) | read 2026-10-20; origin does not matter: `--center zero` (`runs/bench/2026-10-20_15-40-09_lxbelshark_6505_plism_oracle_condmean_gap_zero`) all pairs 0.325, − V1-S +0.003 [−0.003, +0.010], without HR 0.369 |
 
 Caveats to state in the paper: one SCORPION split (5 val and 5 test WSIs), SCORPION val is
 near ceiling (top-1 differences of a few thousandths); hyperparameters not tuned; V0-S, V2-S
@@ -61,7 +62,9 @@ general.
 
 ## 3. Runs in flight and remaining tasks
 
-In flight (host): nothing (2026-10-17). Done since the last update:
+In flight (host): nothing (2026-10-20). PLISM condition-mean oracle (center global) done and read 2026-10-20
+(`runs/bench/2026-10-20_14-40-47_lxbelshark_8d2c_plism_oracle_condmean_gap`, claim 9); `--center zero` done and read the same day (`runs/bench/2026-10-20_15-40-09_lxbelshark_6505_plism_oracle_condmean_gap_zero`).
+Done before:
 - LOSO trained fits (`scripts/loso_fits.sh`): 10 of 10 done (6000 steps, last logged step 5999
   in each W&B file): V1-S without AT2 `runs/2026-10-16_15-18-37_lxbelshark_31cf`, DP200
   `runs/2026-10-16_16-06-17_lxbelshark_7de8`, GT450 `runs/2026-10-16_16-52-45_lxbelshark_98a6`,
@@ -118,6 +121,7 @@ selection unchanged (no-aug 7e3c). It replaces e198 in the `cgm` block.
   `runs/bench/2026-10-18_17-08-01_lxbelshark_6514_cgm_v1_73af` (`hest` block). 8ed0 and ac94
   were each run twice (identical results); the duplicates b84e and d2b8 are excluded from the
   block. Read 2026-10-20 into claims 3 and 7.
+- Done 2026-10-20: PLISM oracle with `--center zero` (`runs/bench/2026-10-20_15-40-09_lxbelshark_6505_plism_oracle_condmean_gap_zero`), read into claim 9.
 - Optional analysis, only after the results above are final and if time allows:
   scanner-count curve (how many training scanners G0 / CGM need, with a fixed-view-budget
   arm to separate scanner diversity from data size); design in `docs/experiment-log.md`,
@@ -164,6 +168,8 @@ Paper writing: not started.
 | cgm_v1s_seed44_ac94 | posthoc_gap | 0.900 | 0.321 | 0.273 | 0.321 | `runs/bench/2026-10-16_22-18-40_lxbelshark_bec7_cgm_v1s_seed44_ac94` | – | af7ba29 |
 | cgm_v1_73af | posthoc_gap | 0.898 | 0.320 | 0.272 | 0.320 | `runs/bench/2026-10-17_00-15-28_lxbelshark_7a78_cgm_v1_73af` | – | 0c9761c* |
 | cgm_v1s_shift_aa1c | posthoc_gap | 0.898 | 0.317 | 0.270 | 0.318 | `runs/bench/2026-10-17_01-16-13_lxbelshark_1a37_cgm_v1s_shift_aa1c` | – | 5864b27 |
+| plism_oracle_condmean_gap | oracle_condition_mean(backbone_gap) | 0.892 | 0.335 | 0.277 | 0.326 | `runs/bench/2026-10-20_14-40-47_lxbelshark_8d2c_plism_oracle_condmean_gap` | – | f87a13f |
+| plism_oracle_condmean_gap_zero | oracle_condition_mean(backbone_gap) | 0.892 | 0.334 | 0.276 | 0.325 | `runs/bench/2026-10-20_15-40-09_lxbelshark_6505_plism_oracle_condmean_gap_zero` | – | f87a13f* |
 | h0_mini | – | 0.600 | 0.120 | 0.055 | 0.100 | `../plism-benchmark/output/metrics/8139_tiles/h0_mini` | – | – |
 | sipe_h0_mini | – | 0.666 | 0.237 | 0.158 | 0.203 | `../plism-benchmark/output/metrics/8139_tiles/sipe_h0_mini` | – | – |
 
@@ -173,7 +179,7 @@ Top-1 accuracy, mean over slide pairs (PLISM `results.csv`).
 
 ### PLISM per slide pair vs G0 (slide-bootstrap intervals)
 
-<!-- results:plism_pairs exclude=*smoke* ref=mixture_G0_K1 tags=h0_mini_gap_ref,softshrink_gap_lam0.5,softshrink_gap_tile_lam0.4,softshrink_gap_region_lam0.7,cgm_v1s_7b71,cgm_v1s_seed43_8ed0,cgm_v1s_seed44_ac94,cgm_v1s_noaug_7e3c,cgm_v0s_a602,cgm_v0_5ee4,cgm_v1_73af,cgm_v2s_920f,cgm_v1s_shift_e3c7,cgm_v1s_shift_aa1c,aug_g0_geo_all,aug_cgminit_clean_all,quadratic_Q2_m16,quadratic_Q2-rand_m16,paired_vae_ysltwjoj,paired_vae_geometric_aug_lazztzda -->
+<!-- results:plism_pairs exclude=*smoke* ref=mixture_G0_K1 tags=h0_mini_gap_ref,softshrink_gap_lam0.5,softshrink_gap_tile_lam0.4,softshrink_gap_region_lam0.7,cgm_v1s_7b71,cgm_v1s_seed43_8ed0,cgm_v1s_seed44_ac94,cgm_v1s_noaug_7e3c,cgm_v0s_a602,cgm_v0_5ee4,cgm_v1_73af,cgm_v2s_920f,cgm_v1s_shift_e3c7,cgm_v1s_shift_aa1c,aug_g0_geo_all,aug_cgminit_clean_all,quadratic_Q2_m16,quadratic_Q2-rand_m16,paired_vae_ysltwjoj,paired_vae_geometric_aug_lazztzda,plism_oracle_condmean_gap,plism_oracle_condmean_gap_zero -->
 <!-- generated by `uv run python -m sipe.eval.results_tables --write`; do not edit -->
 
 | method | pairs | n | top-1 | ref top-1 | Δ top-1 | 95% CI | pairs better | bench run dir |
@@ -298,6 +304,18 @@ Top-1 accuracy, mean over slide pairs (PLISM `results.csv`).
 | paired_vae_geometric_aug_lazztzda | all | 4095 | 0.269 | 0.294 | -0.025 | [-0.028, -0.022] | 12% | `runs/bench/2026-10-15_02-56-10_lxbelshark_e50a_paired_vae_geometric_aug_lazztzda` |
 | paired_vae_geometric_aug_lazztzda | inter-scanner, HR | 21 | 0.626 | 0.731 | -0.105 | [-0.183, -0.032] | 0% | `runs/bench/2026-10-15_02-56-10_lxbelshark_e50a_paired_vae_geometric_aug_lazztzda` |
 | paired_vae_geometric_aug_lazztzda | all, HR | 609 | 0.029 | 0.032 | -0.003 | [-0.006, +0.000] | 72% | `runs/bench/2026-10-15_02-56-10_lxbelshark_e50a_paired_vae_geometric_aug_lazztzda` |
+| plism_oracle_condmean_gap | inter-scanner | 273 | 0.892 | 0.887 | +0.006 | [-0.004, +0.021] | 32% | `runs/bench/2026-10-20_14-40-47_lxbelshark_8d2c_plism_oracle_condmean_gap` |
+| plism_oracle_condmean_gap | inter-staining | 546 | 0.335 | 0.303 | +0.032 | [+0.026, +0.038] | 85% | `runs/bench/2026-10-20_14-40-47_lxbelshark_8d2c_plism_oracle_condmean_gap` |
+| plism_oracle_condmean_gap | scanner + staining | 3276 | 0.277 | 0.243 | +0.034 | [+0.029, +0.039] | 91% | `runs/bench/2026-10-20_14-40-47_lxbelshark_8d2c_plism_oracle_condmean_gap` |
+| plism_oracle_condmean_gap | all | 4095 | 0.326 | 0.294 | +0.032 | [+0.027, +0.037] | 86% | `runs/bench/2026-10-20_14-40-47_lxbelshark_8d2c_plism_oracle_condmean_gap` |
+| plism_oracle_condmean_gap | inter-scanner, HR | 21 | 0.818 | 0.731 | +0.087 | [+0.008, +0.160] | 100% | `runs/bench/2026-10-20_14-40-47_lxbelshark_8d2c_plism_oracle_condmean_gap` |
+| plism_oracle_condmean_gap | all, HR | 609 | 0.074 | 0.032 | +0.042 | [+0.032, +0.053] | 100% | `runs/bench/2026-10-20_14-40-47_lxbelshark_8d2c_plism_oracle_condmean_gap` |
+| plism_oracle_condmean_gap_zero | inter-scanner | 273 | 0.892 | 0.887 | +0.005 | [-0.004, +0.021] | 32% | `runs/bench/2026-10-20_15-40-09_lxbelshark_6505_plism_oracle_condmean_gap_zero` |
+| plism_oracle_condmean_gap_zero | inter-staining | 546 | 0.334 | 0.303 | +0.031 | [+0.024, +0.036] | 84% | `runs/bench/2026-10-20_15-40-09_lxbelshark_6505_plism_oracle_condmean_gap_zero` |
+| plism_oracle_condmean_gap_zero | scanner + staining | 3276 | 0.276 | 0.243 | +0.033 | [+0.028, +0.038] | 89% | `runs/bench/2026-10-20_15-40-09_lxbelshark_6505_plism_oracle_condmean_gap_zero` |
+| plism_oracle_condmean_gap_zero | all | 4095 | 0.325 | 0.294 | +0.031 | [+0.026, +0.036] | 85% | `runs/bench/2026-10-20_15-40-09_lxbelshark_6505_plism_oracle_condmean_gap_zero` |
+| plism_oracle_condmean_gap_zero | inter-scanner, HR | 21 | 0.817 | 0.731 | +0.086 | [+0.008, +0.159] | 100% | `runs/bench/2026-10-20_15-40-09_lxbelshark_6505_plism_oracle_condmean_gap_zero` |
+| plism_oracle_condmean_gap_zero | all, HR | 609 | 0.074 | 0.032 | +0.042 | [+0.031, +0.053] | 100% | `runs/bench/2026-10-20_15-40-09_lxbelshark_6505_plism_oracle_condmean_gap_zero` |
 
 Reference: `mixture_G0_K1` (`runs/bench/2026-10-14_07-10-49_lxbelshark_0721_mixture_G0_K1`). Per slide pair top-1 (plismbench `metrics.csv`, mean of both directions); Δ = method minus reference, mean over the pairs of the group; 95% CI = percentile interval of a slide-level bootstrap (2000 draws, seed 0; pairs share slides, so slides are resampled and a pair counts once per drawn copy of each of its slides); pairs better = share of pairs with Δ > 0. HR = either slide has the HR stain. One fit per method, so the interval covers the slide sample only, not seeds.
 
@@ -385,7 +403,7 @@ Reference: `cgm_v0s_a602` (`runs/bench/2026-10-15_10-03-00_lxbelshark_ae3c_cgm_v
 
 Seed 43 vs seed 42 of V1-S is the seed-to-seed scale for the V2-S row.
 
-<!-- results:plism_pairs exclude=*smoke* ref=cgm_v1s_7b71 tags=cgm_v1_73af,cgm_v1s_shift_e3c7,cgm_v1s_shift_aa1c,cgm_v2s_920f,cgm_v1s_seed43_8ed0,cgm_v1s_seed44_ac94,cgm_v1s_noaug_7e3c -->
+<!-- results:plism_pairs exclude=*smoke* ref=cgm_v1s_7b71 tags=cgm_v1_73af,cgm_v1s_shift_e3c7,cgm_v1s_shift_aa1c,cgm_v2s_920f,cgm_v1s_seed43_8ed0,cgm_v1s_seed44_ac94,cgm_v1s_noaug_7e3c,plism_oracle_condmean_gap,plism_oracle_condmean_gap_zero -->
 <!-- generated by `uv run python -m sipe.eval.results_tables --write`; do not edit -->
 
 | method | pairs | n | top-1 | ref top-1 | Δ top-1 | 95% CI | pairs better | bench run dir |
@@ -432,6 +450,18 @@ Seed 43 vs seed 42 of V1-S is the seed-to-seed scale for the V2-S row.
 | cgm_v1s_noaug_7e3c | all | 4095 | 0.320 | 0.321 | -0.002 | [-0.002, -0.001] | 24% | `runs/bench/2026-10-16_14-07-40_lxbelshark_3c28_cgm_v1s_noaug_7e3c` |
 | cgm_v1s_noaug_7e3c | inter-scanner, HR | 21 | 0.735 | 0.732 | +0.003 | [-0.002, +0.008] | 76% | `runs/bench/2026-10-16_14-07-40_lxbelshark_3c28_cgm_v1s_noaug_7e3c` |
 | cgm_v1s_noaug_7e3c | all, HR | 609 | 0.038 | 0.038 | -0.000 | [-0.001, -0.000] | 24% | `runs/bench/2026-10-16_14-07-40_lxbelshark_3c28_cgm_v1s_noaug_7e3c` |
+| plism_oracle_condmean_gap | inter-scanner | 273 | 0.892 | 0.899 | -0.007 | [-0.017, +0.009] | 21% | `runs/bench/2026-10-20_14-40-47_lxbelshark_8d2c_plism_oracle_condmean_gap` |
+| plism_oracle_condmean_gap | inter-staining | 546 | 0.335 | 0.321 | +0.013 | [+0.006, +0.020] | 65% | `runs/bench/2026-10-20_14-40-47_lxbelshark_8d2c_plism_oracle_condmean_gap` |
+| plism_oracle_condmean_gap | scanner + staining | 3276 | 0.277 | 0.273 | +0.004 | [-0.002, +0.010] | 49% | `runs/bench/2026-10-20_14-40-47_lxbelshark_8d2c_plism_oracle_condmean_gap` |
+| plism_oracle_condmean_gap | all | 4095 | 0.326 | 0.321 | +0.004 | [-0.002, +0.011] | 50% | `runs/bench/2026-10-20_14-40-47_lxbelshark_8d2c_plism_oracle_condmean_gap` |
+| plism_oracle_condmean_gap | inter-scanner, HR | 21 | 0.818 | 0.732 | +0.086 | [+0.013, +0.156] | 100% | `runs/bench/2026-10-20_14-40-47_lxbelshark_8d2c_plism_oracle_condmean_gap` |
+| plism_oracle_condmean_gap | all, HR | 609 | 0.074 | 0.038 | +0.036 | [+0.028, +0.043] | 100% | `runs/bench/2026-10-20_14-40-47_lxbelshark_8d2c_plism_oracle_condmean_gap` |
+| plism_oracle_condmean_gap_zero | inter-scanner | 273 | 0.892 | 0.899 | -0.007 | [-0.017, +0.009] | 21% | `runs/bench/2026-10-20_15-40-09_lxbelshark_6505_plism_oracle_condmean_gap_zero` |
+| plism_oracle_condmean_gap_zero | inter-staining | 546 | 0.334 | 0.321 | +0.012 | [+0.005, +0.019] | 63% | `runs/bench/2026-10-20_15-40-09_lxbelshark_6505_plism_oracle_condmean_gap_zero` |
+| plism_oracle_condmean_gap_zero | scanner + staining | 3276 | 0.276 | 0.273 | +0.003 | [-0.004, +0.009] | 48% | `runs/bench/2026-10-20_15-40-09_lxbelshark_6505_plism_oracle_condmean_gap_zero` |
+| plism_oracle_condmean_gap_zero | all | 4095 | 0.325 | 0.321 | +0.003 | [-0.003, +0.010] | 48% | `runs/bench/2026-10-20_15-40-09_lxbelshark_6505_plism_oracle_condmean_gap_zero` |
+| plism_oracle_condmean_gap_zero | inter-scanner, HR | 21 | 0.817 | 0.732 | +0.085 | [+0.013, +0.154] | 100% | `runs/bench/2026-10-20_15-40-09_lxbelshark_6505_plism_oracle_condmean_gap_zero` |
+| plism_oracle_condmean_gap_zero | all, HR | 609 | 0.074 | 0.038 | +0.036 | [+0.028, +0.043] | 100% | `runs/bench/2026-10-20_15-40-09_lxbelshark_6505_plism_oracle_condmean_gap_zero` |
 
 Reference: `cgm_v1s_7b71` (`runs/bench/2026-10-14_23-36-54_lxbelshark_22f4_cgm_v1s_7b71`). Per slide pair top-1 (plismbench `metrics.csv`, mean of both directions); Δ = method minus reference, mean over the pairs of the group; 95% CI = percentile interval of a slide-level bootstrap (2000 draws, seed 0; pairs share slides, so slides are resampled and a pair counts once per drawn copy of each of its slides); pairs better = share of pairs with Δ > 0. HR = either slide has the HR stain. One fit per method, so the interval covers the slide sample only, not seeds.
 
@@ -497,6 +527,8 @@ this reason, never instead of them.
 | cgm_v1s_seed44_ac94 | posthoc_gap | 0.914 | 0.377 | 0.320 | 0.371 | `runs/bench/2026-10-16_22-18-40_lxbelshark_bec7_cgm_v1s_seed44_ac94` | – | af7ba29 |
 | cgm_v1_73af | posthoc_gap | 0.912 | 0.376 | 0.319 | 0.370 | `runs/bench/2026-10-17_00-15-28_lxbelshark_7a78_cgm_v1_73af` | – | 0c9761c* |
 | cgm_v1s_shift_aa1c | posthoc_gap | 0.912 | 0.373 | 0.316 | 0.367 | `runs/bench/2026-10-17_01-16-13_lxbelshark_1a37_cgm_v1s_shift_aa1c` | – | 5864b27 |
+| plism_oracle_condmean_gap | oracle_condition_mean(backbone_gap) | 0.899 | 0.386 | 0.319 | 0.370 | `runs/bench/2026-10-20_14-40-47_lxbelshark_8d2c_plism_oracle_condmean_gap` | – | f87a13f |
+| plism_oracle_condmean_gap_zero | oracle_condition_mean(backbone_gap) | 0.898 | 0.385 | 0.318 | 0.369 | `runs/bench/2026-10-20_15-40-09_lxbelshark_6505_plism_oracle_condmean_gap_zero` | – | f87a13f* |
 | h0_mini | – | 0.609 | 0.142 | 0.065 | 0.114 | `../plism-benchmark/output/metrics/8139_tiles/h0_mini` | – | – |
 | sipe_h0_mini | – | 0.678 | 0.280 | 0.187 | 0.235 | `../plism-benchmark/output/metrics/8139_tiles/sipe_h0_mini` | – | – |
 
@@ -506,7 +538,7 @@ Top-1 accuracy, mean over slide pairs without the stain(s) HR on either side (re
 
 ### PLISM per slide pair vs G0, without the HR stain
 
-<!-- results:plism_pairs exclude=*smoke* drop_stain=HR ref=mixture_G0_K1 tags=h0_mini_gap_ref,softshrink_gap_lam0.5,softshrink_gap_tile_lam0.4,softshrink_gap_region_lam0.7,cgm_v1s_7b71,cgm_v1s_seed43_8ed0,cgm_v1s_seed44_ac94,cgm_v1s_noaug_7e3c,cgm_v0s_a602,cgm_v0_5ee4,cgm_v1_73af,cgm_v2s_920f,cgm_v1s_shift_e3c7,cgm_v1s_shift_aa1c,aug_g0_geo_all,aug_cgminit_clean_all,quadratic_Q2_m16,quadratic_Q2-rand_m16,paired_vae_ysltwjoj,paired_vae_geometric_aug_lazztzda -->
+<!-- results:plism_pairs exclude=*smoke* drop_stain=HR ref=mixture_G0_K1 tags=h0_mini_gap_ref,softshrink_gap_lam0.5,softshrink_gap_tile_lam0.4,softshrink_gap_region_lam0.7,cgm_v1s_7b71,cgm_v1s_seed43_8ed0,cgm_v1s_seed44_ac94,cgm_v1s_noaug_7e3c,cgm_v0s_a602,cgm_v0_5ee4,cgm_v1_73af,cgm_v2s_920f,cgm_v1s_shift_e3c7,cgm_v1s_shift_aa1c,aug_g0_geo_all,aug_cgminit_clean_all,quadratic_Q2_m16,quadratic_Q2-rand_m16,paired_vae_ysltwjoj,paired_vae_geometric_aug_lazztzda,plism_oracle_condmean_gap,plism_oracle_condmean_gap_zero -->
 <!-- generated by `uv run python -m sipe.eval.results_tables --write`; do not edit -->
 
 | method | pairs | n | top-1 | ref top-1 | Δ top-1 | 95% CI | pairs better | bench run dir |
@@ -591,6 +623,14 @@ Top-1 accuracy, mean over slide pairs without the stain(s) HR on either side (re
 | paired_vae_geometric_aug_lazztzda | inter-staining | 462 | 0.337 | 0.357 | -0.019 | [-0.022, -0.017] | 6% | `runs/bench/2026-10-15_02-56-10_lxbelshark_e50a_paired_vae_geometric_aug_lazztzda` |
 | paired_vae_geometric_aug_lazztzda | scanner + staining | 2772 | 0.255 | 0.285 | -0.031 | [-0.034, -0.028] | 1% | `runs/bench/2026-10-15_02-56-10_lxbelshark_e50a_paired_vae_geometric_aug_lazztzda` |
 | paired_vae_geometric_aug_lazztzda | all | 3486 | 0.311 | 0.339 | -0.028 | [-0.031, -0.026] | 2% | `runs/bench/2026-10-15_02-56-10_lxbelshark_e50a_paired_vae_geometric_aug_lazztzda` |
+| plism_oracle_condmean_gap | inter-scanner | 252 | 0.899 | 0.900 | -0.001 | [-0.006, +0.008] | 26% | `runs/bench/2026-10-20_14-40-47_lxbelshark_8d2c_plism_oracle_condmean_gap` |
+| plism_oracle_condmean_gap | inter-staining | 462 | 0.386 | 0.357 | +0.029 | [+0.023, +0.037] | 82% | `runs/bench/2026-10-20_14-40-47_lxbelshark_8d2c_plism_oracle_condmean_gap` |
+| plism_oracle_condmean_gap | scanner + staining | 2772 | 0.319 | 0.285 | +0.033 | [+0.028, +0.039] | 89% | `runs/bench/2026-10-20_14-40-47_lxbelshark_8d2c_plism_oracle_condmean_gap` |
+| plism_oracle_condmean_gap | all | 3486 | 0.370 | 0.339 | +0.030 | [+0.025, +0.035] | 83% | `runs/bench/2026-10-20_14-40-47_lxbelshark_8d2c_plism_oracle_condmean_gap` |
+| plism_oracle_condmean_gap_zero | inter-scanner | 252 | 0.898 | 0.900 | -0.001 | [-0.006, +0.008] | 26% | `runs/bench/2026-10-20_15-40-09_lxbelshark_6505_plism_oracle_condmean_gap_zero` |
+| plism_oracle_condmean_gap_zero | inter-staining | 462 | 0.385 | 0.357 | +0.028 | [+0.021, +0.035] | 81% | `runs/bench/2026-10-20_15-40-09_lxbelshark_6505_plism_oracle_condmean_gap_zero` |
+| plism_oracle_condmean_gap_zero | scanner + staining | 2772 | 0.318 | 0.285 | +0.032 | [+0.027, +0.038] | 87% | `runs/bench/2026-10-20_15-40-09_lxbelshark_6505_plism_oracle_condmean_gap_zero` |
+| plism_oracle_condmean_gap_zero | all | 3486 | 0.369 | 0.339 | +0.029 | [+0.024, +0.034] | 82% | `runs/bench/2026-10-20_15-40-09_lxbelshark_6505_plism_oracle_condmean_gap_zero` |
 
 Reference: `mixture_G0_K1` (`runs/bench/2026-10-14_07-10-49_lxbelshark_0721_mixture_G0_K1`). Per slide pair top-1 (plismbench `metrics.csv`, mean of both directions); Δ = method minus reference, mean over the pairs of the group; 95% CI = percentile interval of a slide-level bootstrap (2000 draws, seed 0; pairs share slides, so slides are resampled and a pair counts once per drawn copy of each of its slides); pairs better = share of pairs with Δ > 0. HR = either slide has the HR stain. One fit per method, so the interval covers the slide sample only, not seeds. Pairs with the stain(s) HR on either side are dropped before grouping and bootstrapping.
 

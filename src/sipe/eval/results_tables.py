@@ -182,7 +182,11 @@ class BenchRun:
     @property
     def representation(self) -> str:
         rep = (self.provenance.get("features") or {}).get("representation")
-        return rep or str(self.config.get("representation", "–"))
+        rep = rep or str(self.config.get("representation", "–"))
+        # Oracle rows (sipe.bench.plism_oracle) rewrite another run's features with
+        # the condition label; label them so they never read as a method.
+        oracle = (self.provenance.get("checkpoint") or {}).get("oracle")
+        return f"oracle_{oracle}({rep})" if oracle else rep
 
     @property
     def train_run(self) -> Path | None:

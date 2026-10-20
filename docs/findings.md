@@ -33,7 +33,10 @@ near zero for every method (G0 0.007 vs 0.357 for the other inter-staining pairs
 `runs/bench/2026-10-15_05-38-58_claude-box_6ed5_plism_pairs_gap_g0_cgm_q2_vae/by_stain.csv`);
 HRH (not overnight) behaves like the other stains. HR is in 609 of 4,095 pairs, so it
 dilutes the inter-staining / joint / all means. Every PLISM table has a `drop_stain=HR` twin;
-report it next to the full table, never instead. "inter-scanner, HR" (21 pairs) is where
+report it next to the full table, never instead. HR is mostly a slide-wide translation: the PLISM
+condition-mean oracle (each slide's mean removed) lifts the inter-scanner HR pairs by
++0.086 [+0.013, +0.156] over V1-S and the HR pairs overall by +0.036 [+0.028, +0.043], while it
+is at V1-S's level elsewhere (`runs/bench/2026-10-20_14-40-47_lxbelshark_8d2c_plism_oracle_condmean_gap`). "inter-scanner, HR" (21 pairs) is where
 learned maps that break on an unusual stain show it (PairedVAE `ysltwjoj`).
 
 **3. Protocols are not interchangeable.** (a) In-loop validation of a training module

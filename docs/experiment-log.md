@@ -448,6 +448,21 @@ The ISBI-facing summary of these items is in `docs/progress.md` (section 2, clai
     −0.004, inter-scanner −0.001 [−0.002, −0.001]; vs G0 +0.024 [+0.020, +0.028]; vs V0-S
     −0.001 [−0.001, +0.000]. So restricting the rank only recovers part of the loss (−0.005
     → −0.004): the verdict stands.
+  - PLISM condition-mean oracle (a different oracle from the SCORPION one below; run
+    2026-10-20, `runs/bench/2026-10-20_14-40-47_lxbelshark_8d2c_plism_oracle_condmean_gap`, `sipe.bench.plism_oracle`, center global,
+    source features = the GAP reference run). Each PLISM tile minus the mean of its slide
+    (= its staining × scanner condition, all 16,278 tiles) plus the mean of the 91 slide
+    means; uses the condition label and the query slide's own tiles, so a ceiling for
+    per-condition translations, not a method. Read: oracle vs G0 +0.032 [+0.027, +0.037]
+    all pairs; vs V1-S 7b71 +0.004 [−0.002, +0.011] (50% of pairs), inter-scanner −0.007
+    [−0.017, +0.009], inter-staining +0.013 [+0.006, +0.020], HR pairs +0.036 [+0.028,
+    +0.043] (per-pair blocks in `docs/progress.md`). Without HR it equals V1-S on all pairs
+    (0.370 vs 0.371) and is below it inter-scanner (0.899 vs 0.913). Reading: a scanner-blind
+    single-embedding map reaches what translating each condition to a common mean gives,
+    and beats it within a staining across scanners; the translation wins across stainings,
+    mostly through HR (overnight hematoxylin acts largely as a slide-wide shift). The origin does
+    not matter: with m = 0 (`runs/bench/2026-10-20_15-40-09_lxbelshark_6505_plism_oracle_condmean_gap_zero`) all pairs 0.325 vs 0.326,
+    oracle − V1-S +0.003 [−0.003, +0.010], every group within 0.001 of the global-center run.
   - Oracle retrieval ceiling (for the analysis, not run).
     Per scanner s, ridge-regress the consensus on x_s (train), apply with the true
     scanner on val, SCORPION retrieval vs G0. It captures δ_s + D_s exactly at the
