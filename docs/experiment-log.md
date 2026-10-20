@@ -334,7 +334,10 @@ The ISBI-facing summary of these items is in `docs/progress.md` (section 2, clai
 - Exp 7 CGM: first fit done (`runs/2026-10-14_22-30-38_lxbelshark_7b71`); PLISM done
   2026-10-15, above G0 in every row (see roadmap status; per-pair table). HEST done
   2026-10-15 (`runs/bench/2026-10-15_07-47-25_lxbelshark_8823_cgm_v1s_7b71`): average 0.363 =
-  G0, preservation holds on average. V0-S and seed-43 fits done 2026-10-15 (see roadmap
+  G0, preservation holds on average. HEST for seeds 8ed0 / ac94 and the ablations 7e3c / 73af
+  done 2026-10-18 (`scripts/hest_cgm_seeds.sh`, read 2026-10-20 in `docs/progress.md` claims 3
+  and 7): 0.363 on all three V1-S seeds with the same per-task pattern (up on COAD/PRAD, down
+  on READ/SKCM/HCC), no-aug 7e3c 0.361, V1 73af 0.362 (HEST table). V0-S and seed-43 fits done 2026-10-15 (see roadmap
   status; on SCORPION val, seed 43 reproduces 7b71 and V0-S is lower). Next: their PLISM
   done 2026-10-15 (see roadmap status: V0-S gets most of the gain, nonlinear +0.003–0.004;
   vs the region eraser +0.011 on all pairs). Next: HEST for the region eraser and V0-S
