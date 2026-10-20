@@ -67,13 +67,14 @@ plus the arm overrides below. Hyperparameters are fixed, not selected on val.
 | **V1-S** nonlinear encoder, per-scanner (selected) | – | seed 42 `runs/2026-10-14_22-30-38_lxbelshark_7b71`, seed 43 `runs/2026-10-15_08-51-41_lxbelshark_8ed0`, seed 44 `runs/2026-10-16_21-25-30_lxbelshark_ac94`; no aug `runs/2026-10-16_13-08-26_lxbelshark_7e3c` |
 | V2-S + nonlinear generator h | `generator_hidden_dim=1024` | `runs/2026-10-15_19-48-26_lxbelshark_920f` |
 | V1-S+D content-dependent scanner shift (follow-up, not ISBI) | `--config configs/consensus_gen_shift.yaml` (`ContentShiftCGM`, `shift_rank: 128`) | rank 128 `runs/2026-10-16_19-27-29_lxbelshark_e3c7`, rank 32 `runs/2026-10-17_00-06-04_lxbelshark_aa1c`; not pursued |
-| LOSO, per held-out scanner j | `--data.init_args.hold_out_scanner=<j> --data.init_args.views=4` | V1-S and V0-S × 5 scanners, done 2026-10-16 (`scripts/loso_fits.sh`) |
+| LOSO, per held-out scanner j | `--data.init_args.hold_out_scanner=<j> --data.init_args.views=4` | V1-S and V0-S × 5 scanners, done 2026-10-16 (dirs in `docs/progress.md`, section 3) |
 
 Overrides are under `--model.init_args.network.init_args.`; no-aug = `--data.init_args.
 augmentations=[] --data.init_args.horizontal_flip=false --data.init_args.vertical_flip=false`.
-Host scripts (gitignored): `scripts/cgm_arms_fits.sh`, `cgm_v2s_fit.sh`,
-`aug_study_5_noaug_fits.sh`, `loso_fits.sh`; each creates its run dir and passes it via
-`SIPE_RUN_DIR`, then runs PLISM on `map_cgm.pt`.
+Host script (gitignored): `scripts/cgm_arms_fits.sh` (`ARMS=...`) creates each fit's run
+dir, passes it via `SIPE_RUN_DIR`, then runs PLISM on `map_cgm.pt`. The other host scripts
+(`cgm_v2s_fit.sh`, `aug_study_5_noaug_fits.sh`, `loso_fits.sh`) were removed on 2026-10-20;
+each fit dir's `config.yaml` holds its overrides.
 
 ## 4. Evaluation pipeline and gates
 

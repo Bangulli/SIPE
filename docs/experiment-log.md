@@ -14,6 +14,11 @@ Where to write what:
   open point in section 3, a table block in section 4;
 - a general lesson (protocol, benchmark quirk, negative result) → `docs/findings.md`.
 
+
+Host scripts named below (`scripts/*.sh`, gitignored) were removed on 2026-10-20, except
+`scripts/cgm_arms_fits.sh`; every run dir keeps what was run (`config.yaml`, `git.txt`,
+bench `provenance.json`).
+
 ## 1. Roadmap status and decisions
 
 | step (roadmap) | status | evidence (run dir) | decision |

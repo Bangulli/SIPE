@@ -184,8 +184,10 @@ W&B), and each row must name the run dir it came from.
   `uv run python -m sipe.eval.loso --tag <tag> --features-from <feature cache>
   [--split val|test] --runs <CGM fit dirs>`; paper numbers on test, read once. For each held-out
   scanner j, G0^-j and CGM-init^-j are fitted in the run on train without j; trained fits
-  come from `scripts/loso_fits.sh` (`ARM=V1-S|V0-S`; `--data.init_args.hold_out_scanner=<j>
-  --data.init_args.views=4`, which drops j from train only). Fits without a hold-out are the
+  are `sipe fit --config configs/consensus_gen.yaml` (V0-S: plus `--model.init_args.network.
+  init_args.encoder_hidden_dim=0`) with `--data.init_args.hold_out_scanner=<j>
+  --data.init_args.views=4`, which drops j from train only (the 10 fits of 2026-10-16 record
+  their overrides in their `config.yaml`). Fits without a hold-out are the
   full-data references. Readout: pairs of the split with j (`unseen`), map^-j - G0^-j and
   map^-j - map^full, with slide-bootstrap intervals. `cgm_select` refuses LOSO fits.
   Pairing unit: tile-level pairs over the kept scanners. Table block `loso`.
