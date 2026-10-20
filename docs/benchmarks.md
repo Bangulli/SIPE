@@ -40,6 +40,25 @@ bench/run python -m sipe.bench.hest  --posthoc runs/bench/<fit run>/<map>.pt --t
 `provenance.json` → `checkpoint` then holds the map file (sha256, kind, scalar fields such
 as `lambda`) and the fit run dir with its `git.txt`.
 
+## PLISM condition-mean oracle (not a method)
+
+Reference ceiling for per-condition translations. It uses the PLISM condition (slide =
+staining x scanner) at inference, so it breaks the inference contract on purpose. No
+extraction: it rewrites the features of an existing PLISM run (each tile x becomes
+x - mu_slide + m, mu_slide = mean over all 16,278 tiles of its slide) and runs the
+official `compute_metrics` (the metric half of a PLISM run; the user runs it):
+
+```bash
+bench/run python -m sipe.bench.plism_oracle \
+    --features-from runs/bench/2026-10-13_10-02-08_lxbelshark_053f_h0_mini_gap_ref \
+    --tag plism_oracle_condmean_gap [--center global|zero]
+```
+
+- `--center global` (default): m = mean of the 91 slide means (keeps the origin, as the
+  affine maps whose bias is the train mean; cosine depends on the origin). `zero`: m = 0.
+- Pairing unit: PLISM slide means. It bounds translations only; a map that also
+  rescales can exceed it. Outputs as a PLISM run, plus `condition_means.npz`.
+
 ## Inspect PLISM retrieval (which tiles are retrieved)
 
 Diagnostic for the top-k numbers, no new metric. Two steps:

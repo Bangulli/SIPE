@@ -138,6 +138,10 @@ W&B), and each row must name the run dir it came from.
   target x_k − x_j, content from the other views (no shared noise); train/val only, writes
   `summary.csv`, `per_scanner.csv`, `per_cluster.csv`, `ridge.csv` (table block
   `content_offsets`).
+- PLISM condition-mean oracle (uses the condition label: an oracle row, never a method):
+  `bench/run python -m sipe.bench.plism_oracle --features-from <PLISM run> --tag <tag>
+  [--center global|zero]`; rewrites that run's features, x - mu_slide + m, then the
+  official metrics (`docs/benchmarks.md`).
 - PLISM retrieval diagnostics (no new metric; `docs/benchmarks.md`):
   `uv run python -m sipe.eval.plism_pairs --runs <ref run> <method runs> --tag <tag>`
   merges the runs' per-pair `metrics.csv` into `pairs.csv` + `shortlist.csv`; then
