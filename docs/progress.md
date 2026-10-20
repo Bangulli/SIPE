@@ -47,7 +47,7 @@ Inference is one global map on one H0-mini GAP embedding: no scanner ID, no pair
 |---|---|---|---|
 | 1 | CGM beats its linear limit G0 on PLISM | V1-S 7b71 vs G0, all pairs +0.028 [+0.024, +0.032], better on 98% of pairs; seed 8ed0 0.322 vs 7b71 0.321 on all pairs; seed 44 (`runs/bench/2026-10-16_22-18-40_lxbelshark_bec7_cgm_v1s_seed44_ac94`) +0.028 [+0.023, +0.032], 98% (per-pair vs G0; PLISM) | done, 3 seeds |
 | 2 | the gain is largest under the joint scanner + staining shift | 7b71 vs G0: scanner + staining +0.031 [+0.026, +0.035], inter-staining +0.018 [+0.015, +0.022], inter-scanner +0.012 [+0.007, +0.020]; HR inter-scanner +0.001 [−0.007, +0.012] (21 pairs) | done |
-| 3 | it keeps downstream utility (HEST) | average 0.363 for 7b71 (`runs/bench/2026-10-15_07-47-25_lxbelshark_8823_cgm_v1s_7b71`), V0-S 0.362, G0 0.363, GAP 0.364, tile eraser 0.363 (`runs/bench/2026-10-17_11-26-14_lxbelshark_65e7_softshrink_gap_tile_lam0.4`); per task CGM moves more than G0 (HEST table). Seeds 8ed0 (`runs/bench/2026-10-18_10-48-57_lxbelshark_e123_cgm_v1s_seed43_8ed0`) and ac94 (`runs/bench/2026-10-18_13-09-01_lxbelshark_2236_cgm_v1s_seed44_ac94`): average 0.363 each, so V1-S is 0.363 on all 3 seeds. The per-task shifts repeat across seeds (7b71 / 8ed0 / ac94): COAD 0.285 / 0.283 / 0.283 vs GAP 0.256, PRAD 0.389 / 0.385 / 0.390 vs 0.371; READ 0.167 / 0.168 / 0.167 vs 0.202, SKCM 0.573 / 0.567 / 0.571 vs 0.594, HCC 0.060 / 0.062 / 0.059 vs 0.074. Seed spread is far below these shifts, so they belong to the method; fold stds are 0.01–0.09 and there are no intervals, so per-task differences are not tested. Ablations: V1 73af 0.362 (`runs/bench/2026-10-18_17-08-01_lxbelshark_6514_cgm_v1_73af`), no-aug 7e3c 0.361 (claim 7) | done, 3 seeds: average preserved (V1-S 0.363 vs GAP 0.364); state the per-task trade-off (up on COAD/PRAD, down on READ/SKCM/HCC) |
+| 3 | it keeps downstream utility (HEST) | average 0.363 for 7b71 (`runs/bench/2026-10-15_07-47-25_lxbelshark_8823_cgm_v1s_7b71`), V0-S 0.362, G0 0.363, GAP 0.364, tile eraser 0.363 (`runs/bench/2026-10-17_11-26-14_lxbelshark_65e7_softshrink_gap_tile_lam0.4`); per task CGM moves more than G0 (HEST table). Seeds 8ed0 (`runs/bench/2026-10-18_10-48-57_lxbelshark_e123_cgm_v1s_seed43_8ed0`) and ac94 (`runs/bench/2026-10-18_13-09-01_lxbelshark_2236_cgm_v1s_seed44_ac94`): average 0.363 each, so V1-S is 0.363 on all 3 seeds. The per-task shifts repeat across seeds (7b71 / 8ed0 / ac94): COAD 0.285 / 0.283 / 0.283 vs GAP 0.256, PRAD 0.389 / 0.385 / 0.390 vs 0.371; READ 0.167 / 0.168 / 0.167 vs 0.202, SKCM 0.573 / 0.567 / 0.571 vs 0.594, HCC 0.060 / 0.062 / 0.059 vs 0.074. Seed spread is far below these shifts, so they belong to the method; fold stds are 0.01–0.09 and there are no intervals, so per-task differences are not tested. Ablations: V1 73af 0.362 (`runs/bench/2026-10-18_17-08-01_lxbelshark_6514_cgm_v1_73af`), no-aug 7e3c 0.361 (claim 7) | done, 3 seeds: average preserved (V1-S 0.363 vs GAP 0.364); state the per-task trade-off (up on COAD/PRAD, down on READ/SKCM/HCC). Paired (2026-10-20, `sipe.eval.hest_pairs`, HEST paired blocks): average vs GAP −0.001 [−0.013, +0.012] (7b71; 8ed0 and ac94 −0.001 [−0.013, +0.011]), vs G0 +0.000 [−0.006, +0.008] (bootstrap over tasks and genes); per task vs GAP, gene-bootstrap intervals (conditional on the test patients) exclude 0 for COAD +0.029, PAAD +0.016, PRAD +0.018, READ −0.035, SKCM −0.021, HCC −0.014 (7b71), the same for every seed; the tile eraser shows the same pattern (READ −0.034, COAD +0.014, PRAD +0.014, PAAD +0.012), G0 a weaker one (READ −0.024): the trade-off comes with tile-level pairing, not with CGM's nonlinearity. READ is better on 1 of 2 folds despite −0.035 (one fold drives it) |
 | 4 | the published eraser is beaten by G0 already | PLISM all pairs: GAP 0.227, eraser λ=0.5 0.281, G0 0.294 (PLISM table) | done |
 | 5 | SCORPION val/test agree (shared protocol) | `runs/bench/2026-10-15_18-22-36_lxbelshark_aae8_scorpion_cgm_select`: V1-S selected; val top-1 0.9852 vs V0-S 0.9807 and G0 0.9787; test 0.9756 vs 0.9682 and 0.9645 (CGM selection table). All fits, `runs/bench/2026-10-18_10-46-17_lxbelshark_0256_scorpion_cgm_select_all` (rerun with the seed-grouping fix; same values as e198): the rule selects V1-S *without augmentation* (7e3c, one fit): val 0.9876 vs augmented V1-S 0.9852 / 0.9852 / 0.9855 (7b71 / 8ed0 / ac94), V1 0.9850, V0-S no-aug 0.9832, G0 0.9787; only 7e3c reaches 95% of the best gain. Test 0.9780 vs 0.9756 / 0.9756 / 0.9758. On PLISM 7e3c is −0.002 [−0.002, −0.001] below 7b71 (+0.026 [+0.022, +0.030] over G0) | done; arm V1-S confirmed. Paper row = augmented V1-S (decision 2026-10-18, section 3); the no-aug numbers are reported with claim 7 |
 | 6 | most of the gain is the trained linear map | V0-S vs G0 +0.025 [+0.021, +0.028] of the +0.028; V1-S vs V0-S +0.003 [+0.003, +0.004] (7b71) and +0.004 (8ed0), positive in every group; V2-S vs V1-S +0.002 [+0.001, +0.002], about the seed-to-seed +0.001; V1-S seed 44 vs V0-S +0.003 [+0.002, +0.003]. Exchangeable linear V0 (`runs/bench/2026-10-16_22-17-16_lxbelshark_d926_cgm_v0_5ee4`): +0.022 [+0.018, +0.025] over G0, −0.003 [−0.003, −0.002] below V0-S (8% of pairs better), so the per-scanner likelihood is worth about 0.003 in the linear arm and the trained exchangeable model already has most of the gain (ablation blocks). Exchangeable nonlinear V1 (`runs/bench/2026-10-17_00-15-28_lxbelshark_7a78_cgm_v1_73af`): +0.027 [+0.023, +0.031] over G0 (98% of pairs), +0.002 [+0.002, +0.003] over V0-S, −0.001 [−0.002, −0.000] below V1-S 7b71 (36% of pairs better), i.e. about the seed-to-seed spread: in the nonlinear arm the per-scanner likelihood is worth ≤ 0.001 | done (2026-10-17); one seed for V0, V1 |
@@ -662,6 +662,151 @@ Reference: `mixture_G0_K1` (`runs/bench/2026-10-14_07-10-49_lxbelshark_0721_mixt
 Pearson mean (std over folds), HEST `dataset_results.json`; average only when all tasks ran.
 
 <!-- /results:hest -->
+
+### HEST paired per task and fold vs raw GAP (gene-bootstrap intervals)
+
+<!-- results:hest_pairs exclude=*smoke*,*b84e_cgm_v1s_seed43_8ed0,*d2b8_cgm_v1s_seed44_ac94 ref=h0_mini_gap_ref tags=softshrink_gap_lam0.5,mixture_G0_K1,softshrink_gap_tile_lam0.4,cgm_v0s_a602,cgm_v1s_7b71,cgm_v1s_seed43_8ed0,cgm_v1s_seed44_ac94 -->
+<!-- generated by `uv run python -m sipe.eval.results_tables --write`; do not edit -->
+
+| method | task | Pearson | ref Pearson | Δ | 95% CI (genes) | folds better | bench run dir |
+|---|---|---|---|---|---|---|---|
+| softshrink_gap_lam0.5 | CCRCC | 0.259 | 0.267 | -0.008 | [-0.013, -0.003] | 3/6 | `runs/bench/2026-10-13_23-15-00_lxbelshark_c5a0_softshrink_gap_lam0.5` |
+| softshrink_gap_lam0.5 | COAD | 0.268 | 0.256 | +0.012 | [+0.003, +0.021] | 2/2 | `runs/bench/2026-10-13_23-15-00_lxbelshark_c5a0_softshrink_gap_lam0.5` |
+| softshrink_gap_lam0.5 | HCC | 0.067 | 0.074 | -0.006 | [-0.011, -0.002] | 0/2 | `runs/bench/2026-10-13_23-15-00_lxbelshark_c5a0_softshrink_gap_lam0.5` |
+| softshrink_gap_lam0.5 | IDC | 0.577 | 0.578 | -0.001 | [-0.003, +0.002] | 1/4 | `runs/bench/2026-10-13_23-15-00_lxbelshark_c5a0_softshrink_gap_lam0.5` |
+| softshrink_gap_lam0.5 | LUNG | 0.534 | 0.535 | -0.000 | [-0.007, +0.007] | 0/2 | `runs/bench/2026-10-13_23-15-00_lxbelshark_c5a0_softshrink_gap_lam0.5` |
+| softshrink_gap_lam0.5 | LYMPH_IDC | 0.266 | 0.267 | -0.001 | [-0.003, +0.001] | 2/4 | `runs/bench/2026-10-13_23-15-00_lxbelshark_c5a0_softshrink_gap_lam0.5` |
+| softshrink_gap_lam0.5 | PAAD | 0.500 | 0.497 | +0.004 | [+0.001, +0.007] | 3/3 | `runs/bench/2026-10-13_23-15-00_lxbelshark_c5a0_softshrink_gap_lam0.5` |
+| softshrink_gap_lam0.5 | PRAD | 0.382 | 0.371 | +0.010 | [+0.007, +0.013] | 1/2 | `runs/bench/2026-10-13_23-15-00_lxbelshark_c5a0_softshrink_gap_lam0.5` |
+| softshrink_gap_lam0.5 | READ | 0.199 | 0.202 | -0.003 | [-0.011, +0.003] | 1/2 | `runs/bench/2026-10-13_23-15-00_lxbelshark_c5a0_softshrink_gap_lam0.5` |
+| softshrink_gap_lam0.5 | SKCM | 0.591 | 0.594 | -0.004 | [-0.011, +0.003] | 1/2 | `runs/bench/2026-10-13_23-15-00_lxbelshark_c5a0_softshrink_gap_lam0.5` |
+| softshrink_gap_lam0.5 | average | 0.364 | 0.364 | +0.000 | [-0.004, +0.005] | 14/29 | `runs/bench/2026-10-13_23-15-00_lxbelshark_c5a0_softshrink_gap_lam0.5` |
+| mixture_G0_K1 | CCRCC | 0.265 | 0.267 | -0.002 | [-0.006, +0.002] | 3/6 | `runs/bench/2026-10-14_10-08-10_lxbelshark_41cf_mixture_G0_K1` |
+| mixture_G0_K1 | COAD | 0.262 | 0.256 | +0.006 | [-0.005, +0.018] | 2/2 | `runs/bench/2026-10-14_10-08-10_lxbelshark_41cf_mixture_G0_K1` |
+| mixture_G0_K1 | HCC | 0.067 | 0.074 | -0.007 | [-0.012, -0.001] | 0/2 | `runs/bench/2026-10-14_10-08-10_lxbelshark_41cf_mixture_G0_K1` |
+| mixture_G0_K1 | IDC | 0.580 | 0.578 | +0.002 | [-0.001, +0.005] | 3/4 | `runs/bench/2026-10-14_10-08-10_lxbelshark_41cf_mixture_G0_K1` |
+| mixture_G0_K1 | LUNG | 0.535 | 0.535 | +0.001 | [-0.008, +0.009] | 1/2 | `runs/bench/2026-10-14_10-08-10_lxbelshark_41cf_mixture_G0_K1` |
+| mixture_G0_K1 | LYMPH_IDC | 0.266 | 0.267 | -0.001 | [-0.003, +0.001] | 1/4 | `runs/bench/2026-10-14_10-08-10_lxbelshark_41cf_mixture_G0_K1` |
+| mixture_G0_K1 | PAAD | 0.505 | 0.497 | +0.008 | [+0.004, +0.013] | 3/3 | `runs/bench/2026-10-14_10-08-10_lxbelshark_41cf_mixture_G0_K1` |
+| mixture_G0_K1 | PRAD | 0.383 | 0.371 | +0.012 | [+0.008, +0.016] | 2/2 | `runs/bench/2026-10-14_10-08-10_lxbelshark_41cf_mixture_G0_K1` |
+| mixture_G0_K1 | READ | 0.179 | 0.202 | -0.024 | [-0.032, -0.015] | 1/2 | `runs/bench/2026-10-14_10-08-10_lxbelshark_41cf_mixture_G0_K1` |
+| mixture_G0_K1 | SKCM | 0.587 | 0.594 | -0.007 | [-0.014, -0.000] | 0/2 | `runs/bench/2026-10-14_10-08-10_lxbelshark_41cf_mixture_G0_K1` |
+| mixture_G0_K1 | average | 0.363 | 0.364 | -0.001 | [-0.008, +0.005] | 16/29 | `runs/bench/2026-10-14_10-08-10_lxbelshark_41cf_mixture_G0_K1` |
+| softshrink_gap_tile_lam0.4 | CCRCC | 0.266 | 0.267 | -0.001 | [-0.006, +0.004] | 3/6 | `runs/bench/2026-10-17_11-26-14_lxbelshark_65e7_softshrink_gap_tile_lam0.4` |
+| softshrink_gap_tile_lam0.4 | COAD | 0.270 | 0.256 | +0.014 | [+0.001, +0.026] | 2/2 | `runs/bench/2026-10-17_11-26-14_lxbelshark_65e7_softshrink_gap_tile_lam0.4` |
+| softshrink_gap_tile_lam0.4 | HCC | 0.066 | 0.074 | -0.008 | [-0.014, -0.002] | 0/2 | `runs/bench/2026-10-17_11-26-14_lxbelshark_65e7_softshrink_gap_tile_lam0.4` |
+| softshrink_gap_tile_lam0.4 | IDC | 0.581 | 0.578 | +0.003 | [+0.000, +0.007] | 3/4 | `runs/bench/2026-10-17_11-26-14_lxbelshark_65e7_softshrink_gap_tile_lam0.4` |
+| softshrink_gap_tile_lam0.4 | LUNG | 0.538 | 0.535 | +0.003 | [-0.009, +0.015] | 2/2 | `runs/bench/2026-10-17_11-26-14_lxbelshark_65e7_softshrink_gap_tile_lam0.4` |
+| softshrink_gap_tile_lam0.4 | LYMPH_IDC | 0.267 | 0.267 | +0.000 | [-0.003, +0.004] | 1/4 | `runs/bench/2026-10-17_11-26-14_lxbelshark_65e7_softshrink_gap_tile_lam0.4` |
+| softshrink_gap_tile_lam0.4 | PAAD | 0.509 | 0.497 | +0.012 | [+0.007, +0.017] | 3/3 | `runs/bench/2026-10-17_11-26-14_lxbelshark_65e7_softshrink_gap_tile_lam0.4` |
+| softshrink_gap_tile_lam0.4 | PRAD | 0.385 | 0.371 | +0.014 | [+0.010, +0.018] | 2/2 | `runs/bench/2026-10-17_11-26-14_lxbelshark_65e7_softshrink_gap_tile_lam0.4` |
+| softshrink_gap_tile_lam0.4 | READ | 0.168 | 0.202 | -0.034 | [-0.045, -0.024] | 1/2 | `runs/bench/2026-10-17_11-26-14_lxbelshark_65e7_softshrink_gap_tile_lam0.4` |
+| softshrink_gap_tile_lam0.4 | SKCM | 0.582 | 0.594 | -0.012 | [-0.023, -0.002] | 0/2 | `runs/bench/2026-10-17_11-26-14_lxbelshark_65e7_softshrink_gap_tile_lam0.4` |
+| softshrink_gap_tile_lam0.4 | average | 0.363 | 0.364 | -0.001 | [-0.011, +0.008] | 17/29 | `runs/bench/2026-10-17_11-26-14_lxbelshark_65e7_softshrink_gap_tile_lam0.4` |
+| cgm_v0s_a602 | CCRCC | 0.261 | 0.267 | -0.006 | [-0.013, +0.001] | 3/6 | `runs/bench/2026-10-15_15-08-23_lxbelshark_78e1_cgm_v0s_a602` |
+| cgm_v0s_a602 | COAD | 0.281 | 0.256 | +0.025 | [+0.010, +0.040] | 2/2 | `runs/bench/2026-10-15_15-08-23_lxbelshark_78e1_cgm_v0s_a602` |
+| cgm_v0s_a602 | HCC | 0.062 | 0.074 | -0.012 | [-0.019, -0.004] | 0/2 | `runs/bench/2026-10-15_15-08-23_lxbelshark_78e1_cgm_v0s_a602` |
+| cgm_v0s_a602 | IDC | 0.582 | 0.578 | +0.004 | [+0.000, +0.008] | 3/4 | `runs/bench/2026-10-15_15-08-23_lxbelshark_78e1_cgm_v0s_a602` |
+| cgm_v0s_a602 | LUNG | 0.540 | 0.535 | +0.006 | [-0.008, +0.021] | 2/2 | `runs/bench/2026-10-15_15-08-23_lxbelshark_78e1_cgm_v0s_a602` |
+| cgm_v0s_a602 | LYMPH_IDC | 0.260 | 0.267 | -0.006 | [-0.011, -0.002] | 0/4 | `runs/bench/2026-10-15_15-08-23_lxbelshark_78e1_cgm_v0s_a602` |
+| cgm_v0s_a602 | PAAD | 0.509 | 0.497 | +0.013 | [+0.006, +0.020] | 3/3 | `runs/bench/2026-10-15_15-08-23_lxbelshark_78e1_cgm_v0s_a602` |
+| cgm_v0s_a602 | PRAD | 0.384 | 0.371 | +0.013 | [+0.008, +0.018] | 1/2 | `runs/bench/2026-10-15_15-08-23_lxbelshark_78e1_cgm_v0s_a602` |
+| cgm_v0s_a602 | READ | 0.171 | 0.202 | -0.031 | [-0.043, -0.019] | 1/2 | `runs/bench/2026-10-15_15-08-23_lxbelshark_78e1_cgm_v0s_a602` |
+| cgm_v0s_a602 | SKCM | 0.572 | 0.594 | -0.022 | [-0.034, -0.011] | 0/2 | `runs/bench/2026-10-15_15-08-23_lxbelshark_78e1_cgm_v0s_a602` |
+| cgm_v0s_a602 | average | 0.362 | 0.364 | -0.002 | [-0.013, +0.010] | 15/29 | `runs/bench/2026-10-15_15-08-23_lxbelshark_78e1_cgm_v0s_a602` |
+| cgm_v1s_7b71 | CCRCC | 0.262 | 0.267 | -0.005 | [-0.013, +0.001] | 3/6 | `runs/bench/2026-10-15_07-47-25_lxbelshark_8823_cgm_v1s_7b71` |
+| cgm_v1s_7b71 | COAD | 0.285 | 0.256 | +0.029 | [+0.014, +0.045] | 2/2 | `runs/bench/2026-10-15_07-47-25_lxbelshark_8823_cgm_v1s_7b71` |
+| cgm_v1s_7b71 | HCC | 0.060 | 0.074 | -0.014 | [-0.021, -0.006] | 0/2 | `runs/bench/2026-10-15_07-47-25_lxbelshark_8823_cgm_v1s_7b71` |
+| cgm_v1s_7b71 | IDC | 0.582 | 0.578 | +0.004 | [-0.001, +0.008] | 2/4 | `runs/bench/2026-10-15_07-47-25_lxbelshark_8823_cgm_v1s_7b71` |
+| cgm_v1s_7b71 | LUNG | 0.541 | 0.535 | +0.006 | [-0.006, +0.020] | 2/2 | `runs/bench/2026-10-15_07-47-25_lxbelshark_8823_cgm_v1s_7b71` |
+| cgm_v1s_7b71 | LYMPH_IDC | 0.263 | 0.267 | -0.004 | [-0.009, +0.003] | 1/4 | `runs/bench/2026-10-15_07-47-25_lxbelshark_8823_cgm_v1s_7b71` |
+| cgm_v1s_7b71 | PAAD | 0.513 | 0.497 | +0.016 | [+0.009, +0.023] | 3/3 | `runs/bench/2026-10-15_07-47-25_lxbelshark_8823_cgm_v1s_7b71` |
+| cgm_v1s_7b71 | PRAD | 0.389 | 0.371 | +0.018 | [+0.013, +0.023] | 2/2 | `runs/bench/2026-10-15_07-47-25_lxbelshark_8823_cgm_v1s_7b71` |
+| cgm_v1s_7b71 | READ | 0.167 | 0.202 | -0.035 | [-0.047, -0.023] | 1/2 | `runs/bench/2026-10-15_07-47-25_lxbelshark_8823_cgm_v1s_7b71` |
+| cgm_v1s_7b71 | SKCM | 0.573 | 0.594 | -0.021 | [-0.034, -0.008] | 0/2 | `runs/bench/2026-10-15_07-47-25_lxbelshark_8823_cgm_v1s_7b71` |
+| cgm_v1s_7b71 | average | 0.363 | 0.364 | -0.001 | [-0.013, +0.012] | 16/29 | `runs/bench/2026-10-15_07-47-25_lxbelshark_8823_cgm_v1s_7b71` |
+| cgm_v1s_seed43_8ed0 | CCRCC | 0.264 | 0.267 | -0.003 | [-0.009, +0.004] | 3/6 | `runs/bench/2026-10-18_10-48-57_lxbelshark_e123_cgm_v1s_seed43_8ed0` |
+| cgm_v1s_seed43_8ed0 | COAD | 0.283 | 0.256 | +0.027 | [+0.012, +0.042] | 2/2 | `runs/bench/2026-10-18_10-48-57_lxbelshark_e123_cgm_v1s_seed43_8ed0` |
+| cgm_v1s_seed43_8ed0 | HCC | 0.062 | 0.074 | -0.012 | [-0.018, -0.004] | 0/2 | `runs/bench/2026-10-18_10-48-57_lxbelshark_e123_cgm_v1s_seed43_8ed0` |
+| cgm_v1s_seed43_8ed0 | IDC | 0.582 | 0.578 | +0.004 | [-0.000, +0.008] | 2/4 | `runs/bench/2026-10-18_10-48-57_lxbelshark_e123_cgm_v1s_seed43_8ed0` |
+| cgm_v1s_seed43_8ed0 | LUNG | 0.545 | 0.535 | +0.010 | [-0.003, +0.027] | 2/2 | `runs/bench/2026-10-18_10-48-57_lxbelshark_e123_cgm_v1s_seed43_8ed0` |
+| cgm_v1s_seed43_8ed0 | LYMPH_IDC | 0.262 | 0.267 | -0.004 | [-0.010, +0.002] | 2/4 | `runs/bench/2026-10-18_10-48-57_lxbelshark_e123_cgm_v1s_seed43_8ed0` |
+| cgm_v1s_seed43_8ed0 | PAAD | 0.509 | 0.497 | +0.013 | [+0.006, +0.020] | 3/3 | `runs/bench/2026-10-18_10-48-57_lxbelshark_e123_cgm_v1s_seed43_8ed0` |
+| cgm_v1s_seed43_8ed0 | PRAD | 0.385 | 0.371 | +0.013 | [+0.008, +0.018] | 1/2 | `runs/bench/2026-10-18_10-48-57_lxbelshark_e123_cgm_v1s_seed43_8ed0` |
+| cgm_v1s_seed43_8ed0 | READ | 0.168 | 0.202 | -0.034 | [-0.046, -0.022] | 1/2 | `runs/bench/2026-10-18_10-48-57_lxbelshark_e123_cgm_v1s_seed43_8ed0` |
+| cgm_v1s_seed43_8ed0 | SKCM | 0.567 | 0.594 | -0.027 | [-0.039, -0.015] | 0/2 | `runs/bench/2026-10-18_10-48-57_lxbelshark_e123_cgm_v1s_seed43_8ed0` |
+| cgm_v1s_seed43_8ed0 | average | 0.363 | 0.364 | -0.001 | [-0.013, +0.011] | 16/29 | `runs/bench/2026-10-18_10-48-57_lxbelshark_e123_cgm_v1s_seed43_8ed0` |
+| cgm_v1s_seed44_ac94 | CCRCC | 0.264 | 0.267 | -0.003 | [-0.010, +0.003] | 3/6 | `runs/bench/2026-10-18_13-09-01_lxbelshark_2236_cgm_v1s_seed44_ac94` |
+| cgm_v1s_seed44_ac94 | COAD | 0.283 | 0.256 | +0.027 | [+0.013, +0.041] | 2/2 | `runs/bench/2026-10-18_13-09-01_lxbelshark_2236_cgm_v1s_seed44_ac94` |
+| cgm_v1s_seed44_ac94 | HCC | 0.059 | 0.074 | -0.015 | [-0.022, -0.006] | 0/2 | `runs/bench/2026-10-18_13-09-01_lxbelshark_2236_cgm_v1s_seed44_ac94` |
+| cgm_v1s_seed44_ac94 | IDC | 0.582 | 0.578 | +0.005 | [+0.000, +0.008] | 2/4 | `runs/bench/2026-10-18_13-09-01_lxbelshark_2236_cgm_v1s_seed44_ac94` |
+| cgm_v1s_seed44_ac94 | LUNG | 0.541 | 0.535 | +0.006 | [-0.006, +0.020] | 2/2 | `runs/bench/2026-10-18_13-09-01_lxbelshark_2236_cgm_v1s_seed44_ac94` |
+| cgm_v1s_seed44_ac94 | LYMPH_IDC | 0.263 | 0.267 | -0.004 | [-0.009, +0.002] | 1/4 | `runs/bench/2026-10-18_13-09-01_lxbelshark_2236_cgm_v1s_seed44_ac94` |
+| cgm_v1s_seed44_ac94 | PAAD | 0.510 | 0.497 | +0.013 | [+0.006, +0.020] | 3/3 | `runs/bench/2026-10-18_13-09-01_lxbelshark_2236_cgm_v1s_seed44_ac94` |
+| cgm_v1s_seed44_ac94 | PRAD | 0.390 | 0.371 | +0.019 | [+0.013, +0.023] | 2/2 | `runs/bench/2026-10-18_13-09-01_lxbelshark_2236_cgm_v1s_seed44_ac94` |
+| cgm_v1s_seed44_ac94 | READ | 0.167 | 0.202 | -0.035 | [-0.046, -0.024] | 1/2 | `runs/bench/2026-10-18_13-09-01_lxbelshark_2236_cgm_v1s_seed44_ac94` |
+| cgm_v1s_seed44_ac94 | SKCM | 0.571 | 0.594 | -0.024 | [-0.037, -0.011] | 0/2 | `runs/bench/2026-10-18_13-09-01_lxbelshark_2236_cgm_v1s_seed44_ac94` |
+| cgm_v1s_seed44_ac94 | average | 0.363 | 0.364 | -0.001 | [-0.013, +0.011] | 16/29 | `runs/bench/2026-10-18_13-09-01_lxbelshark_2236_cgm_v1s_seed44_ac94` |
+
+Reference: `h0_mini_gap_ref` (`runs/bench/2026-10-13_11-03-53_lxbelshark_8f0f_h0_mini_gap_ref`). Per gene and fold Pearson from HEST `results_kfold.json` (nothing recomputed), paired on (task, fold, gene); Δ = method minus reference, mean over folds and genes (= the difference of the official task means). 95% CI: per task, a bootstrap over the 50 genes with the folds fixed, i.e. conditional on these test patients, not an interval over patients (2 to 6 folds per task); average row, a bootstrap over the 10 tasks with the genes resampled inside each (2000 draws, seed 0). Folds better = folds whose mean Pearson beats the reference's. One fit per method.
+
+<!-- /results:hest_pairs -->
+
+### HEST paired per task and fold vs G0
+
+<!-- results:hest_pairs exclude=*smoke*,*b84e_cgm_v1s_seed43_8ed0,*d2b8_cgm_v1s_seed44_ac94 ref=mixture_G0_K1 tags=cgm_v0s_a602,cgm_v1s_7b71,cgm_v1s_seed43_8ed0,cgm_v1s_seed44_ac94 -->
+<!-- generated by `uv run python -m sipe.eval.results_tables --write`; do not edit -->
+
+| method | task | Pearson | ref Pearson | Δ | 95% CI (genes) | folds better | bench run dir |
+|---|---|---|---|---|---|---|---|
+| cgm_v0s_a602 | CCRCC | 0.261 | 0.265 | -0.004 | [-0.007, -0.001] | 2/6 | `runs/bench/2026-10-15_15-08-23_lxbelshark_78e1_cgm_v0s_a602` |
+| cgm_v0s_a602 | COAD | 0.281 | 0.262 | +0.019 | [+0.008, +0.030] | 2/2 | `runs/bench/2026-10-15_15-08-23_lxbelshark_78e1_cgm_v0s_a602` |
+| cgm_v0s_a602 | HCC | 0.062 | 0.067 | -0.005 | [-0.010, +0.000] | 0/2 | `runs/bench/2026-10-15_15-08-23_lxbelshark_78e1_cgm_v0s_a602` |
+| cgm_v0s_a602 | IDC | 0.582 | 0.580 | +0.002 | [-0.000, +0.004] | 3/4 | `runs/bench/2026-10-15_15-08-23_lxbelshark_78e1_cgm_v0s_a602` |
+| cgm_v0s_a602 | LUNG | 0.540 | 0.535 | +0.005 | [-0.003, +0.015] | 2/2 | `runs/bench/2026-10-15_15-08-23_lxbelshark_78e1_cgm_v0s_a602` |
+| cgm_v0s_a602 | LYMPH_IDC | 0.260 | 0.266 | -0.006 | [-0.009, -0.002] | 1/4 | `runs/bench/2026-10-15_15-08-23_lxbelshark_78e1_cgm_v0s_a602` |
+| cgm_v0s_a602 | PAAD | 0.509 | 0.505 | +0.004 | [+0.001, +0.008] | 3/3 | `runs/bench/2026-10-15_15-08-23_lxbelshark_78e1_cgm_v0s_a602` |
+| cgm_v0s_a602 | PRAD | 0.384 | 0.383 | +0.001 | [-0.001, +0.004] | 1/2 | `runs/bench/2026-10-15_15-08-23_lxbelshark_78e1_cgm_v0s_a602` |
+| cgm_v0s_a602 | READ | 0.171 | 0.179 | -0.008 | [-0.015, -0.000] | 0/2 | `runs/bench/2026-10-15_15-08-23_lxbelshark_78e1_cgm_v0s_a602` |
+| cgm_v0s_a602 | SKCM | 0.572 | 0.587 | -0.015 | [-0.024, -0.007] | 0/2 | `runs/bench/2026-10-15_15-08-23_lxbelshark_78e1_cgm_v0s_a602` |
+| cgm_v0s_a602 | average | 0.362 | 0.363 | -0.001 | [-0.006, +0.006] | 14/29 | `runs/bench/2026-10-15_15-08-23_lxbelshark_78e1_cgm_v0s_a602` |
+| cgm_v1s_7b71 | CCRCC | 0.262 | 0.265 | -0.003 | [-0.007, -0.000] | 2/6 | `runs/bench/2026-10-15_07-47-25_lxbelshark_8823_cgm_v1s_7b71` |
+| cgm_v1s_7b71 | COAD | 0.285 | 0.262 | +0.023 | [+0.012, +0.034] | 2/2 | `runs/bench/2026-10-15_07-47-25_lxbelshark_8823_cgm_v1s_7b71` |
+| cgm_v1s_7b71 | HCC | 0.060 | 0.067 | -0.007 | [-0.013, -0.001] | 0/2 | `runs/bench/2026-10-15_07-47-25_lxbelshark_8823_cgm_v1s_7b71` |
+| cgm_v1s_7b71 | IDC | 0.582 | 0.580 | +0.002 | [-0.001, +0.005] | 3/4 | `runs/bench/2026-10-15_07-47-25_lxbelshark_8823_cgm_v1s_7b71` |
+| cgm_v1s_7b71 | LUNG | 0.541 | 0.535 | +0.006 | [-0.003, +0.015] | 1/2 | `runs/bench/2026-10-15_07-47-25_lxbelshark_8823_cgm_v1s_7b71` |
+| cgm_v1s_7b71 | LYMPH_IDC | 0.263 | 0.266 | -0.003 | [-0.007, +0.002] | 1/4 | `runs/bench/2026-10-15_07-47-25_lxbelshark_8823_cgm_v1s_7b71` |
+| cgm_v1s_7b71 | PAAD | 0.513 | 0.505 | +0.008 | [+0.004, +0.012] | 3/3 | `runs/bench/2026-10-15_07-47-25_lxbelshark_8823_cgm_v1s_7b71` |
+| cgm_v1s_7b71 | PRAD | 0.389 | 0.383 | +0.006 | [+0.003, +0.008] | 1/2 | `runs/bench/2026-10-15_07-47-25_lxbelshark_8823_cgm_v1s_7b71` |
+| cgm_v1s_7b71 | READ | 0.167 | 0.179 | -0.012 | [-0.018, -0.005] | 0/2 | `runs/bench/2026-10-15_07-47-25_lxbelshark_8823_cgm_v1s_7b71` |
+| cgm_v1s_7b71 | SKCM | 0.573 | 0.587 | -0.014 | [-0.025, -0.003] | 0/2 | `runs/bench/2026-10-15_07-47-25_lxbelshark_8823_cgm_v1s_7b71` |
+| cgm_v1s_7b71 | average | 0.363 | 0.363 | +0.000 | [-0.006, +0.008] | 13/29 | `runs/bench/2026-10-15_07-47-25_lxbelshark_8823_cgm_v1s_7b71` |
+| cgm_v1s_seed43_8ed0 | CCRCC | 0.264 | 0.265 | -0.001 | [-0.004, +0.003] | 2/6 | `runs/bench/2026-10-18_10-48-57_lxbelshark_e123_cgm_v1s_seed43_8ed0` |
+| cgm_v1s_seed43_8ed0 | COAD | 0.283 | 0.262 | +0.020 | [+0.011, +0.030] | 2/2 | `runs/bench/2026-10-18_10-48-57_lxbelshark_e123_cgm_v1s_seed43_8ed0` |
+| cgm_v1s_seed43_8ed0 | HCC | 0.062 | 0.067 | -0.005 | [-0.010, +0.001] | 0/2 | `runs/bench/2026-10-18_10-48-57_lxbelshark_e123_cgm_v1s_seed43_8ed0` |
+| cgm_v1s_seed43_8ed0 | IDC | 0.582 | 0.580 | +0.002 | [-0.001, +0.005] | 2/4 | `runs/bench/2026-10-18_10-48-57_lxbelshark_e123_cgm_v1s_seed43_8ed0` |
+| cgm_v1s_seed43_8ed0 | LUNG | 0.545 | 0.535 | +0.010 | [+0.001, +0.021] | 1/2 | `runs/bench/2026-10-18_10-48-57_lxbelshark_e123_cgm_v1s_seed43_8ed0` |
+| cgm_v1s_seed43_8ed0 | LYMPH_IDC | 0.262 | 0.266 | -0.003 | [-0.008, +0.001] | 1/4 | `runs/bench/2026-10-18_10-48-57_lxbelshark_e123_cgm_v1s_seed43_8ed0` |
+| cgm_v1s_seed43_8ed0 | PAAD | 0.509 | 0.505 | +0.004 | [+0.001, +0.009] | 3/3 | `runs/bench/2026-10-18_10-48-57_lxbelshark_e123_cgm_v1s_seed43_8ed0` |
+| cgm_v1s_seed43_8ed0 | PRAD | 0.385 | 0.383 | +0.001 | [-0.001, +0.004] | 1/2 | `runs/bench/2026-10-18_10-48-57_lxbelshark_e123_cgm_v1s_seed43_8ed0` |
+| cgm_v1s_seed43_8ed0 | READ | 0.168 | 0.179 | -0.011 | [-0.018, -0.003] | 0/2 | `runs/bench/2026-10-18_10-48-57_lxbelshark_e123_cgm_v1s_seed43_8ed0` |
+| cgm_v1s_seed43_8ed0 | SKCM | 0.567 | 0.587 | -0.020 | [-0.030, -0.010] | 0/2 | `runs/bench/2026-10-18_10-48-57_lxbelshark_e123_cgm_v1s_seed43_8ed0` |
+| cgm_v1s_seed43_8ed0 | average | 0.363 | 0.363 | -0.000 | [-0.007, +0.007] | 12/29 | `runs/bench/2026-10-18_10-48-57_lxbelshark_e123_cgm_v1s_seed43_8ed0` |
+| cgm_v1s_seed44_ac94 | CCRCC | 0.264 | 0.265 | -0.001 | [-0.005, +0.002] | 3/6 | `runs/bench/2026-10-18_13-09-01_lxbelshark_2236_cgm_v1s_seed44_ac94` |
+| cgm_v1s_seed44_ac94 | COAD | 0.283 | 0.262 | +0.020 | [+0.010, +0.031] | 2/2 | `runs/bench/2026-10-18_13-09-01_lxbelshark_2236_cgm_v1s_seed44_ac94` |
+| cgm_v1s_seed44_ac94 | HCC | 0.059 | 0.067 | -0.008 | [-0.014, -0.001] | 0/2 | `runs/bench/2026-10-18_13-09-01_lxbelshark_2236_cgm_v1s_seed44_ac94` |
+| cgm_v1s_seed44_ac94 | IDC | 0.582 | 0.580 | +0.003 | [+0.000, +0.005] | 2/4 | `runs/bench/2026-10-18_13-09-01_lxbelshark_2236_cgm_v1s_seed44_ac94` |
+| cgm_v1s_seed44_ac94 | LUNG | 0.541 | 0.535 | +0.006 | [-0.002, +0.014] | 1/2 | `runs/bench/2026-10-18_13-09-01_lxbelshark_2236_cgm_v1s_seed44_ac94` |
+| cgm_v1s_seed44_ac94 | LYMPH_IDC | 0.263 | 0.266 | -0.003 | [-0.007, +0.001] | 1/4 | `runs/bench/2026-10-18_13-09-01_lxbelshark_2236_cgm_v1s_seed44_ac94` |
+| cgm_v1s_seed44_ac94 | PAAD | 0.510 | 0.505 | +0.005 | [+0.001, +0.009] | 3/3 | `runs/bench/2026-10-18_13-09-01_lxbelshark_2236_cgm_v1s_seed44_ac94` |
+| cgm_v1s_seed44_ac94 | PRAD | 0.390 | 0.383 | +0.007 | [+0.004, +0.009] | 1/2 | `runs/bench/2026-10-18_13-09-01_lxbelshark_2236_cgm_v1s_seed44_ac94` |
+| cgm_v1s_seed44_ac94 | READ | 0.167 | 0.179 | -0.012 | [-0.018, -0.005] | 0/2 | `runs/bench/2026-10-18_13-09-01_lxbelshark_2236_cgm_v1s_seed44_ac94` |
+| cgm_v1s_seed44_ac94 | SKCM | 0.571 | 0.587 | -0.017 | [-0.026, -0.007] | 0/2 | `runs/bench/2026-10-18_13-09-01_lxbelshark_2236_cgm_v1s_seed44_ac94` |
+| cgm_v1s_seed44_ac94 | average | 0.363 | 0.363 | -0.000 | [-0.006, +0.007] | 13/29 | `runs/bench/2026-10-18_13-09-01_lxbelshark_2236_cgm_v1s_seed44_ac94` |
+
+Reference: `mixture_G0_K1` (`runs/bench/2026-10-14_10-08-10_lxbelshark_41cf_mixture_G0_K1`). Per gene and fold Pearson from HEST `results_kfold.json` (nothing recomputed), paired on (task, fold, gene); Δ = method minus reference, mean over folds and genes (= the difference of the official task means). 95% CI: per task, a bootstrap over the 50 genes with the folds fixed, i.e. conditional on these test patients, not an interval over patients (2 to 6 folds per task); average row, a bootstrap over the 10 tasks with the genes resampled inside each (2000 draws, seed 0). Folds better = folds whose mean Pearson beats the reference's. One fit per method.
+
+<!-- /results:hest_pairs -->
 
 ### CGM on the shared SCORPION-proxy protocol (Experiment 7, val selection + test)
 

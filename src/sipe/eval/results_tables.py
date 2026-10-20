@@ -6,7 +6,8 @@ Sources, all under runs/ (gitignored, so every row names the dir it came from):
     drop_stain=, the same means recomputed from the sibling per-pair metrics.csv
   - PLISM per pair vs a reference: runs/bench/*/metrics/<n>_tiles/<tag>/metrics.csv
     (plismbench per-pair metrics, merged as in sipe.eval.plism_pairs)
-  - HEST: runs/bench/*/results/*/dataset_results.json
+  - HEST: runs/bench/*/results/*/dataset_results.json; per gene and fold:
+    results/*/<task>/<encoder>/results_kfold.json (sipe.eval.hest_pairs)
   - SCORPION proxy: runs/bench/*/summary.csv (sipe.eval.scorpion_retrieval)
   - soft-shrinkage sweep: runs/bench/*/summary_test.csv + selected.json
   - content dependence (Experiment 1): runs/bench/*/summary.csv
@@ -45,6 +46,7 @@ Options on the opening marker (space-separated key=value):
   drop_stain=<s>[,<s>]      plism / plism_pairs: drop the slide pairs with one of these
                             stains on either side (e.g. HR), then aggregate as usual
   split=<val|test>          loso only: show only that split (default: both)
+  ref=<tag> tags=<tag>,...  hest_pairs: HEST runs paired per (task, fold, gene) with ref
 
   uv run python -m sipe.eval.results_tables          # print every table
   uv run python -m sipe.eval.results_tables --write  # refresh the blocks in every doc
@@ -443,6 +445,69 @@ def hest_table(root: Path, opts: dict[str, list[str]]) -> str:
         _table(header, rows)
         + "\n\nPearson mean (std over folds), HEST `dataset_results.json`;"
         " average only when all tasks ran."
+    )
+
+
+KFOLD_GLOB = "results/*/*/*/results_kfold.json"
+
+
+def _hest_run_by_tag(root: Path, tag: str, exclude: list[str]) -> BenchRun:
+    """Newest HEST run with this tag that ran every task."""
+    found = [
+        run
+        for run in _bench_runs(root, "hest", exclude)
+        if str(run.config.get("tag")) == tag
+        and set(HEST_TASKS) <= {p.parents[1].name for p in run.dir.glob(KFOLD_GLOB)}
+    ]
+    if not found:
+        raise FileNotFoundError(
+            f"no HEST run with tag {tag!r} and all tasks under {root}"
+        )
+    return found[-1]
+
+
+def hest_pairs_table(root: Path, opts: dict[str, list[str]]) -> str:
+    from sipe.eval.hest_pairs import BOOTSTRAPS, load_kfold, pair_runs, summarize
+
+    if not opts.get("ref"):
+        return "(needs `ref=<tag>` and `tags=<tag>,...` on the block marker)"
+    exclude = opts.get("exclude", [])
+    (ref,) = opts["ref"]
+    ref_run = _hest_run_by_tag(root, ref, exclude)
+    ref_df = load_kfold(ref_run.dir)
+    header = [
+        "method", "task", "Pearson", "ref Pearson", "Δ", "95% CI (genes)",
+        "folds better", "bench run dir",
+    ]  # fmt: skip
+    rows = []
+    for tag in opts.get("tags", []):
+        run = _hest_run_by_tag(root, tag, exclude)
+        summary = summarize(pair_runs(ref_df, load_kfold(run.dir)))
+        for r in summary.itertuples():
+            rows.append(
+                [
+                    tag,
+                    r.task,
+                    _fmt(float(r.method)),
+                    _fmt(float(r.ref)),
+                    f"{r.delta:+.3f}",
+                    f"[{r.ci_lo:+.3f}, {r.ci_hi:+.3f}]",
+                    f"{r.folds_better}/{r.folds}",
+                    f"`{_rel(run.dir)}`",
+                ]
+            )
+    return (
+        _table(header, rows)
+        + f"\n\nReference: `{ref}` (`{_rel(ref_run.dir)}`). Per gene and fold"
+        " Pearson from HEST `results_kfold.json` (nothing recomputed), paired on"
+        " (task, fold, gene); Δ = method minus reference, mean over folds and genes"
+        " (= the difference of the official task means). 95% CI: per task, a"
+        " bootstrap over the 50 genes with the folds fixed, i.e. conditional on these"
+        " test patients, not an interval over patients (2 to 6 folds per task);"
+        " average row, a bootstrap over the 10 tasks with the genes resampled inside"
+        f" each ({BOOTSTRAPS} draws, seed 0)."
+        " Folds better = folds whose mean Pearson beats the reference's. One fit per"
+        " method."
     )
 
 
@@ -1185,6 +1250,7 @@ TABLES = {
     "plism": plism_table,
     "plism_pairs": plism_pairs_table,
     "hest": hest_table,
+    "hest_pairs": hest_pairs_table,
     "scorpion": scorpion_table,
     "softshrink": softshrink_table,
     "content": content_table,

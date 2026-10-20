@@ -53,6 +53,17 @@ without a PLISM gain; PairedVAE with geometric augmentation drops its z-probe fr
 `runs/bench/2026-10-15_02-56-10_lxbelshark_e50a_paired_vae_geometric_aug_lazztzda`). The goal
 is to shrink scanner distances while keeping content, not to erase the scanner.
 
+**14. HEST per-task changes come with tile-level pairing, and are not testable over
+patients.** HEST has 2 to 6 patient folds per task, so the only per-task intervals are over
+the 50 genes with the test patients fixed (`sipe.eval.hest_pairs`, block `hest_pairs`).
+With that caveat, the tile-level maps (tile eraser, V0-S, V1-S) all move the same tasks
+the same way vs GAP: READ −0.034 / −0.031 / −0.035, COAD +0.014 / +0.025 / +0.029, PRAD
++0.014 / +0.013 / +0.018, while the 10-task average stays within [−0.013, +0.012] of GAP
+(`runs/bench/2026-10-17_11-26-14_lxbelshark_65e7_softshrink_gap_tile_lam0.4`,
+`runs/bench/2026-10-15_15-08-23_lxbelshark_78e1_cgm_v0s_a602`,
+`runs/bench/2026-10-15_07-47-25_lxbelshark_8823_cgm_v1s_7b71`). Read HEST as average
+preserved plus a task trade-off of the pairing unit; don't attribute it to a model class.
+
 ## Data and the acquisition nuisance
 
 **5. The pairing unit matters more than the objective.** On PLISM all pairs: slide-level
