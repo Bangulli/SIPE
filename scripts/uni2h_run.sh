@@ -49,8 +49,11 @@ if [ "$SMOKE" = 1 ]; then
     LOGS=runs/uni2h_smoke_logs
     export WANDB_MODE="${WANDB_MODE:-offline}"
 fi
-mkdir -p runs "$LOGS"
+LOGS="$LOGS/$(date +%Y-%m-%d_%H-%M-%S)"  # one log dir per invocation
+mkdir -p runs/bench "$LOGS"
 touch "$MANIFEST"
+STAMP="$LOGS/.start"  # outputs must be newer than this invocation
+touch "$STAMP"
 
 log() { echo "[$(date +%H:%M:%S)] $*" >&2; }
 record() {  # KEY value; later lines win
@@ -64,7 +67,16 @@ get() {  # value of a manifest key, or fail
     [ -n "$v" ] || { log "missing $1 in $MANIFEST (run its step first)"; exit 1; }
     echo "$v"
 }
-newest() { ls -dt runs/bench/*_"$1" 2>/dev/null | head -1 || true; }  # newest dir of a tag
+kill_tree() {  # <pid>: SIGTERM the process and all its descendants (uv -> python -> workers)
+    local c
+    for c in $(pgrep -P "$1" 2>/dev/null || true); do kill_tree "$c"; done
+    kill -TERM "$1" 2>/dev/null || true
+}
+newest() {  # newest dir of a tag touched since this invocation started (one instance at a time)
+    local d
+    d=$(ls -dt runs/bench/*_"$1" 2>/dev/null | head -1 || true)
+    [ -n "$d" ] && [ "$d" -nt "$STAMP" ] && echo "$d" || true
+}
 
 step0() {  # preflight: fail early, before hours of GPU time
     log "preflight"
@@ -121,7 +133,6 @@ d = Path('runs') / run_dir_name()
 d.mkdir(parents=True)
 write_git_info(d / 'git.txt')
 print(d)")
-    record FIT "$dir"
     log "step 3: V1-S fit on GPU $GPU1 in $dir (log $LOGS/3_fit.log)"
     CUDA_VISIBLE_DEVICES=$GPU1 SIPE_RUN_DIR="$dir" uv run sipe fit \
         --config configs/consensus_gen_uni2h.yaml \
@@ -133,13 +144,17 @@ print(d)")
             --trainer.val_check_interval=1 --model.init_args.init_batches=2 ) \
         >"$LOGS/3_fit.log" 2>&1
     test -f "$dir/map_cgm.pt" || { log "no $dir/map_cgm.pt"; exit 1; }
+    record FIT "$dir"
 }
 
 step4() {  # SCORPION val/test: raw, G0 (in-run) and V1-S on the shared protocol
+    local cache fit  # resolved first: a failing $(get) inside the arguments would not stop
+    cache=$(get CACHE)
+    fit=$(get FIT)
     log "step 4: cgm_select"
     CUDA_VISIBLE_DEVICES=$GPU0 uv run python -m sipe.eval.cgm_select \
-        --tag "${P}uni2h_cgm_select" --features-from "$(get CACHE)" \
-        --runs "$(get FIT)" --reference-map none --test all >"$LOGS/4_select.log" 2>&1
+        --tag "${P}uni2h_cgm_select" --features-from "$cache" \
+        --runs "$fit" --reference-map none --test all >"$LOGS/4_select.log" 2>&1
     record SELECT_RUN "$(newest "scorpion_${P}uni2h_cgm_select")"
 }
 
@@ -164,27 +179,27 @@ hest() {  # <gpu> <map file> <tag>
     record "HEST_$3" "$(newest "$3")"
 }
 
-maps() {  # "<map file> <tag>" for raw, G0, V1-S
-    echo "$(get IDENTITY_RUN)/map_identity.pt ${P}uni2h_cls_ref"
-    echo "$(get G0_RUN)/map_G0_K1.pt ${P}uni2h_cls_g0"
-    echo "$(get FIT)/map_cgm.pt $(fit_tag)"
+run_bench() {  # <plism|hest>: raw + G0 on GPU0, V1-S on GPU1; fails if any run fails
+    local kind=$1 identity g0 fit tag p0 p1 status=0 map
+    identity="$(get IDENTITY_RUN)/map_identity.pt"
+    g0="$(get G0_RUN)/map_G0_K1.pt"
+    fit="$(get FIT)/map_cgm.pt"
+    tag=$(fit_tag)
+    for map in "$identity" "$g0" "$fit"; do
+        [ -f "$map" ] || { log "missing map $map"; exit 1; }
+    done
+    { "$kind" "$GPU0" "$identity" "${P}uni2h_cls_ref"
+      "$kind" "$GPU0" "$g0" "${P}uni2h_cls_g0"; } &
+    p0=$!
+    "$kind" "$GPU1" "$fit" "$tag" &
+    p1=$!
+    wait "$p0" || status=1
+    wait "$p1" || status=1
+    [ "$status" = 0 ] || { log "$kind: a run failed (logs in $LOGS)"; exit 1; }
 }
 
-step5() {  # PLISM: raw + G0 on GPU0, V1-S on GPU1
-    local -a m
-    mapfile -t m < <(maps)
-    { plism "$GPU0" ${m[0]}; plism "$GPU0" ${m[1]}; } &
-    plism "$GPU1" ${m[2]} &
-    wait
-}
-
-step6() {  # HEST: raw + G0 on GPU0, V1-S on GPU1
-    local -a m
-    mapfile -t m < <(maps)
-    { hest "$GPU0" ${m[0]}; hest "$GPU0" ${m[1]}; } &
-    hest "$GPU1" ${m[2]} &
-    wait
-}
+step5() { run_bench plism; }
+step6() { run_bench hest; }
 
 sync_hint() {
     local dirs="" key dir
@@ -199,8 +214,12 @@ sync_hint() {
 if [ "$STEPS" = all ]; then
     step0
     step3 & fit=$!
-    step1 && step2
+    # A failing foreground step stops the background fit instead of leaving it on the GPU.
+    trap 'kill_tree "$fit"' EXIT
+    step1  # separate statements: `step1 && step2` would disable set -e inside step1
+    step2
     wait "$fit"
+    trap - EXIT
     step4
     step5
     step6
