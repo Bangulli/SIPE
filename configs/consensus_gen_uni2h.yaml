@@ -1,0 +1,85 @@
+# Second backbone (2026-10-20): consensus_gen.yaml (V1-S) with UNI2-h on its CLS token
+# instead of H0-mini GAP. Everything else is identical (tests/test_consensus_gen.py,
+# test_uni2h_config_matches_base); the arm and the hyperparameters are not re-selected.
+seed_everything: 42
+matmul_precision: high  # TF32 for fp32 matmuls (A100); torch default is "highest"
+trainer:
+  accelerator: gpu
+  devices: 1
+  precision: 16-mixed # backbone only; the CGM head runs in float32
+  max_epochs: -1
+  max_steps: 6000
+  check_val_every_n_epoch: null
+  val_check_interval: 100
+  log_every_n_steps: 25
+  logger:
+    class_path: lightning.pytorch.loggers.WandbLogger
+    init_args:
+      project: cats
+      group: SCORPION
+      job_type: consensus-gen
+      tags:
+        - SCORPION
+        - consensus-gen
+        - exp7
+      save_dir: ./wandb
+      log_model: false
+  callbacks:
+    - class_path: lightning.pytorch.callbacks.ModelCheckpoint
+      init_args:
+        # Only last.ckpt (overwritten at each validation); each save also writes
+        # map_cgm.pt (the --posthoc map file) in the run dir.
+        save_top_k: 0
+        save_last: true
+        save_weights_only: false
+    - class_path: lightning.pytorch.callbacks.LearningRateMonitor
+      init_args:
+        logging_interval: step
+# Experiment 7 (docs/experiment7.md), main arm V1-S, backbone in the
+# loop: frozen H0-mini GAP -> consensus generative model. Per-scanner likelihood at
+# fit time only; the evaluated map f(x) = g(m(x)) is global (no scanner ID, no gate).
+# Init: linear-Gaussian solution from 40 train batches (~ G0). Pairing unit: tile.
+# Augmentations as configs/paired_vae_geometric_aug.yaml (flips, rot90, zoom; shared
+# by the views), so scanner differences between views are not washed out.
+model:
+  class_path: sipe.training.consensus_gen_module.ConsensusGenModule
+  init_args:
+    network:
+      class_path: sipe.model.consensus_gen.ConsensusGenModel
+      init_args:
+        encoder: uni2-h
+        pooling: cls # UNI2-h's own embedding (CLS after the final norm)
+        num_scanners: 5
+        per_scanner: true # false: exchangeable arm (delta = 0, one noise factor)
+        encoder_hidden_dim: 1024 # 0: linear encoder (V0-S)
+        generator_hidden_dim: 0 # > 0: nonlinear h (V2-S)
+        pretrained: true
+    num_domains: 5
+    lr: 3.0e-4 # r/h MLPs; cosine decay over trainer.max_steps
+    linear_lr: 1.0e-4 # M, L, b, Cholesky factors, delta (no weight decay)
+    weight_decay: 0.01 # MLP weights only
+    kl_weight: 1.0 # beta = 1: the ELBO
+    kl_warmup_steps: 0 # init is already the linear-Gaussian solution
+    residual_penalty: 1.0e-3 # rho on the r/h output layers
+    init_batches: 40 # x 128 locations x 5 views = 25,600 train views
+    init_ridge: 1.0e-3 # eigenvalue floor, x tr(Cov)/D
+    freeze_backbone: true
+data:
+  class_path: sipe.data.scorpion.PairedSCORPIONDataModule
+  init_args:
+    data_root: data/processed/SCORPION_tiles_224px_0p5mpp
+    batch_size: 128 # locations; x 5 views = 640 images per step
+    views: 5 # all scanners: the likelihood scores every view of the tile
+    val_views: null # validation: all 5 scanners, i.e. every val tile once
+    val_batch_size: 100 # locations (500 images)
+    num_workers: 8
+    image_size: 224
+    domain_column: scanner
+    horizontal_flip: true
+    vertical_flip: true
+    augmentations: [rot90, zoom]
+    group_column: slide_id
+    val_fraction: 0.1
+    test_fraction: 0.1
+    pin_memory: true
+    persistent_workers: true

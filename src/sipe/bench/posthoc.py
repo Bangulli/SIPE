@@ -1,8 +1,10 @@
-"""Post-hoc estimators on frozen backbone features: a fitted map f(x) on backbone GAP.
+"""Post-hoc estimators on frozen backbone features: a fitted map f(x) on a pooled
+backbone embedding.
 
-The benchmarked representation is `posthoc_gap`: the frozen backbone's GAP over the
-patch tokens (prefix tokens dropped, = `backbone_gap`), then a map fitted on
-SCORPION train and saved as one torch file in a `runs/bench/...` dir. Inference
+The benchmarked representation is `posthoc_<pooling>`: the frozen backbone's GAP over
+the patch tokens (prefix tokens dropped, = `backbone_gap`; `posthoc_gap`) or its CLS
+token (`posthoc_cls`), then a map fitted on SCORPION train and saved as one torch file
+in a `runs/bench/...` dir. Inference
 takes one embedding and the global fit parameters only (no scanner ID, no pair).
 
 Map files (torch.save of a dict), told apart by their keys:
@@ -11,7 +13,9 @@ Map files (torch.save of a dict), told apart by their keys:
   `eraser_<pool>_lam<λ>.pt` of `sipe.eval.soft_shrinkage_sweep`);
 - module: `class_path` ("pkg.mod.Class", an nn.Module mapping [B, D] -> [B, D']),
   `init_args` and `state_dict`, for later estimators.
-Both may carry `encoder` (default h0-mini) and `pooling` (only "gap" is supported).
+Both may carry `encoder` (default h0-mini) and `pooling` ("gap" default, or "cls");
+they must match the feature cache the map was fitted on. An identity affine map
+(`identity_map`, P = I, bias = 0) gives the raw pooled embedding through the same path.
 
 The backbone runs under the caller's autocast (plismbench's PrecisionModule, HEST's
 precision), as in the SCORPION feature cache; the map always runs in float32.
@@ -28,10 +32,13 @@ import torch
 import torch.nn as nn
 
 from sipe.bench.checkpoint import _read_git_txt, sha256
-from sipe.model.encoders import EncoderMeta, build_encoder
+from sipe.model.encoders import POOLINGS, EncoderMeta, build_encoder, pool_tokens
 
-REPRESENTATION = "posthoc_gap"
-POOLINGS = ("gap",)
+REPRESENTATION = "posthoc_gap"  # the default pooling; see `representation`
+
+
+def representation(pooling: str) -> str:
+    return f"posthoc_{pooling}"
 
 
 class AffineMap(nn.Module):
@@ -115,21 +122,28 @@ def load_posthoc_map(path: str | Path) -> LoadedMap:
 
 
 class PosthocFeatures(nn.Module):
-    """[B, 3, H, W] normalized images -> backbone GAP -> fitted map -> [B, D']."""
+    """[B, 3, H, W] normalized images -> pooled backbone embedding -> fitted map."""
 
-    def __init__(self, backbone: nn.Module, fmap: nn.Module, output_dim: int) -> None:
+    def __init__(
+        self,
+        backbone: nn.Module,
+        fmap: nn.Module,
+        output_dim: int,
+        pooling: str = "gap",
+    ) -> None:
         super().__init__()
         self.backbone = backbone
         self.map = fmap
         self.output_dim = output_dim
+        self.pooling = pooling
 
-    def gap(self, images: torch.Tensor) -> torch.Tensor:
+    def pool(self, images: torch.Tensor) -> torch.Tensor:
         # As sipe.features.extract.extract (the SCORPION feature cache).
         tokens = self.backbone.forward_features(images)
-        return tokens[:, self.backbone.num_prefix_tokens :].mean(dim=1).float()
+        return pool_tokens(tokens, self.backbone.num_prefix_tokens, self.pooling)
 
     def forward(self, images: torch.Tensor) -> torch.Tensor:
-        x = self.gap(images)
+        x = self.pool(images)
         with torch.autocast(x.device.type, enabled=False):
             return self.map(x)
 
@@ -148,8 +162,16 @@ def load_posthoc(path: str | Path, pretrained: bool = True) -> LoadedPosthoc:
     bundle = build_encoder(loaded.encoder, pretrained=pretrained)
     with torch.no_grad():
         probe = torch.zeros(1, bundle.meta.embed_dim)
-        output_dim = int(loaded.map(probe).shape[1])
-    features = PosthocFeatures(bundle.backbone, loaded.map, output_dim).eval()
+        try:
+            output_dim = int(loaded.map(probe).shape[1])
+        except RuntimeError as err:
+            raise ValueError(
+                f"{path}: map does not take {loaded.encoder} embeddings "
+                f"(dim {bundle.meta.embed_dim}); wrong `encoder` in the map file?"
+            ) from err
+    features = PosthocFeatures(
+        bundle.backbone, loaded.map, output_dim, loaded.pooling
+    ).eval()
     provenance = {
         **loaded.provenance,
         "encoder": loaded.encoder,
@@ -158,3 +180,15 @@ def load_posthoc(path: str | Path, pretrained: bool = True) -> LoadedPosthoc:
         "pooling": loaded.pooling,
     }
     return LoadedPosthoc(features, bundle.meta, bundle.transform, provenance)
+
+
+def identity_map(encoder: str, pooling: str) -> dict[str, Any]:
+    """Map file dict of the identity (P = I, bias = 0): the raw pooled embedding."""
+    dim = build_encoder(encoder, pretrained=False).meta.embed_dim
+    return {
+        "P": torch.eye(dim),
+        "bias": torch.zeros(dim),
+        "encoder": encoder,
+        "pooling": pooling,
+        "identity": True,
+    }

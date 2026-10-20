@@ -23,8 +23,8 @@ from loguru import logger
 
 from sipe.bench.checkpoint import load_cats_checkpoint
 from sipe.bench.encoders import REPRESENTATIONS, CATSFeatures, hest_transform
-from sipe.bench.posthoc import REPRESENTATION as POSTHOC_REPRESENTATION
 from sipe.bench.posthoc import load_posthoc
+from sipe.bench.posthoc import representation as posthoc_representation
 from sipe.bench.provenance import SIPE_ROOT, new_bench_run_dir, write_run_info
 
 DEFAULT_BENCH_DATA = SIPE_ROOT.parent / "HEST" / "data" / "bench_data"
@@ -79,7 +79,7 @@ def main(argv: list[str] | None = None) -> Path:
         "--representation",
         default="z_gap",
         choices=REPRESENTATIONS,
-        help="With --ckpt only (--posthoc is always posthoc_gap).",
+        help="With --ckpt only (--posthoc gives posthoc_<pooling of the map>).",
     )
     parser.add_argument(
         "--datasets", nargs="+", default=["IDC"], help="HEST tasks, or '*' for all."
@@ -99,8 +99,8 @@ def main(argv: list[str] | None = None) -> Path:
     precision = f"autocast {args.precision}"
     if args.posthoc is not None:
         args.posthoc = args.posthoc.resolve()
-        args.representation = POSTHOC_REPRESENTATION
         posthoc = load_posthoc(args.posthoc)
+        args.representation = posthoc_representation(posthoc.provenance["pooling"])
         features, transform = posthoc.features, posthoc.eval_transform
         source, mean, std = posthoc.provenance, posthoc.meta.mean, posthoc.meta.std
         precision += "; map in float32"

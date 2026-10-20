@@ -100,3 +100,46 @@ def test_load_posthoc_h0mini(tmp_path):
     with torch.no_grad():
         out = loaded.features(torch.randn(1, 3, 224, 224))
     assert out.shape == (1, 768)
+
+
+def test_posthoc_features_cls_pooling():
+    P, bias = _affine()
+    features = PosthocFeatures(_StubBackbone(), AffineMap(P, bias), 8, "cls").eval()
+    images = torch.randn(2, 3, 4, 4)
+    with torch.no_grad():
+        cls = features.backbone.forward_features(images)[:, 0]
+        torch.testing.assert_close(features(images), (cls - bias) @ P.T + bias)
+
+
+def test_identity_map_file_gives_raw_cls(tmp_path):
+    from sipe.bench.posthoc import identity_map, representation
+
+    path = tmp_path / "map_identity.pt"
+    torch.save(identity_map("h0-mini", "cls"), path)
+    loaded = load_posthoc(path, pretrained=False)
+    assert loaded.provenance["pooling"] == "cls"
+    assert representation(loaded.provenance["pooling"]) == "posthoc_cls"
+    images = torch.randn(1, 3, 224, 224)
+    with torch.no_grad():
+        raw = loaded.features.backbone.forward_features(images)[:, 0].float()
+        torch.testing.assert_close(loaded.features(images), raw)
+
+
+def test_load_posthoc_refuses_wrong_encoder_dim(tmp_path):
+    import pytest
+
+    P, bias = _affine(1536)  # a UNI2-h-sized map labelled h0-mini (768)
+    path = tmp_path / "map.pt"
+    torch.save({"P": P, "bias": bias, "encoder": "h0-mini"}, path)
+    with pytest.raises(ValueError, match="wrong `encoder`"):
+        load_posthoc(path, pretrained=False)
+
+
+def test_load_posthoc_map_refuses_unknown_pooling(tmp_path):
+    import pytest
+
+    P, bias = _affine()
+    path = tmp_path / "map.pt"
+    torch.save({"P": P, "bias": bias, "pooling": "max"}, path)
+    with pytest.raises(ValueError, match="pooling"):
+        load_posthoc_map(path)

@@ -18,6 +18,7 @@ behavior changes (2026-10-15); those modules re-export the old names.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable, Mapping
 from pathlib import Path
 
@@ -41,6 +42,33 @@ def load_cache(
         )
         metas[split] = pd.read_csv(cache / f"meta_{split}.csv")
     return feats, metas
+
+
+def cache_encoder(cache: Path) -> str:
+    """Encoder of a feature cache (`provenance.json` -> checkpoint.encoder).
+
+    Map files fitted on the cache record it, so `--posthoc` runs the same backbone.
+    Caches written before the field existed are H0-mini.
+    """
+    path = Path(cache) / "provenance.json"
+    if not path.exists():
+        return "h0-mini"
+    checkpoint = json.loads(path.read_text()).get("checkpoint") or {}
+    return str(checkpoint.get("encoder", "h0-mini"))
+
+
+def check_map_matches_cache(
+    path: Path, encoder: str, pooling: str, cache: Path
+) -> None:
+    """Refuse a map file fitted on another backbone or pooling than the cache."""
+    from sipe.bench.posthoc import load_posthoc_map
+
+    loaded = load_posthoc_map(path)
+    if (loaded.encoder, loaded.pooling) != (encoder, pooling):
+        raise ValueError(
+            f"{path}: map for {loaded.encoder}/{loaded.pooling}, but the cache {cache} "
+            f"is {encoder}/{pooling}."
+        )
 
 
 def subsample(meta: pd.DataFrame, n: int | None, seed: int) -> np.ndarray:

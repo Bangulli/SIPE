@@ -28,9 +28,12 @@ Model code stays in SIPE (`src/sipe/bench/`).
 
 A map fitted on cached SCORPION features (soft-shrinkage eraser, roadmap estimators) is
 benchmarked with `--posthoc <map file>` in place of `--ckpt`. The representation is
-`posthoc_gap`: frozen H0-mini (timm/HF weights) GAP over the patch tokens, exactly as the
-SCORPION feature cache, then the map in float32 (the backbone keeps the benchmark's
-autocast). File format: `sipe.bench.posthoc` docstring / `CLAUDE.md`.
+`posthoc_<pooling>`: the map file's backbone (`encoder`, default H0-mini; timm/HF weights)
+pooled as in the SCORPION feature cache it was fitted on (`gap` = mean of the patch tokens,
+`cls` = token 0), then the map in float32 (the backbone keeps the benchmark's autocast).
+The tables show other backbones in the repr column (e.g. `posthoc_cls[uni2-h]`). A raw
+row of a backbone is an identity map file (`sipe.bench.identity_map`). File format:
+`sipe.bench.posthoc` docstring / `CLAUDE.md`. UNI2-h end to end: `scripts/uni2h_run.sh`.
 
 ```bash
 bench/run python -m sipe.bench.plism --posthoc runs/bench/<fit run>/<map>.pt --tag <tag>

@@ -12,6 +12,7 @@ from functools import lru_cache
 from typing import Any
 
 import timm
+import torch
 import torch.nn as nn
 from timm.data import create_transform, resolve_model_data_config
 
@@ -37,7 +38,45 @@ ENCODERS: dict[str, EncoderSpec] = {
             "dynamic_img_size": False,
         },
     ),
+    # Arguments of the UNI2-h model card (gated: needs an HF token with access); the
+    # HF config only names vit_giant_patch14_224. 1 CLS + 8 register tokens.
+    "uni2-h": EncoderSpec(
+        hf_id="hf-hub:MahmoodLab/UNI2-h",
+        timm_kwargs={
+            "img_size": 224,
+            "patch_size": 14,
+            "depth": 24,
+            "num_heads": 24,
+            "init_values": 1e-5,
+            "embed_dim": 1536,
+            "mlp_ratio": 2.66667 * 2,
+            "num_classes": 0,
+            "no_embed_class": True,
+            "mlp_layer": timm.layers.SwiGLUPacked,
+            "act_layer": nn.SiLU,
+            "reg_tokens": 8,
+            "dynamic_img_size": True,
+        },
+    ),
 }
+
+POOLINGS = ("gap", "cls")
+
+
+def pool_tokens(
+    tokens: torch.Tensor, num_prefix_tokens: int, pooling: str
+) -> torch.Tensor:
+    """`forward_features` tokens [B, N, D] -> [B, D] float32.
+
+    gap = mean of the patch tokens (prefix tokens, i.e. CLS and registers, dropped);
+    cls = token 0 (after the final norm: timm's `global_pool="token"` output, the
+    official embedding of CLS-pooled models such as UNI2-h).
+    """
+    if pooling == "gap":
+        return tokens[:, num_prefix_tokens:].mean(dim=1).float()
+    if pooling == "cls":
+        return tokens[:, 0].float()
+    raise ValueError(f"Unknown pooling {pooling!r}. Known: {POOLINGS}.")
 
 
 @dataclass(frozen=True)

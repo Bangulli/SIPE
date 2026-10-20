@@ -52,6 +52,7 @@ from sipe.eval.content_dependence import paired_views
 from sipe.eval.mixture_sweep import DEFAULT_ALPHAS, DEFAULT_REFERENCE, SETTING
 from sipe.eval.proxy import (
     apply_map,
+    cache_encoder,
     load_cache,
     retrieval_metrics,
     select_lambda,
@@ -157,7 +158,7 @@ def save_map(path: Path, fmap: torch.nn.Module, init_args: dict, **info) -> None
             "init_args": init_args,
             "state_dict": fmap.state_dict(),
             "pooling": "gap",
-            "encoder": "h0-mini",
+            "encoder": "h0-mini",  # overridden by info["encoder"] (the cache's)
             "pairing_unit": "tile",
             **info,
         },
@@ -206,6 +207,7 @@ def main(argv: list[str] | None = None) -> Path:
 
     splits = ("train", "val", "test") if args.test else ("train", "val")
     feats, metas = load_cache(args.features_from, splits)
+    encoder = cache_encoder(args.features_from)
     data = {"clean": (feats["train"], metas["train"])}
     for label, cache in aug_caches.items():
         f, m = load_cache(cache, ("train",))
@@ -280,14 +282,15 @@ def main(argv: list[str] | None = None) -> Path:
                     save_map(run_dir / stem, fmap,
                              {"k": 1, "dim": model.mu.shape[1], "gate_dim": 1},
                              variant="G0", K=1, alpha=alpha, data=data_label,
-                             n_units=size)  # fmt: skip
+                             n_units=size, encoder=encoder)  # fmt: skip
                 else:
                     fmap = cgm_init_map(views, device, args.init_ridge)
                     save_map(run_dir / stem, fmap,
                              {"dim": fmap.dim, "encoder_hidden_dim": 0,
                               "generator_hidden_dim": 0},
                              arm="V0-S init", init_ridge=args.init_ridge,
-                             data=data_label, n_units=size)  # fmt: skip
+                             data=data_label, n_units=size,
+                             encoder=encoder)  # fmt: skip
                 maps[name] = fmap
                 arms[name] = {**info, "map": stem}
                 log.info("arm %s: %s", name, arms[name])

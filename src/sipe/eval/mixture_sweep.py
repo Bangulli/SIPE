@@ -51,6 +51,8 @@ from sipe.estimators.mixture import (
 from sipe.eval.content_dependence import paired_views
 from sipe.eval.proxy import (  # noqa: F401 (apply_map, retrieval_metrics re-exported)
     apply_map,
+    cache_encoder,
+    check_map_matches_cache,
     evaluate,
     retrieval_metrics,
     select_lambda,
@@ -98,7 +100,8 @@ def main(argv: list[str] | None = None) -> Path:
     parser.add_argument("--tag", required=True)
     parser.add_argument("--features-from", type=Path, required=True)
     parser.add_argument("--pooling", default="gap", choices=["gap", "cls"])
-    parser.add_argument("--ks", nargs="+", type=int, default=[2, 4])
+    parser.add_argument("--ks", nargs="*", type=int, default=[2, 4],
+                        help="Mixtures; `--ks` alone = G0 only.")  # fmt: skip
     parser.add_argument("--content-dim", type=int, default=32)
     parser.add_argument("--gate-dim", type=int, default=32)
     parser.add_argument("--alphas", nargs="+", type=float, default=list(DEFAULT_ALPHAS))
@@ -125,6 +128,11 @@ def main(argv: list[str] | None = None) -> Path:
     if 1.0 not in args.alphas:
         args.alphas = sorted([*args.alphas, 1.0])
     reference = None if str(args.reference_map) == "none" else args.reference_map
+    if reference is not None:
+        check_map_matches_cache(
+            reference, cache_encoder(args.features_from), args.pooling,
+            args.features_from,
+        )  # fmt: skip
 
     splits = ("train", "val") if args.skip_test else ("train", "val", "test")
     feats, metas = {}, {}
@@ -274,7 +282,8 @@ def main(argv: list[str] | None = None) -> Path:
                 "state_dict": fmap.state_dict(),
                 "variant": variant, "K": int(k), "alpha": alpha,
                 "beta": float(model.beta), "gamma": float(model.gamma),
-                "pooling": args.pooling, "encoder": "h0-mini",
+                "pooling": args.pooling,
+                "encoder": cache_encoder(args.features_from),
                 "pairing_unit": "tile",
             },
             run_dir / f"map_{variant}_K{k}.pt",

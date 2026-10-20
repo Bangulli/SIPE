@@ -105,8 +105,9 @@ class ConsensusGenModule(FrozenBackboneModule):
         return {"optimizer": optimizer, "lr_scheduler": scheduler}
 
     def _gap(self, images: torch.Tensor) -> torch.Tensor:
+        """Pooled frozen-backbone embedding (GAP or CLS, `network.pooling`)."""
         with torch.no_grad():
-            return self.network.backbone_gap(images)
+            return self.network.backbone_features(images)
 
     def on_fit_start(self) -> None:
         head = self.network.head
@@ -180,7 +181,7 @@ class ConsensusGenModule(FrozenBackboneModule):
                 "init_args": network.map_init_args,
                 "state_dict": state,
                 "encoder": network.encoder_name,
-                "pooling": "gap",
+                "pooling": network.pooling,
                 "pairing_unit": "tile",
                 **network.head.fit_metadata(),
                 "kl_weight": float(hp.kl_weight),

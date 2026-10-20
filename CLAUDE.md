@@ -85,6 +85,15 @@ W&B), and each row must name the run dir it came from.
   provenance in that dir). Reuse them for post-hoc estimators (`--features-from`) instead of
   re-extracting, so every method sees identical inputs. If you need new features (e.g. CLS,
   token grids), extract once into a new run dir and record it here.
+- **Second backbone, UNI2-h** (`uni2-h` in `src/sipe/model/encoders.py`, gated: needs an HF
+  token with access; 1536-d, CLS + 8 register tokens). Pooled on its **CLS token** (its
+  official embedding), H0-mini on patch-token GAP (inherited from CATS; much better than
+  H0-mini CLS on PLISM). Everything runs from `scripts/uni2h_run.sh` (tracked despite
+  `*.sh` being ignored; any machine with the NAS, env vars in its header; `SMOKE=1` tests it):
+  cache, G0 (`mixture_sweep --ks --alphas 1.0`), identity map, V1-S fit
+  (`configs/consensus_gen_uni2h.yaml` = `consensus_gen.yaml` except encoder/pooling, a test
+  enforces it; nothing re-selected), `cgm_select --reference-map none`, PLISM, HEST. Run
+  dirs go into `runs/uni2h_manifest.env`.
 - **Augmented train caches** (CGM augmentation study): `uv run python -m sipe.features.extract
   --tag <tag> --policy none|geo|dihedral|zoom --copies K` (train split by default; meta
   column `aug` = copy; the scanner views of a tile copy share the transform; every view goes
@@ -120,12 +129,16 @@ W&B), and each row must name the run dir it came from.
 - `--poolings`: `gap` = mean of the patch tokens without prefix tokens (= `backbone_gap`);
   `cls` = token 0. Report which pooling a number uses.
 - PLISM/HEST for post-hoc estimators: `--posthoc <map file>` instead of `--ckpt` in
-  `sipe.bench.plism` / `sipe.bench.hest` (representation `posthoc_gap` = frozen backbone GAP,
-  then the map in float32; `sipe.bench.posthoc`). Map file = one `torch.save` dict in the fit
-  run dir: either `P` + `bias` (affine, `bias + (x - bias) P^T`, as the eraser files) or
-  `class_path` + `init_args` + `state_dict` (any `nn.Module` [B, 768] -> [B, D']); optional
-  `encoder` (default h0-mini) and `pooling` (only `gap`). The fit dir's `git.txt` goes into
-  the bench provenance.
+  `sipe.bench.plism` / `sipe.bench.hest` (representation `posthoc_<pooling>` = frozen
+  backbone GAP or CLS, then the map in float32; `sipe.bench.posthoc`). Map file = one
+  `torch.save` dict in the fit run dir: either `P` + `bias` (affine, `bias + (x - bias) P^T`,
+  as the eraser files) or `class_path` + `init_args` + `state_dict` (any `nn.Module` [B, D] ->
+  [B, D']); optional `encoder` (default h0-mini) and `pooling` (`gap` default, or `cls`).
+  The drivers write the cache's encoder (`proxy.cache_encoder`) and refuse a map whose
+  encoder/pooling differs from the cache (`proxy.check_map_matches_cache`). Raw rows of a
+  backbone without a checkpoint: `uv run python -m sipe.bench.identity_map --encoder <e>
+  --pooling <p> --tag <tag>` (P = I). The fit dir's `git.txt` goes into the bench
+  provenance.
 - Experiment 1 (content-dependence diagnostic, no map): `uv run python -m
   sipe.eval.content_dependence --tag <tag> --features-from <feature cache>`; reads train/val
   only, writes `summary.csv`, `likelihood.csv`, `cluster_stats.csv` (table block `content`).

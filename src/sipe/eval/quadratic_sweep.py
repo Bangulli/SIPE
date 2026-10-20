@@ -48,6 +48,7 @@ from sipe.eval.content_dependence import paired_views
 from sipe.eval.mixture_sweep import DEFAULT_REFERENCE, SETTING
 from sipe.eval.proxy import (
     apply_map,
+    cache_encoder,
     evaluate,
     retrieval_metrics,
     select_lambda,
@@ -198,7 +199,8 @@ def main(argv: list[str] | None = None) -> Path:
                               "n_content": n_content},
                 "state_dict": fmap.state_dict(),
                 "variant": variant, "m": int(m), "gamma": gamma,
-                "ridge": args.ridge, "pooling": args.pooling, "encoder": "h0-mini",
+                "ridge": args.ridge, "pooling": args.pooling,
+                "encoder": cache_encoder(args.features_from),
                 "pairing_unit": "tile",
             },
             run_dir / f"map_{variant}_m{m}.pt",

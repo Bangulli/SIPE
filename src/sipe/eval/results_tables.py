@@ -187,7 +187,12 @@ class BenchRun:
         rep = rep or str(self.config.get("representation", "–"))
         # Oracle rows (sipe.bench.plism_oracle) rewrite another run's features with
         # the condition label; label them so they never read as a method.
-        oracle = (self.provenance.get("checkpoint") or {}).get("oracle")
+        checkpoint = self.provenance.get("checkpoint") or {}
+        # Backbones other than H0-mini (the default of every earlier run) are named.
+        encoder = checkpoint.get("encoder")
+        if encoder and encoder != "h0-mini":
+            rep = f"{rep}[{encoder}]"
+        oracle = checkpoint.get("oracle")
         return f"oracle_{oracle}({rep})" if oracle else rep
 
     @property

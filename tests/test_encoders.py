@@ -153,3 +153,24 @@ def test_paired_views_share_geometric_augmentation(tmp_path: Path) -> None:
             original = plain_base[int(views[0]["index"])]["image"]
             changed |= not torch.equal(views[0]["image"], original)
     assert changed
+
+
+def test_uni2h_meta() -> None:
+    meta = encoder_meta("uni2-h")
+    assert meta.embed_dim == 1536
+    assert meta.patch_size == 14
+    assert meta.num_prefix_tokens == 9  # CLS + 8 register tokens
+    assert meta.mean == pytest.approx((0.485, 0.456, 0.406))
+    assert meta.std == pytest.approx((0.229, 0.224, 0.225))
+
+
+def test_pool_tokens() -> None:
+    from sipe.model.encoders import pool_tokens
+
+    tokens = torch.arange(2 * 5 * 3, dtype=torch.float16).reshape(2, 5, 3)
+    gap = pool_tokens(tokens, 2, "gap")
+    assert gap.dtype == torch.float32
+    torch.testing.assert_close(gap, tokens[:, 2:].float().mean(dim=1))
+    torch.testing.assert_close(pool_tokens(tokens, 2, "cls"), tokens[:, 0].float())
+    with pytest.raises(ValueError, match="pooling"):
+        pool_tokens(tokens, 2, "max")

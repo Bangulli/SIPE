@@ -52,7 +52,13 @@ from sipe.bench.provenance import new_bench_run_dir, write_run_info
 from sipe.eval.aug_attribution import g0_map, g0_model
 from sipe.eval.content_dependence import paired_views
 from sipe.eval.mixture_sweep import DEFAULT_REFERENCE, SETTING
-from sipe.eval.proxy import load_cache, select_by_gain, summarize
+from sipe.eval.proxy import (
+    cache_encoder,
+    check_map_matches_cache,
+    load_cache,
+    select_by_gain,
+    summarize,
+)
 from sipe.training.consensus_gen_module import MAP_FILENAME
 
 log = logging.getLogger(__name__)
@@ -167,8 +173,20 @@ def main(argv: list[str] | None = None) -> Path:
     keys = {k: f"c{i}" for i, k in enumerate(dict.fromkeys(fits["config_key"]))}
     fits["config_id"] = fits["config_key"].map(keys)
 
+    # Pooling = the fits' (all the same); every map must match the cache's backbone.
+    poolings = {
+        load_posthoc_map(Path(r) / MAP_FILENAME).pooling for r in fits["run_dir"]
+    }
+    if len(poolings) != 1:
+        raise ValueError(f"fits with different poolings: {sorted(poolings)}")
+    (pooling,) = poolings
+    encoder = cache_encoder(args.features_from)
+    for path in [Path(r) / MAP_FILENAME for r in fits["run_dir"]] + (
+        [reference] if reference is not None else []
+    ):
+        check_map_matches_cache(path, encoder, pooling, args.features_from)
     splits = ("train", "val") if args.test == "none" else ("train", "val", "test")
-    feats, metas = load_cache(args.features_from, splits)
+    feats, metas = load_cache(args.features_from, splits, pooling)
     run_dir = new_bench_run_dir(f"scorpion_{args.tag}")
     write_run_info(
         run_dir,
@@ -185,7 +203,11 @@ def main(argv: list[str] | None = None) -> Path:
             },  # fmt: skip
             "reference_map": str(reference.resolve()) if reference else None,
         },
-        features={"pooling": "gap", "source": "cached SCORPION features"},
+        features={
+            "pooling": pooling,
+            "encoder": encoder,
+            "source": "cached SCORPION features",
+        },
     )
 
     train, _ = paired_views(feats["train"], metas["train"], SETTING)

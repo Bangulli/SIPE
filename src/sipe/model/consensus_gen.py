@@ -32,7 +32,7 @@ import math
 import torch
 import torch.nn as nn
 
-from sipe.model.encoders import build_encoder
+from sipe.model.encoders import POOLINGS, build_encoder, pool_tokens
 
 
 def _mlp(dim: int, hidden_dim: int) -> nn.Sequential:
@@ -285,8 +285,9 @@ class ConsensusGenerativeHead(nn.Module):
 
 
 class ConsensusGenModel(nn.Module):
-    """Frozen backbone -> GAP over patch tokens (= backbone_gap, as the feature cache
-    and `sipe.bench.posthoc`) -> ConsensusGenerativeHead."""
+    """Frozen backbone -> pooled embedding (`pooling`: gap = mean of the patch tokens,
+    = backbone_gap; cls = token 0; as the feature cache and `sipe.bench.posthoc`) ->
+    ConsensusGenerativeHead."""
 
     needs_domains = False
 
@@ -298,10 +299,14 @@ class ConsensusGenModel(nn.Module):
         encoder_hidden_dim: int = 1024,
         generator_hidden_dim: int = 0,
         pretrained: bool = True,
+        pooling: str = "gap",
     ) -> None:
         super().__init__()
+        if pooling not in POOLINGS:
+            raise ValueError(f"Unknown pooling {pooling!r}. Known: {POOLINGS}.")
         bundle = build_encoder(encoder, pretrained=pretrained)
         self.encoder_name = encoder
+        self.pooling = pooling
         self.backbone = bundle.backbone
         self.encoder_meta = bundle.meta
         self.eval_transform = bundle.transform
@@ -325,13 +330,13 @@ class ConsensusGenModel(nn.Module):
     def freeze_backbone(self) -> None:
         self.backbone.requires_grad_(False)
 
-    def backbone_gap(self, images: torch.Tensor) -> torch.Tensor:
-        """As PosthocFeatures.gap: patch tokens only, mean, float32."""
+    def backbone_features(self, images: torch.Tensor) -> torch.Tensor:
+        """As PosthocFeatures.pool: the pooled backbone embedding, float32."""
         tokens = self.backbone.forward_features(images)
-        return tokens[:, self.backbone.num_prefix_tokens :].mean(dim=1).float()
+        return pool_tokens(tokens, self.backbone.num_prefix_tokens, self.pooling)
 
     def forward(self, images: torch.Tensor) -> torch.Tensor:
-        x = self.backbone_gap(images)
+        x = self.backbone_features(images)
         with torch.autocast(x.device.type, enabled=False):
             return self.head.map(x)
 
@@ -443,13 +448,14 @@ class ContentShiftCGM(ConsensusGenModel):
         encoder_hidden_dim: int = 1024,
         generator_hidden_dim: int = 0,
         pretrained: bool = True,
+        pooling: str = "gap",
     ) -> None:
         # Read by _build_head during the base __init__ (a plain int may be set before
         # nn.Module.__init__); this way only one head is built and seeded.
         self._shift_rank = int(shift_rank)
         super().__init__(
             encoder, num_scanners, per_scanner, encoder_hidden_dim,
-            generator_hidden_dim, pretrained,
+            generator_hidden_dim, pretrained, pooling,
         )  # fmt: skip
 
     def _build_head(self, **kwargs) -> ContentShiftHead:

@@ -233,6 +233,17 @@ def test_shift_config_matches_base() -> None:
     assert net_s["init_args"] == net_b["init_args"]
 
 
+def test_uni2h_config_matches_base() -> None:
+    """consensus_gen_uni2h.yaml = consensus_gen.yaml except encoder and pooling."""
+    base = yaml.safe_load((CONFIGS / "consensus_gen.yaml").read_text())
+    uni = yaml.safe_load((CONFIGS / "consensus_gen_uni2h.yaml").read_text())
+    net_b = base["model"]["init_args"]["network"]["init_args"]
+    net_u = uni["model"]["init_args"]["network"]["init_args"]
+    assert (net_u.pop("encoder"), net_u.pop("pooling")) == ("uni2-h", "cls")
+    assert net_b.pop("encoder") == "h0-mini" and "pooling" not in net_b
+    assert uni == base
+
+
 def test_cgm_select_labels_shift_arm(tmp_path) -> None:
     from sipe.eval.cgm_select import ARM_ORDER, fit_info
 

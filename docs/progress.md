@@ -67,7 +67,19 @@ general.
 
 ## 3. Runs in flight and remaining tasks
 
-In flight (host): nothing (2026-10-20). PLISM condition-mean oracle (center global) done and read 2026-10-20
+In flight (host, 2026-10-20): V0-S seeds 43 and 44 (`ARMS="V0-S_s43"` / `"V0-S_s44"
+scripts/cgm_arms_fits.sh`, one per GPU; claim 6 with 3 seeds). Afterwards: add the PLISM tags
+`cgm_v0s_seed43_<rand>`, `cgm_v0s_seed44_<rand>` to the per-pair blocks vs G0 and vs V0-S.
+
+To launch (user): second backbone UNI2-h (CLS), raw / G0 / V1-S on SCORPION, PLISM and HEST,
+on lxbelshark or lxbelwahoo (both GPUs, ~1 day; env vars in the script header):
+`scripts/uni2h_run.sh 2>&1 | tee uni2h.log`. Check: `runs/uni2h_manifest.env` lists CACHE,
+G0_RUN, IDENTITY_RUN, FIT, SELECT_RUN, three PLISM_* and three HEST_* dirs; the fit reached
+step 5999 (W&B); then rsync them back (the script prints the command) and add the PLISM tags
+(`uni2h_cls_ref`, `uni2h_cls_g0`, `cgm_v1s_uni2h_<rand>`) to per-pair blocks with
+ref=uni2h_cls_g0. Pipeline smoke-tested here (`SMOKE=1`, 2026-10-20).
+
+Earlier today: PLISM condition-mean oracle (center global) done and read 2026-10-20
 (`runs/bench/2026-10-20_14-40-47_lxbelshark_8d2c_plism_oracle_condmean_gap`, claim 9); `--center zero` done and read the same day (`runs/bench/2026-10-20_15-40-09_lxbelshark_6505_plism_oracle_condmean_gap_zero`).
 Done before:
 - LOSO trained fits (`scripts/loso_fits.sh`): 10 of 10 done (6000 steps, last logged step 5999

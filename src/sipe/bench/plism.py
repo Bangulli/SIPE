@@ -29,8 +29,8 @@ from plismbench.models.utils import DEFAULT_DEVICE, prepare_module
 
 from sipe.bench.checkpoint import load_cats_checkpoint
 from sipe.bench.encoders import REPRESENTATIONS, CATSFeatures, plism_transform
-from sipe.bench.posthoc import REPRESENTATION as POSTHOC_REPRESENTATION
-from sipe.bench.posthoc import load_posthoc
+from sipe.bench.posthoc import load_posthoc, load_posthoc_map
+from sipe.bench.posthoc import representation as posthoc_representation
 from sipe.bench.provenance import SIPE_ROOT, new_bench_run_dir, write_run_info
 
 FACTORY = "sipe.bench.plism:cats_extractor"
@@ -140,7 +140,7 @@ def main(argv: list[str] | None = None) -> Path:
         "--representation",
         default="z_gap",
         choices=REPRESENTATIONS,
-        help="With --ckpt only (--posthoc is always posthoc_gap).",
+        help="With --ckpt only (--posthoc gives posthoc_<pooling of the map>).",
     )
     parser.add_argument(
         "--n-tiles",
@@ -179,7 +179,9 @@ def main(argv: list[str] | None = None) -> Path:
     if args.posthoc is not None:
         factory = POSTHOC_FACTORY
         args.posthoc = args.posthoc.resolve()
-        args.representation = POSTHOC_REPRESENTATION
+        args.representation = posthoc_representation(
+            load_posthoc_map(args.posthoc).pooling
+        )
         extractor_kwargs = {
             "posthoc": str(args.posthoc),
             "mixed_precision": args.mixed_precision,
