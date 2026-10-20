@@ -33,11 +33,25 @@ N_COORDS = 3
 CENTERS = ("global", "zero")
 
 
-def condition_mean_oracle(features: np.ndarray, m: np.ndarray) -> np.ndarray:
-    """[N, 3 + D] slide matrix -> x - mean(x) + m, coords untouched, float32."""
-    coords, x = features[:, :N_COORDS], features[:, N_COORDS:].astype(np.float64)
-    x = x - x.mean(axis=0) + m
-    return np.concatenate([coords, x], axis=1).astype(np.float32)
+def slide_mean(features: np.ndarray) -> np.ndarray:
+    """Mean over tiles of the feature columns, accumulated in float64."""
+    return features[:, N_COORDS:].mean(axis=0, dtype=np.float64)
+
+
+def condition_mean_oracle(
+    features: np.ndarray, m: np.ndarray, out: np.ndarray | None = None
+) -> np.ndarray:
+    """[N, 3 + D] slide matrix -> x - mean(x) + m, coords untouched, float32.
+
+    The shift (m - mean) is computed in float64 and applied in float32, written into
+    `out` if given (a memmap: large fresh allocations are slow in claude-box).
+    """
+    if out is None:
+        out = np.empty(features.shape, dtype=np.float32)
+    shift = (m - slide_mean(features)).astype(np.float32)
+    out[:, :N_COORDS] = features[:, :N_COORDS]
+    np.add(features[:, N_COORDS:], shift, out=out[:, N_COORDS:])
+    return out
 
 
 def source_features_dir(run_dir: Path) -> Path:
@@ -84,9 +98,7 @@ def main(argv: list[str] | None = None) -> Path:
     export_dir = features_root / args.tag
 
     names = [f.parent.name for f in slide_files]
-    mus = np.stack(
-        [np.load(f)[:, N_COORDS:].astype(np.float64).mean(axis=0) for f in slide_files]
-    )
+    mus = np.stack([slide_mean(np.load(f, mmap_mode="r")) for f in slide_files])
     m = mus.mean(axis=0) if args.center == "global" else np.zeros(mus.shape[1])
     np.savez(run_dir / "condition_means.npz", slides=np.array(names), mu=mus, m=m)
 
@@ -138,7 +150,13 @@ def main(argv: list[str] | None = None) -> Path:
     for f in slide_files:
         out = export_dir / f.parent.name / "features.npy"
         out.parent.mkdir(parents=True)
-        np.save(out, condition_mean_oracle(np.load(f), m))
+        src = np.load(f, mmap_mode="r")
+        dst = np.lib.format.open_memmap(
+            out, mode="w+", dtype=np.float32, shape=src.shape
+        )
+        condition_mean_oracle(src, m, out=dst)
+        dst.flush()
+        del dst
 
     compute_metrics(
         features_root_dir=features_root,
