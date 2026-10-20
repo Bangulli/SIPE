@@ -25,7 +25,8 @@
 #   HEST_BENCH_DATA   HEST bench_data (/mnt/nas7/data/Personal/Valentin/HEST/eval/bench_data)
 #   SYNC_TO           rsync target printed at the end (lxbelshark:workspaces/SIPE/)
 #   SMOKE=1           test the script: 1 slide per split, 2 fit steps, PLISM on the
-#                     slides of PLISM_DIR (point it at a dir with ~3 slides) with 460
+#                     slides of PLISM_DIR (a dir with 3 slides covering scanner, stain
+#                     and joint pairs, e.g. GIVH_AT2, GIVH_GT450, GIV_AT2) with 460
 #                     tiles, HEST on SKCM only; tags prefixed smoke_ (excluded from the
 #                     doc tables), own manifest
 set -euo pipefail

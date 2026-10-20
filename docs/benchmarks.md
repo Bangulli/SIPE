@@ -111,7 +111,10 @@ bench/run python -m sipe.bench.hest  --ckpt runs/<run>/checkpoints/last.ckpt --t
   `--num-workers 0` (HEST). Pick a free GPU with `CUDA_VISIBLE_DEVICES`.
 - **PLISM defaults:** the plismbench defaults (91 slides from `../plism-benchmark/data/plism`,
   metrics on 8,139 tiles/slide, batch 32, autocast). `--smoke` accepts a download dir with
-  fewer slides; it patches plismbench's `NUM_SLIDES` and is for testing only.
+  fewer slides; it patches plismbench's `NUM_SLIDES` and is for testing only. The slides
+  must give at least one inter-scanner, one inter-staining and one joint pair (e.g.
+  `GIVH_AT2`, `GIVH_GT450`, `GIV_AT2`): with one stain only, plismbench's aggregation fails
+  on the empty groups (`Length mismatch: Expected 0 rows`).
 - **HEST defaults:** the HEST `BenchmarkConfig` defaults (ridge on 256-d PCA, batch 128),
   float16 autocast as in TRIDENT's h0-mini, and data from `../HEST/data/bench_data`
   (`skip_download`).
