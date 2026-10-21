@@ -85,3 +85,36 @@ def test_plism_posthoc_factory(tmp_path):
     tiles = [np.random.randint(0, 256, (224, 224, 3), dtype=np.uint8) for _ in range(2)]
     features = extractor(torch.stack([extractor.transform(t) for t in tiles]))
     assert features.shape == (2, 768) and features.dtype == np.float32
+
+
+def test_conch_v15_matches_trident():
+    """sipe's timm CONCH v1.5 = TRIDENT encoder_factory("conch_v15") (the authors'
+    recommended loader). Needs TRIDENT (bench env) and access to the gated weights."""
+    pytest.importorskip("trident")
+    import torch.nn.functional as F
+    from PIL import Image, ImageFilter
+    from trident.patch_encoder_models import encoder_factory
+
+    from sipe.model.encoders import build_encoder, pool_backbone
+
+    try:
+        reference = encoder_factory("conch_v15").eval()
+        ours = build_encoder("conch-v1.5")
+    except Exception as err:  # no HF access / offline
+        pytest.skip(f"CONCH v1.5 weights unavailable: {err}")
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    reference.to(device)
+    backbone = ours.backbone.eval().to(device)
+    rng = np.random.default_rng(0)
+    tiles = [Image.fromarray(rng.integers(0, 256, (224, 224, 3), dtype=np.uint8))]
+    tiles.append(tiles[0].filter(ImageFilter.GaussianBlur(3)))  # smooth tile
+    x_ref = torch.stack([reference.eval_transforms(t) for t in tiles]).to(device)
+    x_ours = torch.stack([ours.transform(t) for t in tiles]).to(device)
+    with torch.no_grad():
+        expected = reference(x_ref).float()
+        # Same 448 px input: position embedding, trunk and head match exactly.
+        same_input = pool_backbone(backbone, backbone.forward_features(x_ref), "head")
+        torch.testing.assert_close(same_input, expected, atol=1e-4, rtol=1e-4)
+        # SIPE input (224 px tile, upsampled inside): only PIL's uint8 rounding differs.
+        tile = pool_backbone(backbone, backbone.forward_features(x_ours), "head")
+    assert F.cosine_similarity(tile, expected).min() > 0.999

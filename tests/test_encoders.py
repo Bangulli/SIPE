@@ -174,3 +174,45 @@ def test_pool_tokens() -> None:
     torch.testing.assert_close(pool_tokens(tokens, 2, "cls"), tokens[:, 0].float())
     with pytest.raises(ValueError, match="pooling"):
         pool_tokens(tokens, 2, "max")
+
+
+def test_conch_v15_meta_and_head_pooling() -> None:
+    from sipe.model.encoders import pool_backbone
+
+    bundle = build_encoder("conch-v1.5", pretrained=False)
+    meta = bundle.meta
+    assert (meta.embed_dim, meta.patch_size, meta.num_prefix_tokens) == (1024, 16, 1)
+    assert meta.input_size == (3, 224, 224)  # tiles stay 224 px; upsampled inside
+    assert meta.mean == pytest.approx((0.485, 0.456, 0.406))
+    assert meta.std == pytest.approx((0.229, 0.224, 0.225))
+    assert meta.pooled_dim("head") == 768 and meta.pooled_dim("cls") == 1024
+    assert encoder_meta("uni2-h").head_dim == 0
+    with pytest.raises(ValueError, match="head"):
+        encoder_meta("uni2-h").pooled_dim("head")
+
+    backbone = bundle.backbone.eval()
+    with torch.no_grad():
+        tokens = backbone.forward_features(torch.randn(2, 3, 224, 224))
+        assert tokens.shape == (2, 1 + 28 * 28, 1024)  # 448 px grid
+        head = pool_backbone(backbone, tokens, "head")
+    assert head.shape == (2, 768) and head.dtype == torch.float32
+    torch.testing.assert_close(
+        pool_backbone(backbone, tokens, "gap"), tokens[:, 1:].mean(dim=1)
+    )
+
+
+def test_conch_attentional_pooler_matches_reference_formula() -> None:
+    """Plain-torch pooler = TRIDENT's einops version written out per head."""
+    from sipe.model.conch import AttentionalPooler
+
+    torch.manual_seed(0)
+    pool = AttentionalPooler(d_model=16, context_dim=8, n_head=4).eval()
+    x = torch.randn(3, 5, 8)
+    q = pool.to_q(pool.ln_q(pool.query))[0]  # [16]
+    k, v = pool.to_kv(pool.ln_k(x)).chunk(2, dim=-1)
+    heads = []
+    for h in range(4):
+        sl = slice(4 * h, 4 * (h + 1))
+        attn = ((k[..., sl] @ q[sl]) * 4**-0.5).softmax(dim=-1)  # [3, 5]
+        heads.append((attn.unsqueeze(-1) * v[..., sl]).sum(dim=1))
+    torch.testing.assert_close(pool(x), pool.to_out(torch.cat(heads, dim=-1)))

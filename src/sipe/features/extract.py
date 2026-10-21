@@ -41,11 +41,11 @@ from torch.utils.data import DataLoader, Dataset
 
 from sipe.bench.provenance import new_bench_run_dir, write_run_info
 from sipe.data.scorpion import SCORPIONDataModule, SCORPIONTileDataset
-from sipe.model.encoders import build_encoder
+from sipe.model.encoders import build_encoder, pool_backbone
 
 log = logging.getLogger(__name__)
 
-POOLINGS = ("gap", "cls")
+POOLINGS = ("gap", "cls", "head")  # head: backbones with a pool_head only
 # Datamodule flags per random policy: (horizontal_flip, vertical_flip, augmentations).
 RANDOM_POLICIES = {
     "none": (False, False, []),
@@ -62,14 +62,19 @@ def extract(
     device: torch.device,
     mixed_precision: bool,
 ) -> tuple[dict[str, np.ndarray], pd.DataFrame]:
-    """One backbone pass -> {"gap", "cls"} features and the proxy's tile metadata."""
-    out: dict[str, list[np.ndarray]] = {name: [] for name in POOLINGS}
+    """One backbone pass -> {"gap", "cls"[, "head"]} features and the tile metadata."""
+    poolings = [p for p in POOLINGS if p != "head" or hasattr(backbone, "pool_head")]
+    out: dict[str, list[np.ndarray]] = {name: [] for name in poolings}
     rows: list[pd.DataFrame] = []
     for batch in loader:
         images = batch["image"].to(device, non_blocking=True)
         # float16 autocast as plismbench's PrecisionModule (and the proxy).
         with torch.autocast(device.type, dtype=torch.float16, enabled=mixed_precision):
             tokens = backbone.forward_features(images)
+            if "head" in out:  # under the same autocast as the trunk (as TRIDENT)
+                out["head"].append(
+                    pool_backbone(backbone, tokens, "head").cpu().numpy()
+                )
         out["gap"].append(
             tokens[:, backbone.num_prefix_tokens :].mean(dim=1).float().cpu().numpy()
         )
@@ -229,6 +234,8 @@ def main(argv: list[str] | None = None) -> Path:
     datasets = {"train": dm.train_dataset, "val": dm.val_dataset,
                 "test": dm.test_dataset}  # fmt: skip
     backbone = build_encoder(args.encoder).backbone.to(device).eval()
+    if "head" in args.poolings and not hasattr(backbone, "pool_head"):
+        raise ValueError(f"--poolings head: {args.encoder} has no pool_head.")
     for split in args.splits:
         dataset = datasets[split]
         if args.limit_slides is not None:

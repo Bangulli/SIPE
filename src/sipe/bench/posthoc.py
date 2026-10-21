@@ -32,7 +32,7 @@ import torch
 import torch.nn as nn
 
 from sipe.bench.checkpoint import _read_git_txt, sha256
-from sipe.model.encoders import POOLINGS, EncoderMeta, build_encoder, pool_tokens
+from sipe.model.encoders import POOLINGS, EncoderMeta, build_encoder, pool_backbone
 
 REPRESENTATION = "posthoc_gap"  # the default pooling; see `representation`
 
@@ -140,7 +140,7 @@ class PosthocFeatures(nn.Module):
     def pool(self, images: torch.Tensor) -> torch.Tensor:
         # As sipe.features.extract.extract (the SCORPION feature cache).
         tokens = self.backbone.forward_features(images)
-        return pool_tokens(tokens, self.backbone.num_prefix_tokens, self.pooling)
+        return pool_backbone(self.backbone, tokens, self.pooling)
 
     def forward(self, images: torch.Tensor) -> torch.Tensor:
         x = self.pool(images)
@@ -161,13 +161,14 @@ def load_posthoc(path: str | Path, pretrained: bool = True) -> LoadedPosthoc:
     loaded = load_posthoc_map(path)
     bundle = build_encoder(loaded.encoder, pretrained=pretrained)
     with torch.no_grad():
-        probe = torch.zeros(1, bundle.meta.embed_dim)
+        dim = bundle.meta.pooled_dim(loaded.pooling)
+        probe = torch.zeros(1, dim)
         try:
             output_dim = int(loaded.map(probe).shape[1])
         except RuntimeError as err:
             raise ValueError(
                 f"{path}: map does not take {loaded.encoder} embeddings "
-                f"(dim {bundle.meta.embed_dim}); wrong `encoder` in the map file?"
+                f"(dim {dim}); wrong `encoder` in the map file?"
             ) from err
     features = PosthocFeatures(
         bundle.backbone, loaded.map, output_dim, loaded.pooling
@@ -184,7 +185,7 @@ def load_posthoc(path: str | Path, pretrained: bool = True) -> LoadedPosthoc:
 
 def identity_map(encoder: str, pooling: str) -> dict[str, Any]:
     """Map file dict of the identity (P = I, bias = 0): the raw pooled embedding."""
-    dim = build_encoder(encoder, pretrained=False).meta.embed_dim
+    dim = build_encoder(encoder, pretrained=False).meta.pooled_dim(pooling)
     return {
         "P": torch.eye(dim),
         "bias": torch.zeros(dim),

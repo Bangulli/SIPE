@@ -32,7 +32,7 @@ import math
 import torch
 import torch.nn as nn
 
-from sipe.model.encoders import POOLINGS, build_encoder, pool_tokens
+from sipe.model.encoders import POOLINGS, build_encoder, pool_backbone
 
 
 def _mlp(dim: int, hidden_dim: int) -> nn.Sequential:
@@ -310,7 +310,7 @@ class ConsensusGenModel(nn.Module):
         self.backbone = bundle.backbone
         self.encoder_meta = bundle.meta
         self.eval_transform = bundle.transform
-        self.feature_dim = self.encoder_meta.embed_dim
+        self.feature_dim = self.encoder_meta.pooled_dim(pooling)
         self.head = self._build_head(
             dim=self.feature_dim,
             num_scanners=num_scanners,
@@ -333,7 +333,7 @@ class ConsensusGenModel(nn.Module):
     def backbone_features(self, images: torch.Tensor) -> torch.Tensor:
         """As PosthocFeatures.pool: the pooled backbone embedding, float32."""
         tokens = self.backbone.forward_features(images)
-        return pool_tokens(tokens, self.backbone.num_prefix_tokens, self.pooling)
+        return pool_backbone(self.backbone, tokens, self.pooling)
 
     def forward(self, images: torch.Tensor) -> torch.Tensor:
         x = self.backbone_features(images)

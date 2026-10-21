@@ -43,8 +43,10 @@ from sipe.baselines.soft_delta_legacy import DeltaSourceSpec, PairedDeltaFitter
 from sipe.bench.provenance import new_bench_run_dir, write_run_info
 from sipe.data.scorpion import SCORPIONDataModule
 from sipe.eval.proxy import evaluate, select_lambda, subsample  # noqa: F401 (re-export)
-from sipe.features.extract import POOLINGS, extract
+from sipe.features.extract import extract
 from sipe.model.encoders import build_encoder
+
+POOLINGS = ("gap", "cls")  # the eraser sweep's poolings (every cache has both)
 
 log = logging.getLogger(__name__)
 

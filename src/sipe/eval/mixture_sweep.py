@@ -58,6 +58,7 @@ from sipe.eval.proxy import (  # noqa: F401 (apply_map, retrieval_metrics re-exp
     select_lambda,
     subsample,
 )
+from sipe.model.encoders import POOLINGS
 
 log = logging.getLogger(__name__)
 
@@ -99,7 +100,7 @@ def main(argv: list[str] | None = None) -> Path:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--tag", required=True)
     parser.add_argument("--features-from", type=Path, required=True)
-    parser.add_argument("--pooling", default="gap", choices=["gap", "cls"])
+    parser.add_argument("--pooling", default="gap", choices=POOLINGS)
     parser.add_argument("--ks", nargs="*", type=int, default=[2, 4],
                         help="Mixtures; `--ks` alone = G0 only.")  # fmt: skip
     parser.add_argument("--content-dim", type=int, default=32)
