@@ -34,7 +34,7 @@ pooled as in the SCORPION feature cache it was fitted on (`gap` = mean of the pa
 The tables show other backbones in the repr column (e.g. `posthoc_cls[uni2-h]`). A raw
 row of a backbone is an identity map file (`sipe.bench.identity_map`). File format:
 `sipe.bench.posthoc` docstring / `CLAUDE.md`. UNI2-h / CONCH v1.5 end to end:
-`scripts/uni2h_run.sh` (`ENCODER=`, `POOLING=`; pooling `head` = a backbone's own pooling
+`scripts/backbone_run.sh` (`ENCODER=`, `POOLING=`; pooling `head` = a backbone's own pooling
 module, CONCH v1.5's attentional pooler).
 
 ```bash

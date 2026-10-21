@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 # Other backbones for the ISBI paper: UNI2-h (default) or CONCH v1.5 (ENCODER=conch-v1.5)
 # through the same pipeline as H0-mini: SCORPION cache -> G0 (closed form) + identity
-# (raw) maps -> CGM V1-S fit (configs/consensus_gen_uni2h.yaml with the encoder and
-# pooling overridden on the command line; arm and hyperparameters as for H0-mini,
-# nothing re-selected) -> cgm_select (SCORPION val/test) -> PLISM -> HEST for raw / G0 /
+# (raw) maps -> CGM V1-S fit (configs/consensus_gen.yaml with the encoder and pooling
+# overridden on the command line; arm and hyperparameters as for H0-mini, nothing
+# re-selected) -> cgm_select (SCORPION val/test) -> PLISM -> HEST for raw / G0 /
 # V1-S.
 #
 # Runs on lxbelshark or lxbelwahoo (needs: uv; ../HEST and ../plism-benchmark on branch
 # `sipe` next to this repo; the NAS; an HF token with access to the gated weights:
 # MahmoodLab/UNI2-h, MahmoodLab/conchv1_5).
 #
-#   scripts/uni2h_run.sh                  # every step, two GPUs (see "all" below)
-#   STEPS="5 6" scripts/uni2h_run.sh      # some steps; earlier outputs from the manifest
-#   STEPS=sync scripts/uni2h_run.sh       # only print the rsync command
+#   scripts/backbone_run.sh               # every step, two GPUs (see "all" below)
+#   STEPS="5 6" scripts/backbone_run.sh   # some steps; earlier outputs from the manifest
+#   STEPS=sync scripts/backbone_run.sh    # only print the rsync command
 #
 # Steps: 0 preflight, 1 cache, 2 G0 + identity map, 3 V1-S fit, 4 cgm_select,
 # 5 PLISM (3 runs), 6 HEST (3 runs). "all" = 0, then {1, 2} on GPU0 while 3 runs on
@@ -126,7 +126,7 @@ assert (m.embed_dim, m.num_prefix_tokens) == ($EXPECT), m
 print('$ENCODER ok:', m)"
 }
 
-step1() {  # SCORPION feature cache (train/val/test, CLS and GAP), ~15-30 min
+step1() {  # SCORPION feature cache (train/val/test, every pooling of CACHE_POOLINGS), ~15-30 min
     local c
     if [ -n "$SFX" ]; then  # the default run's cache holds every pooling
         c=$(MANIFEST=$MANIFEST_DEFAULT get CACHE 2>/dev/null || true)
@@ -169,7 +169,7 @@ write_git_info(d / 'git.txt')
 print(d)")
     log "step 3: V1-S fit on GPU $GPU1 in $dir (log $LOGS/3_fit.log)"
     CUDA_VISIBLE_DEVICES=$GPU1 SIPE_RUN_DIR="$dir" uv run sipe fit \
-        --config configs/consensus_gen_uni2h.yaml \
+        --config configs/consensus_gen.yaml \
         --model.init_args.network.init_args.encoder="$ENCODER" \
         --model.init_args.network.init_args.pooling="$POOLING" \
         --data.init_args.data_root="$SCORPION_ROOT" \

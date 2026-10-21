@@ -77,8 +77,8 @@ general.
 
 Nothing in flight (2026-10-21). Implemented and smoke-tested 2026-10-21, full runs to
 launch (user, overnight each): UNI2-h on patch-token GAP (`POOLING=gap
-scripts/uni2h_run.sh`, CLS vs GAP pooling for the second backbone) and a third backbone,
-CONCH v1.5 on its official head (`ENCODER=conch-v1.5 scripts/uni2h_run.sh`; loader matched
+scripts/backbone_run.sh`, CLS vs GAP pooling for the second backbone) and a third backbone,
+CONCH v1.5 on its official head (`ENCODER=conch-v1.5 scripts/backbone_run.sh`; loader matched
 to TRIDENT, `docs/findings.md` 16). Same pipeline and hyperparameters as UNI2-h, nothing
 re-selected. The pooling is fixed beforehand (each backbone's official embedding for the
 paper rows); the GAP run is a pooling-sensitivity check, not a selection on PLISM.

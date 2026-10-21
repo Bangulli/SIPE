@@ -88,15 +88,16 @@ W&B), and each row must name the run dir it came from.
 - **Second backbone, UNI2-h** (`uni2-h` in `src/sipe/model/encoders.py`, gated: needs an HF
   token with access; 1536-d, CLS + 8 register tokens). Pooled on its **CLS token** (its
   official embedding), H0-mini on patch-token GAP (inherited from CATS; much better than
-  H0-mini CLS on PLISM). Everything runs from `scripts/uni2h_run.sh` (tracked despite
-  `*.sh` being ignored; any machine with the NAS, env vars in its header; `SMOKE=1` tests it):
-  cache, G0 (`mixture_sweep --ks --alphas 1.0`), identity map, V1-S fit
-  (`configs/consensus_gen_uni2h.yaml` = `consensus_gen.yaml` except encoder/pooling, a test
-  enforces it; nothing re-selected), `cgm_select --reference-map none`, PLISM, HEST. Run
+  H0-mini CLS on PLISM). Everything runs from `scripts/backbone_run.sh` (named
+  `scripts/uni2h_run.sh` until 2026-10-21; tracked despite `*.sh` being ignored; any machine
+  with the NAS, env vars in its header; `SMOKE=1` tests it): cache, G0 (`mixture_sweep --ks
+  --alphas 1.0`), identity map, V1-S fit (`configs/consensus_gen.yaml` with encoder/pooling
+  overridden on the command line; same resolved config as the earlier
+  `configs/consensus_gen_uni2h.yaml`; nothing re-selected), `cgm_select --reference-map none`, PLISM, HEST. Run
   dirs go into `runs/uni2h_manifest.env`. `POOLING=gap` runs UNI2-h on patch-token GAP
   (manifest `runs/uni2h_gap_manifest.env`, tags `uni2h_gap_*`, reuses the cls cache).
 - **Third backbone, CONCH v1.5** (`conch-v1.5`, `src/sipe/model/conch.py`, gated
-  `MahmoodLab/conchv1_5`; `ENCODER=conch-v1.5 scripts/uni2h_run.sh`, tags `conch15_*`,
+  `MahmoodLab/conchv1_5`; `ENCODER=conch-v1.5 scripts/backbone_run.sh`, tags `conch15_*`,
   manifest `runs/conch15_manifest.env`). The repo is not a timm hub model; the authors
   recommend TRIDENT's `encoder_factory("conch_v15")`, which needs transformers<5 (bench env
   only), so `conch.py` rebuilds it in timm and `tests/test_bench_adapters.py` checks it
