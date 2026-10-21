@@ -4,6 +4,9 @@
 Sources, all under runs/ (gitignored, so every row names the dir it came from):
   - PLISM: runs/bench/*/metrics/<n>_tiles/<tag>/results.csv (top-1, mean part); with
     drop_stain=, the same means recomputed from the sibling per-pair metrics.csv
+  - PLISM leaderboard (block plism_leaderboard): the medians of results.csv used by
+    plismbench `get_leaderboard_results` (cosine all, top-10 per shift group) and their
+    mean; with drop_stain=, recomputed from metrics.csv
   - PLISM per pair vs a reference: runs/bench/*/metrics/<n>_tiles/<tag>/metrics.csv
     (plismbench per-pair metrics, merged as in sipe.eval.plism_pairs)
   - HEST: runs/bench/*/results/*/dataset_results.json; per gene and fold:
@@ -39,14 +42,16 @@ Options on the opening marker (space-separated key=value):
   exclude=<glob>[,<glob>]   skip run dirs matching any glob (all blocks)
   include=<glob>[,<glob>]   keep only run dirs matching a glob (blocks that list runs;
                             not the by-tag pairs blocks)
-  extra=<dir>[,<dir>]       plism only: metrics dirs outside runs/ with results.csv
+  extra=<dir>[,<dir>]       plism / plism_leaderboard: metrics dirs outside runs/ with
+                            results.csv
   module=<Class>[,<Class>]  training only: keep runs of these SIPEModule classes
   cols=<key>[,<key>]        training only: val/ metrics to show (last-10-val mean)
   min_steps=<n>             training only: skip runs that stopped before step n
   ref=<tag>                 plism_pairs only: reference PLISM run (by tag)
   tags=<tag>[,<tag>]        plism_pairs only: methods compared with ref
-  drop_stain=<s>[,<s>]      plism / plism_pairs: drop the slide pairs with one of these
-                            stains on either side (e.g. HR), then aggregate as usual
+  drop_stain=<s>[,<s>]      plism / plism_leaderboard / plism_pairs: drop the slide
+                            pairs with one of these stains on either side (e.g. HR),
+                            then aggregate as usual
   split=<val|test>          loso only: show only that split (default: both)
   ref=<tag> tags=<tag>,...  hest_pairs: HEST runs paired per (task, fold, gene) with ref
 
@@ -320,6 +325,85 @@ def plism_table(root: Path, opts: dict[str, list[str]]) -> str:
             f" {', '.join(drop)} on either side (recomputed from PLISM `metrics.csv`"
             " with the `results.csv` row masks)."
         )
+    return _table(header, rows) + "\n\n" + caption
+
+
+# --- PLISM leaderboard metrics (plismbench README) ----------------------------
+
+# (column, results.csv row label, metric): medians over slide pairs, as in plismbench
+# `get_leaderboard_results`; the leaderboard metric is the mean of the four.
+LEADERBOARD_COLS = (
+    ("cosine (all)", "all", "cosine_similarity"),
+    ("top-10 inter-scanner", "inter-scanner", "top_10_accuracy"),
+    ("top-10 inter-staining", "inter-staining", "top_10_accuracy"),
+    ("top-10 scanner + staining", "inter-scanner, inter-staining", "top_10_accuracy"),
+)
+
+
+def plism_leaderboard_from_results(results_csv: Path) -> list[float]:
+    """The four leaderboard medians; cells read 'mean (std) ; median (IQR)'."""
+    df = pd.read_csv(results_csv, index_col=0)
+    return [
+        float(str(df.loc[row, metric]).split(";")[1].split("(")[0])
+        for _, row, metric in LEADERBOARD_COLS
+    ]
+
+
+def plism_leaderboard_from_metrics(
+    metrics_csv: Path, drop_stains: list[str]
+) -> list[float]:
+    """The four leaderboard medians from the per-pair metrics.csv (same row masks as
+    plismbench `get_results`), after dropping pairs with a `drop_stains` stain."""
+    df = pd.read_csv(metrics_csv)
+    df = df[_keeps_stains(df, drop_stains)]
+    same_stain = df["staining_a"] == df["staining_b"]
+    same_scanner = df["scanner_a"] == df["scanner_b"]
+    masks = {
+        "all": pd.Series(True, index=df.index),
+        "inter-scanner": same_stain,
+        "inter-staining": same_scanner,
+        "inter-scanner, inter-staining": ~same_stain & ~same_scanner,
+    }
+    return [
+        float(df.loc[masks[row], metric].median())
+        for _, row, metric in LEADERBOARD_COLS
+    ]
+
+
+def plism_leaderboard_table(root: Path, opts: dict[str, list[str]]) -> str:
+    drop = opts.get("drop_stain", [])
+
+    def read(results_csv: Path) -> list[str]:
+        values = (
+            plism_leaderboard_from_metrics(results_csv.with_name("metrics.csv"), drop)
+            if drop
+            else plism_leaderboard_from_results(results_csv)
+        )
+        return [_fmt(v) for v in values] + [_fmt(sum(values) / len(values))]
+
+    header = [
+        "tag", "repr", *(c for c, _, _ in LEADERBOARD_COLS), "leaderboard metric",
+        *SOURCE_HEADER,
+    ]  # fmt: skip
+    rows = []
+    for run in _bench_runs(root, "plism", *_filters(opts)):
+        found = sorted(run.dir.glob("metrics/*_tiles/*/results.csv"))
+        tag = str(run.config.get("tag"))
+        cells = read(found[0]) if found else ["no results", *["–"] * 4]
+        rows.append([tag, run.representation, *cells, *run.source_cells()])
+    for extra in opts.get("extra", []):
+        cells = read(SIPE_ROOT / extra / "results.csv")
+        rows.append([Path(extra).name, "–", *cells, f"`{extra}`", "–", "–"])
+    where = (
+        f"over slide pairs without the stain(s) {', '.join(drop)} on either side"
+        " (recomputed from PLISM `metrics.csv`)"
+        if drop
+        else "over slide pairs (PLISM `results.csv`)"
+    )
+    caption = (
+        f"plismbench leaderboard metrics: medians {where}; leaderboard metric = mean"
+        " of the four columns (plismbench `get_leaderboard_results`)."
+    )
     return _table(header, rows) + "\n\n" + caption
 
 
@@ -1270,6 +1354,7 @@ def training_table(root: Path, opts: dict[str, list[str]]) -> str:
 
 TABLES = {
     "plism": plism_table,
+    "plism_leaderboard": plism_leaderboard_table,
     "plism_pairs": plism_pairs_table,
     "hest": hest_table,
     "hest_pairs": hest_pairs_table,

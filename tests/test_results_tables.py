@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 import yaml
 
 from sipe.eval import results_tables as rt
@@ -50,7 +51,6 @@ def test_plism_reads_top1_mean(tmp_path):
     assert "s_smoke" not in table
 
 
-
 def test_include_keeps_only_matching_runs(tmp_path):
     for name in ("s_a_uni2h_x", "s_b_other"):
         metrics = bench_dir(tmp_path, name, "plism") / "metrics" / "8139_tiles" / "t"
@@ -61,6 +61,7 @@ def test_include_keeps_only_matching_runs(tmp_path):
     assert "s_a_uni2h_x" in table and "s_b_other" not in table
     table = rt.plism_table(tmp_path, {"exclude": ["*uni2h*"]})
     assert "s_a_uni2h_x" not in table and "s_b_other" in table
+
 
 def test_hest_average_only_for_full_task_set(tmp_path):
     run = bench_dir(tmp_path, "s_hest", "hest")
@@ -205,3 +206,37 @@ def test_plism_pairs_table_drop_stain(tmp_path):
     assert cells[2] == str(int(keep.sum()))
     assert cells[5] == f"{delta.mean():+.3f}"
     assert ", HR |" not in table
+
+
+LEADERBOARD_CSV = """\
+,cosine_similarity,top_10_accuracy
+inter-scanner,0.7 (0.1) ; 0.760 (0.17),0.4 (0.3) ; 0.501 (0.48)
+inter-staining,0.6 (0.2) ; 0.682 (0.13),0.1 (0.1) ; 0.190 (0.25)
+"inter-scanner, inter-staining",0.5 (0.1) ; 0.562 (0.17),0.1 (0.1) ; 0.046 (0.09)
+all,0.6 (0.2) ; 0.591 (0.19),0.1 (0.2) ; 0.063 (0.15)
+"""
+
+
+def test_plism_leaderboard_medians(tmp_path):
+    from test_plism_pairs import fake_metrics
+
+    run = bench_dir(tmp_path, "s_lb", "plism")
+    out = run / "metrics" / "8139_tiles" / "s_lb"
+    out.mkdir(parents=True)
+    (out / "results.csv").write_text(LEADERBOARD_CSV)
+    df = fake_metrics(0)
+    df.to_csv(out / "metrics.csv", index=False)
+
+    # plismbench README row of UNI2-h: medians of cosine (all) and top-10 per group
+    row = next(
+        x for x in rt.plism_leaderboard_table(tmp_path, {}).splitlines() if "s_lb" in x
+    )
+    assert "| 0.591 | 0.501 | 0.190 | 0.046 | 0.332 |" in row
+
+    keep = (df["staining_a"] != "HR") & (df["staining_b"] != "HR")
+    same_stain = df["staining_a"] == df["staining_b"]
+    values = rt.plism_leaderboard_from_metrics(out / "metrics.csv", ["HR"])
+    assert values[0] == pytest.approx(df.loc[keep, "cosine_similarity"].median())
+    assert values[1] == pytest.approx(
+        df.loc[keep & same_stain, "top_10_accuracy"].median()
+    )
