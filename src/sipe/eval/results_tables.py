@@ -37,6 +37,8 @@ generated blocks; the same block may appear in both:
 
 Options on the opening marker (space-separated key=value):
   exclude=<glob>[,<glob>]   skip run dirs matching any glob (all blocks)
+  include=<glob>[,<glob>]   keep only run dirs matching a glob (blocks that list runs;
+                            not the by-tag pairs blocks)
   extra=<dir>[,<dir>]       plism only: metrics dirs outside runs/ with results.csv
   module=<Class>[,<Class>]  training only: keep runs of these SIPEModule classes
   cols=<key>[,<key>]        training only: val/ metrics to show (last-10-val mean)
@@ -215,10 +217,23 @@ class BenchRun:
 SOURCE_HEADER = ["bench run dir", "train W&B", "SIPE commit"]
 
 
-def _bench_runs(root: Path, benchmark: str, exclude: list[str]) -> list[BenchRun]:
+def _skip(name: str, exclude: list[str], include: list[str] = ()) -> bool:
+    """Run dir filtered out by exclude= (any match) or include= (no match)."""
+    if any(fnmatch.fnmatch(name, pat) for pat in exclude):
+        return True
+    return bool(include) and not any(fnmatch.fnmatch(name, pat) for pat in include)
+
+
+def _filters(opts: dict[str, list[str]]) -> tuple[list[str], list[str]]:
+    return opts.get("exclude", []), opts.get("include", [])
+
+
+def _bench_runs(
+    root: Path, benchmark: str, exclude: list[str], include: list[str] = ()
+) -> list[BenchRun]:
     runs = []
     for run_dir in sorted((root / "bench").glob("*/")):
-        if any(fnmatch.fnmatch(run_dir.name, pat) for pat in exclude):
+        if _skip(run_dir.name, exclude, include):
             continue
         run = BenchRun.load(run_dir)
         if run.benchmark == benchmark:
@@ -277,7 +292,7 @@ def plism_table(root: Path, opts: dict[str, list[str]]) -> str:
 
     header = ["tag", "repr", *PLISM_ROWS.values(), *SOURCE_HEADER]
     rows = []
-    for run in _bench_runs(root, "plism", opts.get("exclude", [])):
+    for run in _bench_runs(root, "plism", *_filters(opts)):
         found = sorted(run.dir.glob("metrics/*_tiles/*/results.csv"))
         if not found:
             empty = ["no results"] + ["–"] * (len(PLISM_ROWS) - 1)
@@ -426,7 +441,7 @@ def read_hest_results(
 def hest_table(root: Path, opts: dict[str, list[str]]) -> str:
     header = ["tag", "repr", *HEST_TASKS, "average", *SOURCE_HEADER]
     rows = []
-    for run in _bench_runs(root, "hest", opts.get("exclude", [])):
+    for run in _bench_runs(root, "hest", *_filters(opts)):
         found = sorted(run.dir.glob("results/*/dataset_results.json"))
         if not found:
             cells = ["no results"] + ["–"] * len(HEST_TASKS)
@@ -522,7 +537,7 @@ def hest_pairs_table(root: Path, opts: dict[str, list[str]]) -> str:
 def scorpion_table(root: Path, opts: dict[str, list[str]]) -> str:
     header = ["tag", "repr", *PROXY_COLS.values(), *SOURCE_HEADER]
     rows = []
-    for run in _bench_runs(root, "scorpion_retrieval", opts.get("exclude", [])):
+    for run in _bench_runs(root, "scorpion_retrieval", *_filters(opts)):
         summary = run.dir / "summary.csv"
         if not summary.exists():
             empty = ["no results"] + ["–"] * len(PROXY_COLS)
@@ -559,9 +574,7 @@ def softshrink_table(root: Path, opts: dict[str, list[str]]) -> str:
         "SIPE commit",
     ]
     rows = []
-    for run in _bench_runs(
-        root, "scorpion_soft_shrinkage_sweep", opts.get("exclude", [])
-    ):
+    for run in _bench_runs(root, "scorpion_soft_shrinkage_sweep", *_filters(opts)):
         source = [f"`{_rel(run.dir)}`", run.source_cells()[2]]
         tag = str(run.config.get("tag"))
         # Pairing unit of B; runs before --deltas existed used slide-level deltas.
@@ -606,9 +619,7 @@ def content_table(root: Path, opts: dict[str, list[str]]) -> str:
         "SIPE commit",
     ]  # fmt: skip
     rows = []
-    for run in _bench_runs(
-        root, "scorpion_content_dependence", opts.get("exclude", [])
-    ):
+    for run in _bench_runs(root, "scorpion_content_dependence", *_filters(opts)):
         source = [f"`{_rel(run.dir)}`", run.source_cells()[2]]
         summary = run.dir / "summary.csv"
         if not summary.exists():
@@ -659,7 +670,7 @@ def offsets_table(root: Path, opts: dict[str, list[str]]) -> str:
         "bench run dir", "SIPE commit",
     ]  # fmt: skip
     rows = []
-    for run in _bench_runs(root, "scorpion_scanner_offsets", opts.get("exclude", [])):
+    for run in _bench_runs(root, "scorpion_scanner_offsets", *_filters(opts)):
         source = [f"`{_rel(run.dir)}`", run.source_cells()[2]]
         summary = run.dir / "summary.csv"
         if not summary.exists():
@@ -728,7 +739,7 @@ def content_offsets_table(root: Path, opts: dict[str, list[str]]) -> str:
         "WSIs > 0", "content part in offset span", "bench run dir", "SIPE commit",
     ]  # fmt: skip
     rows = []
-    for run in _bench_runs(root, "scorpion_content_offsets", opts.get("exclude", [])):
+    for run in _bench_runs(root, "scorpion_content_offsets", *_filters(opts)):
         source = [f"`{_rel(run.dir)}`", run.source_cells()[2]]
         summary = run.dir / "summary.csv"
         if not summary.exists():
@@ -776,7 +787,13 @@ def _mixture_rows(run: BenchRun, split: str) -> list[dict[str, Any]]:
     summary = pd.read_csv(run.dir / f"summary_{split}.csv")
     selected = _read_json(run.dir / "selected.json")
     lik = pd.read_csv(run.dir / "likelihood.csv")
-    gating = pd.read_csv(run.dir / "gating.csv")
+    # G0-only runs (`--ks` alone) have no gates: gating.csv is empty.
+    gating_csv = run.dir / "gating.csv"
+    gating = (
+        pd.read_csv(gating_csv)
+        if gating_csv.stat().st_size > 1
+        else pd.DataFrame(columns=["variant", "K"])
+    )
     rows = []
     for _, r in summary.iterrows():
         row: dict[str, Any] = {**r.to_dict(), **selected.get(r["name"], {})}
@@ -805,7 +822,7 @@ def mixture_table(root: Path, opts: dict[str, list[str]]) -> str:
         "test region probe", "note", "bench run dir", "SIPE commit",
     ]  # fmt: skip
     rows = []
-    for run in _bench_runs(root, "scorpion_mixture_sweep", opts.get("exclude", [])):
+    for run in _bench_runs(root, "scorpion_mixture_sweep", *_filters(opts)):
         source = [f"`{_rel(run.dir)}`", run.source_cells()[2]]
         if not (run.dir / "summary_val.csv").exists():
             rows.append(["no results", *["–"] * (len(header) - 3), *source])
@@ -877,7 +894,7 @@ def quadratic_table(root: Path, opts: dict[str, list[str]]) -> str:
         "bench run dir", "SIPE commit",
     ]  # fmt: skip
     rows = []
-    for run in _bench_runs(root, "scorpion_quadratic_sweep", opts.get("exclude", [])):
+    for run in _bench_runs(root, "scorpion_quadratic_sweep", *_filters(opts)):
         source = [f"`{_rel(run.dir)}`", run.source_cells()[2]]
         if not (run.dir / "summary_val.csv").exists():
             rows.append(["no results", *["–"] * (len(header) - 3), *source])
@@ -962,7 +979,7 @@ def aug_attribution_table(root: Path, opts: dict[str, list[str]]) -> str:
         "rel. change", "bench run dir", "SIPE commit",
     ]  # fmt: skip
     rows = []
-    for run in _bench_runs(root, "scorpion_aug_attribution", opts.get("exclude", [])):
+    for run in _bench_runs(root, "scorpion_aug_attribution", *_filters(opts)):
         source = [f"`{_rel(run.dir)}`", run.source_cells()[2]]
         if not (run.dir / "summary_val.csv").exists():
             rows.append(["no results", *["–"] * (len(header) - 3), *source])
@@ -1018,7 +1035,7 @@ def cgm_select_table(root: Path, opts: dict[str, list[str]]) -> str:
         "bench run dir", "SIPE commit",
     ]  # fmt: skip
     rows = []
-    for run in _bench_runs(root, "scorpion_cgm_select", opts.get("exclude", [])):
+    for run in _bench_runs(root, "scorpion_cgm_select", *_filters(opts)):
         source = [f"`{_rel(run.dir)}`", run.source_cells()[2]]
         if not (run.dir / "summary_val.csv").exists():
             rows.append(["no results", *["–"] * (len(header) - 3), *source])
@@ -1126,7 +1143,7 @@ def loso_table(root: Path, opts: dict[str, list[str]]) -> str:
     ]  # fmt: skip
     splits = opts.get("split", ["val", "test"])
     rows = []
-    for run in _bench_runs(root, "scorpion_loso", opts.get("exclude", [])):
+    for run in _bench_runs(root, "scorpion_loso", *_filters(opts)):
         source = [f"`{_rel(run.dir)}`", run.source_cells()[2]]
         if not any(run.dir.glob("contrasts_*.csv")):
             rows.append(["no results", *["–"] * (len(header) - 3), *source])
@@ -1215,11 +1232,11 @@ def training_table(root: Path, opts: dict[str, list[str]]) -> str:
     cols = opts.get("cols") or list(TRAIN_COLS)
     modules = opts.get("module", [])
     min_steps = int(opts.get("min_steps", ["0"])[0])
-    exclude = opts.get("exclude", [])
+    exclude, include = _filters(opts)
     header = ["run dir", "W&B", "module", "commit", "step", *cols]
     rows = []
     for run_dir in sorted(p for p in root.glob("*/") if (p / "wandb").is_dir()):
-        if any(fnmatch.fnmatch(run_dir.name, pat) for pat in exclude):
+        if _skip(run_dir.name, exclude, include):
             continue
         config = _read_yaml(run_dir / "config.yaml")
         model = config.get("model") or {}

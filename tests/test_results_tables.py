@@ -50,6 +50,18 @@ def test_plism_reads_top1_mean(tmp_path):
     assert "s_smoke" not in table
 
 
+
+def test_include_keeps_only_matching_runs(tmp_path):
+    for name in ("s_a_uni2h_x", "s_b_other"):
+        metrics = bench_dir(tmp_path, name, "plism") / "metrics" / "8139_tiles" / "t"
+        metrics.mkdir(parents=True)
+        (metrics / "results.csv").write_text(PLISM_CSV)
+
+    table = rt.plism_table(tmp_path, {"include": ["*uni2h*"]})
+    assert "s_a_uni2h_x" in table and "s_b_other" not in table
+    table = rt.plism_table(tmp_path, {"exclude": ["*uni2h*"]})
+    assert "s_a_uni2h_x" not in table and "s_b_other" in table
+
 def test_hest_average_only_for_full_task_set(tmp_path):
     run = bench_dir(tmp_path, "s_hest", "hest")
     results = run / "results" / "tag"
