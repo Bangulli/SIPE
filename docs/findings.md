@@ -76,6 +76,17 @@ differences to that backbone's own raw and G0 rows. For a PLISM `--smoke` run, t
 must give scanner, stain and joint pairs, or plismbench's aggregation fails
 (`docs/benchmarks.md`).
 
+**16. Load a backbone the way its authors do; resolution and position embedding change the
+embedding.** CONCH v1.5 (`MahmoodLab/conchv1_5`) has no timm config, and its loaders
+disagree: TRIDENT's `encoder_factory("conch_v15")` (recommended by the authors) resizes
+224 px tiles to 448 px, while plismbench's `CONCHv15` feeds 224 px tiles. On a check of
+SCORPION tiles (2026-10-21, not saved as a run), the 224 px and 448 px embeddings of the same
+tile were far apart, and TRIDENT's position embedding (the checkpoint's 28x28 grid resampled
+to 14x14 at load, interpolated back at each 448 px forward) changed nearest neighbours
+against the checkpoint's own grid. We follow TRIDENT exactly (`src/sipe/model/conch.py`)
+and test the match (`tests/test_bench_adapters.py::test_conch_v15_matches_trident`, bench
+env). A plismbench leaderboard row of CONCH v1.5 is therefore not directly comparable to ours.
+
 ## Data and the acquisition nuisance
 
 **5. The pairing unit matters more than the objective.** On PLISM all pairs: slide-level

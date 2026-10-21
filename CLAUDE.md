@@ -93,7 +93,17 @@ W&B), and each row must name the run dir it came from.
   cache, G0 (`mixture_sweep --ks --alphas 1.0`), identity map, V1-S fit
   (`configs/consensus_gen_uni2h.yaml` = `consensus_gen.yaml` except encoder/pooling, a test
   enforces it; nothing re-selected), `cgm_select --reference-map none`, PLISM, HEST. Run
-  dirs go into `runs/uni2h_manifest.env`.
+  dirs go into `runs/uni2h_manifest.env`. `POOLING=gap` runs UNI2-h on patch-token GAP
+  (manifest `runs/uni2h_gap_manifest.env`, tags `uni2h_gap_*`, reuses the cls cache).
+- **Third backbone, CONCH v1.5** (`conch-v1.5`, `src/sipe/model/conch.py`, gated
+  `MahmoodLab/conchv1_5`; `ENCODER=conch-v1.5 scripts/uni2h_run.sh`, tags `conch15_*`,
+  manifest `runs/conch15_manifest.env`). The repo is not a timm hub model; the authors
+  recommend TRIDENT's `encoder_factory("conch_v15")`, which needs transformers<5 (bench env
+  only), so `conch.py` rebuilds it in timm and `tests/test_bench_adapters.py` checks it
+  against TRIDENT (bench env). As TRIDENT: 448 px input (224 px tiles upsampled inside the
+  model, so every pipeline still feeds 224 px tiles), TRIDENT's position embedding, and the
+  official embedding = pooling `head` (attentional pooler, 768-d; `pool_backbone` in
+  `encoders.py`). The cache also holds `cls` and `gap` (1024-d trunk).
 - **Augmented train caches** (CGM augmentation study): `uv run python -m sipe.features.extract
   --tag <tag> --policy none|geo|dihedral|zoom --copies K` (train split by default; meta
   column `aug` = copy; the scanner views of a tile copy share the transform; every view goes

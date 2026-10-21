@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
-# Second backbone for the ISBI paper: UNI2-h (CLS token) through the same pipeline as
-# H0-mini: SCORPION cache -> G0 (closed form) + identity (raw) maps -> CGM V1-S fit
-# (configs/consensus_gen_uni2h.yaml; arm and hyperparameters as for H0-mini, nothing
-# re-selected) -> cgm_select (SCORPION val/test) -> PLISM -> HEST for raw / G0 / V1-S.
+# Other backbones for the ISBI paper: UNI2-h (default) or CONCH v1.5 (ENCODER=conch-v1.5)
+# through the same pipeline as H0-mini: SCORPION cache -> G0 (closed form) + identity
+# (raw) maps -> CGM V1-S fit (configs/consensus_gen_uni2h.yaml with the encoder and
+# pooling overridden on the command line; arm and hyperparameters as for H0-mini,
+# nothing re-selected) -> cgm_select (SCORPION val/test) -> PLISM -> HEST for raw / G0 /
+# V1-S.
 #
 # Runs on lxbelshark or lxbelwahoo (needs: uv; ../HEST and ../plism-benchmark on branch
-# `sipe` next to this repo; the NAS; an HF token with access to MahmoodLab/UNI2-h).
+# `sipe` next to this repo; the NAS; an HF token with access to the gated weights:
+# MahmoodLab/UNI2-h, MahmoodLab/conchv1_5).
 #
 #   scripts/uni2h_run.sh                  # every step, two GPUs (see "all" below)
 #   STEPS="5 6" scripts/uni2h_run.sh      # some steps; earlier outputs from the manifest
@@ -14,7 +17,7 @@
 # Steps: 0 preflight, 1 cache, 2 G0 + identity map, 3 V1-S fit, 4 cgm_select,
 # 5 PLISM (3 runs), 6 HEST (3 runs). "all" = 0, then {1, 2} on GPU0 while 3 runs on
 # GPU1, then 4, then PLISM and HEST split over both GPUs. Every run dir goes into
-# runs/uni2h_manifest.env (KEY=path, re-read by later steps); the end prints the rsync
+# runs/<bk>_manifest.env (KEY=path, re-read by later steps); the end prints the rsync
 # command that copies them to the other machine.
 #
 # Environment (defaults = lxbelshark):
@@ -24,6 +27,13 @@
 #   PLISM_DIR         PLISM .tif.h5 dir (/mnt/nas7/data/Personal/Valentin/plism)
 #   HEST_BENCH_DATA   HEST bench_data (/mnt/nas7/data/Personal/Valentin/HEST/eval/bench_data)
 #   SYNC_TO           rsync target printed at the end (lxbelshark:workspaces/SIPE/)
+#   ENCODER           uni2-h (default; tags uni2h_*) or conch-v1.5 (tags conch15_*)
+#   POOLING           the encoder's own embedding by default (uni2-h: cls; conch-v1.5:
+#                     head, its attentional pooler), or cls / gap (mean of the patch
+#                     tokens, as H0-mini). The default pooling writes runs/<bk>_manifest.env,
+#                     another one runs/<bk>_<pooling>_manifest.env with tags
+#                     <bk>_<pooling>_*; its step 1 reuses the CACHE of the default
+#                     manifest (the cache holds every pooling)
 #   SMOKE=1           test the script: 1 slide per split, 2 fit steps, PLISM on the
 #                     slides of PLISM_DIR (a dir with 3 slides covering scanner, stain
 #                     and joint pairs, e.g. GIVH_AT2, GIVH_GT450, GIV_AT2) with 460
@@ -41,15 +51,29 @@ HEST_BENCH_DATA="${HEST_BENCH_DATA:-/mnt/nas7/data/Personal/Valentin/HEST/eval/b
 SYNC_TO="${SYNC_TO:-lxbelshark:workspaces/SIPE/}"
 STEPS="${STEPS:-all}"
 SMOKE="${SMOKE:-0}"
+ENCODER="${ENCODER:-uni2-h}"
+case "$ENCODER" in  # short tag, default pooling, cache poolings, expected (dim, prefix)
+    uni2-h) BK=uni2h; DEFAULT_POOLING=cls; CACHE_POOLINGS="cls gap"; EXPECT="1536, 9" ;;
+    conch-v1.5) BK=conch15; DEFAULT_POOLING=head; CACHE_POOLINGS="cls gap head"
+        EXPECT="1024, 1" ;;
+    *) echo "ENCODER must be uni2-h or conch-v1.5" >&2; exit 1 ;;
+esac
+POOLING="${POOLING:-$DEFAULT_POOLING}"
+case " $CACHE_POOLINGS " in *" $POOLING "*) ;;
+    *) echo "POOLING must be one of: $CACHE_POOLINGS" >&2; exit 1 ;; esac
 P=""  # tag prefix
-MANIFEST=runs/uni2h_manifest.env
-LOGS=runs/uni2h_logs
+SFX=""  # tag suffix of the select run and the fit tag (default pooling: none)
+[ "$POOLING" = "$DEFAULT_POOLING" ] || SFX="_$POOLING"
+MANIFEST_DEFAULT=runs/${BK}_manifest.env
+LOGS=runs/${BK}_logs
 if [ "$SMOKE" = 1 ]; then
     P=smoke_
-    MANIFEST=runs/uni2h_smoke_manifest.env
-    LOGS=runs/uni2h_smoke_logs
+    MANIFEST_DEFAULT=runs/${BK}_smoke_manifest.env
+    LOGS=runs/${BK}_smoke_logs
     export WANDB_MODE="${WANDB_MODE:-offline}"
 fi
+MANIFEST=$MANIFEST_DEFAULT
+[ -z "$SFX" ] || MANIFEST="${MANIFEST_DEFAULT%_manifest.env}${SFX}_manifest.env"
 LOGS="$LOGS/$(date +%Y-%m-%d_%H-%M-%S)"  # one log dir per invocation
 mkdir -p runs/bench "$LOGS"
 touch "$MANIFEST"
@@ -94,22 +118,31 @@ step0() {  # preflight: fail early, before hours of GPU time
     done
     uv sync -q
     bench/run python -c "import plismbench, hest" || { log "bench env broken"; exit 1; }
-    # Downloads the gated UNI2-h weights once (fails without access) and checks them.
+    # Downloads the gated weights once (fails without access) and checks them.
     uv run python -c "
 from sipe.model.encoders import build_encoder
-m = build_encoder('uni2-h').meta
-assert (m.embed_dim, m.num_prefix_tokens) == (1536, 9), m
-print('UNI2-h ok:', m)"
+m = build_encoder('$ENCODER').meta
+assert (m.embed_dim, m.num_prefix_tokens) == ($EXPECT), m
+print('$ENCODER ok:', m)"
 }
 
 step1() {  # SCORPION feature cache (train/val/test, CLS and GAP), ~15-30 min
-    log "step 1: UNI2-h feature cache on GPU $GPU0"
+    local c
+    if [ -n "$SFX" ]; then  # the default run's cache holds every pooling
+        c=$(MANIFEST=$MANIFEST_DEFAULT get CACHE 2>/dev/null || true)
+        if [ -n "$c" ]; then
+            log "step 1: reusing the cache of $MANIFEST_DEFAULT"
+            record CACHE "$c"
+            return
+        fi
+    fi
+    log "step 1: $ENCODER feature cache on GPU $GPU0"
     CUDA_VISIBLE_DEVICES=$GPU0 uv run python -m sipe.features.extract \
-        --tag "${P}uni2h_cache" --policy none --splits train val test \
-        --poolings cls gap --encoder uni2-h --data-root "$SCORPION_ROOT" \
+        --tag "${P}${BK}_cache" --policy none --splits train val test \
+        --poolings $CACHE_POOLINGS --encoder "$ENCODER" --data-root "$SCORPION_ROOT" \
         --workers "$WORKERS" $( [ "$SMOKE" = 1 ] && echo --limit-slides 1 ) \
         >"$LOGS/1_cache.log" 2>&1
-    record CACHE "$(newest "${P}uni2h_cache")"
+    record CACHE "$(newest "${P}${BK}_cache")"
 }
 
 step2() {  # G0 (closed form, alpha = 1, K = 1) and the identity map (raw row)
@@ -117,12 +150,12 @@ step2() {  # G0 (closed form, alpha = 1, K = 1) and the identity map (raw row)
     cache=$(get CACHE)
     log "step 2: G0 on $cache"
     CUDA_VISIBLE_DEVICES=$GPU0 uv run python -m sipe.eval.mixture_sweep \
-        --tag "${P}uni2h_cls_g0" --features-from "$cache" --pooling cls --ks \
+        --tag "${P}${BK}_${POOLING}_g0" --features-from "$cache" --pooling "$POOLING" --ks \
         --alphas 1.0 --reference-map none >"$LOGS/2_g0.log" 2>&1
-    record G0_RUN "$(newest "scorpion_${P}uni2h_cls_g0")"
-    uv run python -m sipe.bench.identity_map --encoder uni2-h --pooling cls \
-        --tag "${P}identity_uni2h_cls" >"$LOGS/2_identity.log" 2>&1
-    record IDENTITY_RUN "$(newest "${P}identity_uni2h_cls")"
+    record G0_RUN "$(newest "scorpion_${P}${BK}_${POOLING}_g0")"
+    uv run python -m sipe.bench.identity_map --encoder "$ENCODER" --pooling "$POOLING" \
+        --tag "${P}identity_${BK}_${POOLING}" >"$LOGS/2_identity.log" 2>&1
+    record IDENTITY_RUN "$(newest "${P}identity_${BK}_${POOLING}")"
 }
 
 step3() {  # CGM V1-S, backbone in the loop, 6000 steps
@@ -137,6 +170,8 @@ print(d)")
     log "step 3: V1-S fit on GPU $GPU1 in $dir (log $LOGS/3_fit.log)"
     CUDA_VISIBLE_DEVICES=$GPU1 SIPE_RUN_DIR="$dir" uv run sipe fit \
         --config configs/consensus_gen_uni2h.yaml \
+        --model.init_args.network.init_args.encoder="$ENCODER" \
+        --model.init_args.network.init_args.pooling="$POOLING" \
         --data.init_args.data_root="$SCORPION_ROOT" \
         --data.init_args.num_workers="$WORKERS" \
         $( [ "$WORKERS" -eq 0 ] && echo --data.init_args.persistent_workers=false ) \
@@ -154,12 +189,12 @@ step4() {  # SCORPION val/test: raw, G0 (in-run) and V1-S on the shared protocol
     fit=$(get FIT)
     log "step 4: cgm_select"
     CUDA_VISIBLE_DEVICES=$GPU0 uv run python -m sipe.eval.cgm_select \
-        --tag "${P}uni2h_cgm_select" --features-from "$cache" \
+        --tag "${P}${BK}${SFX}_cgm_select" --features-from "$cache" \
         --runs "$fit" --reference-map none --test all >"$LOGS/4_select.log" 2>&1
-    record SELECT_RUN "$(newest "scorpion_${P}uni2h_cgm_select")"
+    record SELECT_RUN "$(newest "scorpion_${P}${BK}${SFX}_cgm_select")"
 }
 
-fit_tag() { local f; f=$(get FIT); echo "${P}cgm_v1s_uni2h_${f##*_}"; }
+fit_tag() { local f; f=$(get FIT); echo "${P}cgm_v1s_${BK}${SFX}_${f##*_}"; }
 
 plism() {  # <gpu> <map file> <tag>
     log "PLISM $3 on GPU $1"
@@ -189,8 +224,8 @@ run_bench() {  # <plism|hest>: raw + G0 on GPU0, V1-S on GPU1; fails if any run 
     for map in "$identity" "$g0" "$fit"; do
         [ -f "$map" ] || { log "missing map $map"; exit 1; }
     done
-    { "$kind" "$GPU0" "$identity" "${P}uni2h_cls_ref"
-      "$kind" "$GPU0" "$g0" "${P}uni2h_cls_g0"; } &
+    { "$kind" "$GPU0" "$identity" "${P}${BK}_${POOLING}_ref"
+      "$kind" "$GPU0" "$g0" "${P}${BK}_${POOLING}_g0"; } &
     p0=$!
     "$kind" "$GPU1" "$fit" "$tag" &
     p1=$!

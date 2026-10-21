@@ -33,7 +33,9 @@ pooled as in the SCORPION feature cache it was fitted on (`gap` = mean of the pa
 `cls` = token 0), then the map in float32 (the backbone keeps the benchmark's autocast).
 The tables show other backbones in the repr column (e.g. `posthoc_cls[uni2-h]`). A raw
 row of a backbone is an identity map file (`sipe.bench.identity_map`). File format:
-`sipe.bench.posthoc` docstring / `CLAUDE.md`. UNI2-h end to end: `scripts/uni2h_run.sh`.
+`sipe.bench.posthoc` docstring / `CLAUDE.md`. UNI2-h / CONCH v1.5 end to end:
+`scripts/uni2h_run.sh` (`ENCODER=`, `POOLING=`; pooling `head` = a backbone's own pooling
+module, CONCH v1.5's attentional pooler).
 
 ```bash
 bench/run python -m sipe.bench.plism --posthoc runs/bench/<fit run>/<map>.pt --tag <tag>
