@@ -77,8 +77,10 @@ gain over G0 on UNI2-h CLS is mostly inter-scanner (+0.041 vs +0.011 joint), the
 H0-mini; on UNI2-h GAP it has H0-mini's profile (joint +0.015, inter-scanner +0.004 near
 ceiling) and the same all-pairs size as on CLS, +0.014 (`docs/progress.md`, claims 10, 11).
 So the gain's profile over shift types follows where the raw embedding sits, not the
-backbone. Keep one block set per backbone and pooling (`include=` / `exclude=*uni2h*`,
-`*uni2h_gap*`) and report gains as differences to that set's own raw and G0 rows; state the
+backbone. CONCH v1.5 on its official head is also low (all pairs 0.047, joint 0.023;
+`runs/bench/2026-10-22_17-14-14_lxbelshark_735a_conch15_head_ref`) and its V1-S gain over G0
+is again mostly inter-scanner (+0.065 vs +0.016 joint; `docs/progress.md`, claim 12). Keep one block set per backbone and pooling (`include=` / `exclude=*uni2h*`,
+`*uni2h_gap*`, `*conch15*`) and report gains as differences to that set's own raw and G0 rows; state the
 pooling with every backbone number. For a PLISM `--smoke` run, the slides
 must give scanner, stain and joint pairs, or plismbench's aggregation fails
 (`docs/benchmarks.md`).

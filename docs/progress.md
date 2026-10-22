@@ -68,20 +68,21 @@ Inference is one global map on one H0-mini GAP embedding: no scanner ID, no pair
 | 9 | (analysis, oracle row, not a method) a label-using per-condition translation is no better than V1-S | PLISM condition-mean oracle, x − mean of its slide + mean of the slide means (uses the condition label; `runs/bench/2026-10-20_14-40-47_lxbelshark_8d2c_plism_oracle_condmean_gap`, center global): all pairs 0.326 vs V1-S 7b71 0.321, oracle − V1-S +0.004 [−0.002, +0.011], 50% of pairs; inter-scanner −0.007 [−0.017, +0.009] (oracle better on 21% of pairs), inter-staining +0.013 [+0.006, +0.020], joint +0.004 [−0.002, +0.010]; its edge is the HR stain: inter-scanner HR +0.086 [+0.013, +0.156], all HR pairs +0.036 [+0.028, +0.043]. Without HR: oracle 0.370 vs V1-S 0.371 on all pairs, 0.899 vs 0.913 inter-scanner, 0.386 vs 0.377 inter-staining (PLISM without HR table; no per-pair block vs V1-S without HR). Vs G0: +0.032 [+0.027, +0.037] (per-pair vs G0) | read 2026-10-20; origin does not matter: `--center zero` (`runs/bench/2026-10-20_15-40-09_lxbelshark_6505_plism_oracle_condmean_gap_zero`) all pairs 0.325, − V1-S +0.003 [−0.003, +0.010], without HR 0.369 |
 | 10 | (second backbone, one seed, nothing re-selected) CGM's gain over G0 on PLISM carries over to UNI2-h (CLS) | UNI2-h tables (section 4): raw UNI2-h CLS is far less robust than H0-mini GAP, all pairs 0.043 (`runs/bench/2026-10-21_02-32-59_lxbelshark_2f49_uni2h_cls_ref`; identical to the official plismbench `../plism-benchmark/output/metrics/8139_tiles/uni2h`, 0.317 / 0.073 / 0.015 / 0.043). G0 0.060 (`runs/bench/2026-10-21_05-18-27_lxbelshark_1d58_uni2h_cls_g0`), V1-S 03e2 0.074 (`runs/bench/2026-10-21_02-32-59_lxbelshark_911a_cgm_v1s_uni2h_03e2`). V1-S vs G0, all pairs +0.014 [+0.012, +0.016], better on 91% of pairs; inter-scanner +0.041 [+0.035, +0.048] (99%), inter-staining +0.017 [+0.014, +0.020], joint +0.011 [+0.009, +0.014]; without HR all pairs +0.016 [+0.014, +0.018] (100%). Unlike H0-mini (claim 2) the largest gain is inter-scanner, joint pairs sit near the floor (0.015 raw). Leaderboard metric (medians, UNI2-h leaderboard blocks): raw 0.332, G0 0.415, V1-S 0.479; without HR 0.354 / 0.438 / 0.504. SCORPION (`runs/bench/2026-10-21_02-09-08_lxbelshark_34e8_scorpion_uni2h_cgm_select`): val top-1 raw 0.4278, G0 0.9589, V1-S 0.9742; test 0.3790 / 0.8980 / 0.9320. HEST average: raw 0.380 (`runs/bench/2026-10-21_07-17-58_lxbelshark_f6ee_uni2h_cls_ref`), G0 0.378, V1-S 0.374 (`runs/bench/2026-10-21_07-17-58_lxbelshark_70dc_cgm_v1s_uni2h_03e2`); paired V1-S vs raw −0.006 [−0.016, +0.004], vs G0 −0.004 [−0.012, +0.003]; per task vs raw, gene-bootstrap intervals exclude 0 for SKCM −0.032, READ −0.023, CCRCC −0.021, HCC −0.010 (down) and IDC +0.008 (up); COAD +0.017 [+0.000, +0.034] | read 2026-10-21: PLISM gain transfers (smaller in absolute terms, from a much lower raw level); HEST average not significantly lower, but per-task costs are larger than on H0-mini (SKCM −0.032 vs −0.021) and CCRCC drops, which H0-mini did not show. One seed, H0-mini hyperparameters |
 | 11 | (pooling sensitivity: UNI2-h on patch-token GAP, one seed, nothing re-selected) CGM's gain over G0 does not depend on the CLS pooling | UNI2-h GAP tables (section 4; run dirs in `runs/uni2h_gap_manifest.env`, all at bb132c4, clean): raw GAP is far more robust than raw CLS, all pairs 0.333 vs 0.043, +0.290 [+0.255, +0.324], better on 100% of pairs (`runs/bench/2026-10-21_19-32-12_lxbelshark_819b_uni2h_gap_ref`), and above H0-mini GAP (0.227, claim 4). G0 0.378 (`runs/bench/2026-10-21_22-47-00_lxbelshark_e1bd_uni2h_gap_g0`), V1-S b116 0.392 (`runs/bench/2026-10-21_19-32-12_lxbelshark_c2bc_cgm_v1s_uni2h_gap_b116`). V1-S vs G0, all pairs +0.014 [+0.013, +0.016], better on 99% of pairs; inter-scanner +0.004 [+0.002, +0.006] (84%; G0 already at 0.928), inter-staining +0.012 [+0.010, +0.014], joint +0.015 [+0.014, +0.017] (100%). V1-S on GAP vs V1-S on CLS, all pairs +0.318 [+0.285, +0.350]. Leaderboard metric (medians): raw 0.776, G0 0.799, V1-S 0.810. SCORPION (`runs/bench/2026-10-21_18-41-26_lxbelshark_074f_scorpion_uni2h_gap_cgm_select`), near ceiling: val top-1 raw 0.9685, G0 0.9850, V1-S 0.9867; test 0.9476 / 0.9750 / 0.9771. HEST average: raw 0.387 (`runs/bench/2026-10-22_01-11-20_lxbelshark_71d7_uni2h_gap_ref`), G0 0.387 (`runs/bench/2026-10-22_02-48-24_lxbelshark_fdf6_uni2h_gap_g0`), V1-S 0.381 (`runs/bench/2026-10-22_01-11-21_lxbelshark_699b_cgm_v1s_uni2h_gap_b116`); paired G0 vs raw +0.000 [−0.003, +0.003]; V1-S vs raw −0.006 [−0.013, −0.001] (9/29 folds better), vs G0 −0.007 [−0.011, −0.003]; per task vs raw, gene-bootstrap intervals exclude 0 for SKCM −0.023, COAD −0.017, LYMPH_IDC −0.010, READ −0.008, PAAD −0.006 (down). In-loop training (`runs/2026-10-21_14-24-01_lxbelshark_b116`, 5999/6000): nonlinear_rel 0.012 vs 0.058 on CLS (03e2) | read 2026-10-22: the all-pairs gain over G0 is the same as on CLS (+0.014), with H0-mini's profile (joint largest, inter-scanner near ceiling) rather than CLS's. The pooling, not the map, sets UNI2-h's raw robustness level: every GAP row beats every CLS row. HEST: G0 free, V1-S a small cost whose interval excludes 0 here (on CLS it did not). One seed |
+| 12 | (third backbone, one seed, nothing re-selected) CGM's gain over G0 on PLISM carries over to CONCH v1.5 (official head) | CONCH v1.5 tables (section 4; run dirs in `runs/conch15_manifest.env`; benchmarks at b613327, fit at bb132c4, clean): raw head is weak on PLISM, all pairs 0.047 (`runs/bench/2026-10-22_17-14-14_lxbelshark_735a_conch15_head_ref`; inter-scanner 0.326, joint 0.023), close to UNI2-h CLS (0.043). G0 0.084 (`runs/bench/2026-10-22_19-41-27_lxbelshark_5b5b_conch15_head_g0`), V1-S e78e 0.103 (`runs/bench/2026-10-22_17-14-14_lxbelshark_b87a_cgm_v1s_conch15_e78e`). V1-S vs G0, all pairs +0.019 [+0.017, +0.022], better on 96% of pairs; inter-scanner +0.065 [+0.057, +0.073] (100%), inter-staining +0.014 [+0.012, +0.016], joint +0.016 [+0.014, +0.019]; without HR all pairs +0.022 [+0.020, +0.025] (100%). Leaderboard metric (medians): raw 0.410, G0 0.534, V1-S 0.580. SCORPION (`runs/bench/2026-10-22_16-08-16_lxbelshark_18b1_scorpion_conch15_cgm_select`), far from ceiling: val top-1 raw 0.1702, G0 0.7002, V1-S 0.8077 (+0.1075 over G0); test 0.1435 / 0.6163 / 0.7417. In-loop training (`runs/2026-10-22_10-28-08_lxbelshark_e78e`, 5999/6000): nonlinear_rel 0.120 (UNI2-h CLS 0.058, GAP 0.012). HEST: running (raw, V1-S), G0 not started | read 2026-10-22 (SCORPION + PLISM only): the gain over G0 transfers and is the largest of the three backbones in absolute terms (+0.019 all pairs); like UNI2-h CLS, from a low raw level the gain is mostly inter-scanner. HEST pending, so no utility claim yet. One seed, H0-mini hyperparameters |
 
 Caveats to state in the paper: one SCORPION split (5 val and 5 test WSIs), SCORPION val is
 near ceiling (top-1 differences of a few thousandths); hyperparameters not tuned; V2-S, the
-no-aug fits and the UNI2-h fit have one seed; LOSO on SCORPION is not unseen-scanner generalization in
+no-aug fits, the UNI2-h fits and the CONCH v1.5 fit have one seed; LOSO on SCORPION is not unseen-scanner generalization in
 general.
 
 ## 3. Runs in flight and remaining tasks
 
 In flight (2026-10-22, launched by the user at 10:27, manifest `runs/conch15_manifest.env`,
-logs `runs/conch15_logs/2026-10-22_10-27-46`; cache and G0 written, fit
-`runs/2026-10-22_10-28-08_lxbelshark_e78e` running): a third backbone, CONCH v1.5 on its official head
-(`ENCODER=conch-v1.5 scripts/backbone_run.sh`; loader matched to TRIDENT,
-`docs/findings.md` 16). Same pipeline and hyperparameters as UNI2-h, nothing re-selected.
-The pooling is fixed beforehand (each backbone's official embedding for the paper rows).
+logs `runs/conch15_logs/2026-10-22_10-27-46`): CONCH v1.5 HEST. Raw
+(`runs/bench/2026-10-22_22-13-02_lxbelshark_56da_conch15_head_ref`) and V1-S
+(`runs/bench/2026-10-22_22-13-02_lxbelshark_3560_cgm_v1s_conch15_e78e`) running, G0 HEST not
+started. When done: add `hest_pairs` blocks (vs raw, vs G0) to the CONCH section, as for
+UNI2-h, and complete claim 12.
 
 Open (user decision): UNI2-h CLS, the official embedding, is far below UNI2-h GAP on PLISM
 for every map (claim 11). Whether the paper's UNI2-h rows stay on CLS with GAP as a
@@ -89,6 +90,11 @@ sensitivity row, or the reverse, is not decided here; GAP was run as a check, no
 on PLISM.
 
 Done 2026-10-22:
+- CONCH v1.5 on its official head (`ENCODER=conch-v1.5 scripts/backbone_run.sh`; same
+  pipeline and hyperparameters as UNI2-h, nothing re-selected): cache, G0, identity, fit
+  `runs/2026-10-22_10-28-08_lxbelshark_e78e` (5999/6000), cgm_select and PLISM (raw, G0,
+  V1-S) done, logs without errors. Own blocks at the end of section 4 (the H0-mini blocks
+  already exclude `*conch15*`); SCORPION and PLISM read into claim 12.
 - UNI2-h on patch-token GAP (`POOLING=gap scripts/backbone_run.sh` at bb132c4, clean;
   every run dir in `runs/uni2h_gap_manifest.env`; cache reused from the CLS run): fit
   `runs/2026-10-21_14-24-01_lxbelshark_b116` reached 5999/6000; logs in
@@ -1582,6 +1588,145 @@ UNI2-h GAP V1-S training (SCORPION val, in-loop):
 | run dir | W&B | module | commit | step | retrieval_top1_cgm | retrieval_top1_backbone | probe_cgm_acc | probe_backbone_acc | nll | kl | nonlinear_rel |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | `runs/2026-10-21_14-24-01_lxbelshark_b116` | qs41clu5 | ConsensusGenModule | bb132c4 | 5999/6000 | 0.987 | 0.968 | 0.308 | 0.840 | -0.096 | 0.614 | 0.012 |
+
+Mean of the last 10 validations of `val/<col>`, read from the local `.wandb` file; step = last logged `trainer/global_step` / `max_steps`.
+
+<!-- /results:training -->
+
+### Third backbone: CONCH v1.5 (official attentional-pooler head), raw / G0 / V1-S
+
+Same pipeline, `ENCODER=conch-v1.5 scripts/backbone_run.sh`, run dirs in
+`runs/conch15_manifest.env`; loader matched to TRIDENT (`docs/findings.md` 16), so the
+plismbench leaderboard row of CONCH v1.5 is not directly comparable. Embedding = pooling
+`head` (768-d), fixed beforehand. V1-S with the H0-mini hyperparameters, one seed, nothing
+re-selected.
+
+SCORPION proxy (cgm_select, val selection + test):
+
+<!-- results:cgm include=*conch15_cgm_select* exclude=*smoke* -->
+<!-- generated by `uv run python -m sipe.eval.results_tables --write`; do not edit -->
+
+| model | arm | seed | config | val top-1 | val Δtop-1 vs G0 | val region probe | test top-1 | test top-5 | test scanner probe logreg / MLP | test region probe | note | bench run dir | SIPE commit |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| raw | – | – | – | 0.1702 | – | 0.763 | 0.1435 | 0.2627 | 0.938 / 0.895 | 0.773 | – | `runs/bench/2026-10-22_16-08-16_lxbelshark_18b1_scorpion_conch15_cgm_select` | b613327 |
+| G0 | – | – | – | 0.7002 | +0.0000 | 0.855 | 0.6163 | 0.8131 | 0.532 / 0.423 | 0.883 | – | `runs/bench/2026-10-22_16-08-16_lxbelshark_18b1_scorpion_conch15_cgm_select` | b613327 |
+| V1-S_e78e | V1-S | 42 | c0 | 0.8077 | +0.1075 | 0.834 | 0.7417 | 0.8986 | 0.355 / 0.279 | 0.869 | selected | `runs/bench/2026-10-22_16-08-16_lxbelshark_18b1_scorpion_conch15_cgm_select` | b613327 |
+
+CGM fits (`map_cgm.pt`) on the shared SCORPION-proxy protocol (`sipe.eval.cgm_select`), clean features. Val: probes trained on train (`summary_val.csv`); selection = the simplest configuration (arm, then larger ρ) whose mean val top-1 gain over G0 (fitted in the run, α = 1) reaches 95% of the best gain (`selected.json`, `candidates.csv`). Test: read once after the selection, probes trained on val (`summary_test.csv`). Config = fits that differ only by seed share an id.
+
+<!-- /results:cgm -->
+
+PLISM, top-1 accuracy:
+
+<!-- results:plism include=*conch15* exclude=*smoke* -->
+<!-- generated by `uv run python -m sipe.eval.results_tables --write`; do not edit -->
+
+| tag | repr | inter-scanner | inter-staining | scanner + staining | all | bench run dir | train W&B | SIPE commit |
+|---|---|---|---|---|---|---|---|---|
+| conch15_head_ref | posthoc_head[conch-v1.5] | 0.326 | 0.052 | 0.023 | 0.047 | `runs/bench/2026-10-22_17-14-14_lxbelshark_735a_conch15_head_ref` | – | b613327 |
+| cgm_v1s_conch15_e78e | posthoc_head[conch-v1.5] | 0.576 | 0.094 | 0.065 | 0.103 | `runs/bench/2026-10-22_17-14-14_lxbelshark_b87a_cgm_v1s_conch15_e78e` | – | b613327 |
+| conch15_head_g0 | posthoc_head[conch-v1.5] | 0.511 | 0.080 | 0.049 | 0.084 | `runs/bench/2026-10-22_19-41-27_lxbelshark_5b5b_conch15_head_g0` | – | b613327 |
+
+Top-1 accuracy, mean over slide pairs (PLISM `results.csv`).
+
+<!-- /results:plism -->
+
+PLISM without the HR stain:
+
+<!-- results:plism include=*conch15* exclude=*smoke* drop_stain=HR -->
+<!-- generated by `uv run python -m sipe.eval.results_tables --write`; do not edit -->
+
+| tag | repr | inter-scanner | inter-staining | scanner + staining | all | bench run dir | train W&B | SIPE commit |
+|---|---|---|---|---|---|---|---|---|
+| conch15_head_ref | posthoc_head[conch-v1.5] | 0.337 | 0.062 | 0.027 | 0.054 | `runs/bench/2026-10-22_17-14-14_lxbelshark_735a_conch15_head_ref` | – | b613327 |
+| cgm_v1s_conch15_e78e | posthoc_head[conch-v1.5] | 0.597 | 0.111 | 0.077 | 0.119 | `runs/bench/2026-10-22_17-14-14_lxbelshark_b87a_cgm_v1s_conch15_e78e` | – | b613327 |
+| conch15_head_g0 | posthoc_head[conch-v1.5] | 0.530 | 0.094 | 0.057 | 0.096 | `runs/bench/2026-10-22_19-41-27_lxbelshark_5b5b_conch15_head_g0` | – | b613327 |
+
+Top-1 accuracy, mean over slide pairs without the stain(s) HR on either side (recomputed from PLISM `metrics.csv` with the `results.csv` row masks).
+
+<!-- /results:plism -->
+
+PLISM, plismbench leaderboard metrics (medians):
+
+<!-- results:plism_leaderboard include=*conch15* exclude=*smoke* -->
+<!-- generated by `uv run python -m sipe.eval.results_tables --write`; do not edit -->
+
+| tag | repr | cosine (all) | top-10 inter-scanner | top-10 inter-staining | top-10 scanner + staining | leaderboard metric | bench run dir | train W&B | SIPE commit |
+|---|---|---|---|---|---|---|---|---|---|
+| conch15_head_ref | posthoc_head[conch-v1.5] | 0.845 | 0.534 | 0.174 | 0.086 | 0.410 | `runs/bench/2026-10-22_17-14-14_lxbelshark_735a_conch15_head_ref` | – | b613327 |
+| cgm_v1s_conch15_e78e | posthoc_head[conch-v1.5] | 0.959 | 0.842 | 0.292 | 0.225 | 0.580 | `runs/bench/2026-10-22_17-14-14_lxbelshark_b87a_cgm_v1s_conch15_e78e` | – | b613327 |
+| conch15_head_g0 | posthoc_head[conch-v1.5] | 0.922 | 0.784 | 0.252 | 0.177 | 0.534 | `runs/bench/2026-10-22_19-41-27_lxbelshark_5b5b_conch15_head_g0` | – | b613327 |
+
+plismbench leaderboard metrics: medians over slide pairs (PLISM `results.csv`); leaderboard metric = mean of the four columns (plismbench `get_leaderboard_results`).
+
+<!-- /results:plism_leaderboard -->
+
+PLISM per slide pair vs CONCH v1.5 G0:
+
+<!-- results:plism_pairs exclude=*smoke* ref=conch15_head_g0 tags=conch15_head_ref,cgm_v1s_conch15_e78e -->
+<!-- generated by `uv run python -m sipe.eval.results_tables --write`; do not edit -->
+
+| method | pairs | n | top-1 | ref top-1 | Δ top-1 | 95% CI | pairs better | bench run dir |
+|---|---|---|---|---|---|---|---|---|
+| conch15_head_ref | inter-scanner | 273 | 0.326 | 0.511 | -0.185 | [-0.206, -0.163] | 0% | `runs/bench/2026-10-22_17-14-14_lxbelshark_735a_conch15_head_ref` |
+| conch15_head_ref | inter-staining | 546 | 0.052 | 0.080 | -0.027 | [-0.032, -0.023] | 1% | `runs/bench/2026-10-22_17-14-14_lxbelshark_735a_conch15_head_ref` |
+| conch15_head_ref | scanner + staining | 3276 | 0.023 | 0.049 | -0.026 | [-0.030, -0.021] | 1% | `runs/bench/2026-10-22_17-14-14_lxbelshark_735a_conch15_head_ref` |
+| conch15_head_ref | all | 4095 | 0.047 | 0.084 | -0.037 | [-0.042, -0.032] | 1% | `runs/bench/2026-10-22_17-14-14_lxbelshark_735a_conch15_head_ref` |
+| conch15_head_ref | inter-scanner, HR | 21 | 0.187 | 0.277 | -0.089 | [-0.129, -0.055] | 0% | `runs/bench/2026-10-22_17-14-14_lxbelshark_735a_conch15_head_ref` |
+| conch15_head_ref | all, HR | 609 | 0.007 | 0.010 | -0.003 | [-0.006, -0.001] | 6% | `runs/bench/2026-10-22_17-14-14_lxbelshark_735a_conch15_head_ref` |
+| cgm_v1s_conch15_e78e | inter-scanner | 273 | 0.576 | 0.511 | +0.065 | [+0.057, +0.073] | 100% | `runs/bench/2026-10-22_17-14-14_lxbelshark_b87a_cgm_v1s_conch15_e78e` |
+| cgm_v1s_conch15_e78e | inter-staining | 546 | 0.094 | 0.080 | +0.014 | [+0.012, +0.016] | 96% | `runs/bench/2026-10-22_17-14-14_lxbelshark_b87a_cgm_v1s_conch15_e78e` |
+| cgm_v1s_conch15_e78e | scanner + staining | 3276 | 0.065 | 0.049 | +0.016 | [+0.014, +0.019] | 95% | `runs/bench/2026-10-22_17-14-14_lxbelshark_b87a_cgm_v1s_conch15_e78e` |
+| cgm_v1s_conch15_e78e | all | 4095 | 0.103 | 0.084 | +0.019 | [+0.017, +0.022] | 96% | `runs/bench/2026-10-22_17-14-14_lxbelshark_b87a_cgm_v1s_conch15_e78e` |
+| cgm_v1s_conch15_e78e | inter-scanner, HR | 21 | 0.324 | 0.277 | +0.047 | [+0.023, +0.073] | 100% | `runs/bench/2026-10-22_17-14-14_lxbelshark_b87a_cgm_v1s_conch15_e78e` |
+| cgm_v1s_conch15_e78e | all, HR | 609 | 0.012 | 0.010 | +0.002 | [+0.000, +0.003] | 71% | `runs/bench/2026-10-22_17-14-14_lxbelshark_b87a_cgm_v1s_conch15_e78e` |
+
+Reference: `conch15_head_g0` (`runs/bench/2026-10-22_19-41-27_lxbelshark_5b5b_conch15_head_g0`). Per slide pair top-1 (plismbench `metrics.csv`, mean of both directions); Δ = method minus reference, mean over the pairs of the group; 95% CI = percentile interval of a slide-level bootstrap (2000 draws, seed 0; pairs share slides, so slides are resampled and a pair counts once per drawn copy of each of its slides); pairs better = share of pairs with Δ > 0. HR = either slide has the HR stain. One fit per method, so the interval covers the slide sample only, not seeds.
+
+<!-- /results:plism_pairs -->
+
+PLISM per slide pair vs CONCH v1.5 G0, without the HR stain:
+
+<!-- results:plism_pairs exclude=*smoke* drop_stain=HR ref=conch15_head_g0 tags=conch15_head_ref,cgm_v1s_conch15_e78e -->
+<!-- generated by `uv run python -m sipe.eval.results_tables --write`; do not edit -->
+
+| method | pairs | n | top-1 | ref top-1 | Δ top-1 | 95% CI | pairs better | bench run dir |
+|---|---|---|---|---|---|---|---|---|
+| conch15_head_ref | inter-scanner | 252 | 0.337 | 0.530 | -0.193 | [-0.211, -0.172] | 0% | `runs/bench/2026-10-22_17-14-14_lxbelshark_735a_conch15_head_ref` |
+| conch15_head_ref | inter-staining | 462 | 0.062 | 0.094 | -0.032 | [-0.036, -0.029] | 0% | `runs/bench/2026-10-22_17-14-14_lxbelshark_735a_conch15_head_ref` |
+| conch15_head_ref | scanner + staining | 2772 | 0.027 | 0.057 | -0.030 | [-0.035, -0.027] | 0% | `runs/bench/2026-10-22_17-14-14_lxbelshark_735a_conch15_head_ref` |
+| conch15_head_ref | all | 3486 | 0.054 | 0.096 | -0.042 | [-0.047, -0.039] | 0% | `runs/bench/2026-10-22_17-14-14_lxbelshark_735a_conch15_head_ref` |
+| cgm_v1s_conch15_e78e | inter-scanner | 252 | 0.597 | 0.530 | +0.066 | [+0.058, +0.074] | 100% | `runs/bench/2026-10-22_17-14-14_lxbelshark_b87a_cgm_v1s_conch15_e78e` |
+| cgm_v1s_conch15_e78e | inter-staining | 462 | 0.111 | 0.094 | +0.017 | [+0.015, +0.019] | 100% | `runs/bench/2026-10-22_17-14-14_lxbelshark_b87a_cgm_v1s_conch15_e78e` |
+| cgm_v1s_conch15_e78e | scanner + staining | 2772 | 0.077 | 0.057 | +0.019 | [+0.017, +0.022] | 100% | `runs/bench/2026-10-22_17-14-14_lxbelshark_b87a_cgm_v1s_conch15_e78e` |
+| cgm_v1s_conch15_e78e | all | 3486 | 0.119 | 0.096 | +0.022 | [+0.020, +0.025] | 100% | `runs/bench/2026-10-22_17-14-14_lxbelshark_b87a_cgm_v1s_conch15_e78e` |
+
+Reference: `conch15_head_g0` (`runs/bench/2026-10-22_19-41-27_lxbelshark_5b5b_conch15_head_g0`). Per slide pair top-1 (plismbench `metrics.csv`, mean of both directions); Δ = method minus reference, mean over the pairs of the group; 95% CI = percentile interval of a slide-level bootstrap (2000 draws, seed 0; pairs share slides, so slides are resampled and a pair counts once per drawn copy of each of its slides); pairs better = share of pairs with Δ > 0. HR = either slide has the HR stain. One fit per method, so the interval covers the slide sample only, not seeds. Pairs with the stain(s) HR on either side are dropped before grouping and bootstrapping.
+
+<!-- /results:plism_pairs -->
+
+HEST (in progress 2026-10-22: raw and V1-S running, G0 not started):
+
+<!-- results:hest include=*conch15* exclude=*smoke* -->
+<!-- generated by `uv run python -m sipe.eval.results_tables --write`; do not edit -->
+
+| tag | repr | CCRCC | COAD | HCC | IDC | LUNG | LYMPH_IDC | PAAD | PRAD | READ | SKCM | average | bench run dir | train W&B | SIPE commit |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| cgm_v1s_conch15_e78e | posthoc_head[conch-v1.5] | no results | – | – | – | – | – | – | – | – | – | – | `runs/bench/2026-10-22_22-13-02_lxbelshark_3560_cgm_v1s_conch15_e78e` | – | b613327 |
+| conch15_head_ref | posthoc_head[conch-v1.5] | no results | – | – | – | – | – | – | – | – | – | – | `runs/bench/2026-10-22_22-13-02_lxbelshark_56da_conch15_head_ref` | – | b613327 |
+
+Pearson mean (std over folds), HEST `dataset_results.json`; average only when all tasks ran.
+
+<!-- /results:hest -->
+
+CONCH v1.5 V1-S training (SCORPION val, in-loop):
+
+<!-- results:training module=ConsensusGenModule include=*_e78e cols=retrieval_top1_cgm,retrieval_top1_backbone,probe_cgm_acc,probe_backbone_acc,nll,kl,nonlinear_rel -->
+<!-- generated by `uv run python -m sipe.eval.results_tables --write`; do not edit -->
+
+| run dir | W&B | module | commit | step | retrieval_top1_cgm | retrieval_top1_backbone | probe_cgm_acc | probe_backbone_acc | nll | kl | nonlinear_rel |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| `runs/2026-10-22_10-28-08_lxbelshark_e78e` | d191irr6 | ConsensusGenModule | bb132c4 | 5999/6000 | 0.808 | 0.170 | 0.283 | 0.926 | -1.197 | 0.242 | 0.120 |
 
 Mean of the last 10 validations of `val/<col>`, read from the local `.wandb` file; step = last logged `trainer/global_step` / `max_steps`.
 
