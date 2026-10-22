@@ -45,6 +45,8 @@ Options on the opening marker (space-separated key=value):
   extra=<dir>[,<dir>]       plism / plism_leaderboard: metrics dirs outside runs/ with
                             results.csv
   module=<Class>[,<Class>]  training only: keep runs of these SIPEModule classes
+  encoder=<name>[,<name>]   training only: keep fits of these backbones (the network's
+                            `encoder` in config.yaml; h0-mini when absent)
   cols=<key>[,<key>]        training only: val/ metrics to show (last-10-val mean)
   min_steps=<n>             training only: skip runs that stopped before step n
   ref=<tag>                 plism_pairs only: reference PLISM run (by tag)
@@ -1312,9 +1314,23 @@ def last_val_mean(
     return sum(values[-n:]) / len(values[-n:]) if values else None
 
 
+def fit_encoder(config: dict[str, Any]) -> str:
+    """Backbone of a fit: the network's `encoder` init arg, h0-mini when absent.
+
+    Fit dirs carry no tag, so the encoder in config.yaml is what separates backbones.
+    Configs before 2026-10-10 have a flat model: section; fits without the arg predate
+    the other backbones (H0-mini, as for BenchRun.representation).
+    """
+    model = config.get("model") or {}
+    model = model.get("init_args", model)
+    network = (model.get("network") or {}).get("init_args") or {}
+    return str(network.get("encoder") or model.get("encoder") or "h0-mini")
+
+
 def training_table(root: Path, opts: dict[str, list[str]]) -> str:
     cols = opts.get("cols") or list(TRAIN_COLS)
     modules = opts.get("module", [])
+    encoders = opts.get("encoder", [])
     min_steps = int(opts.get("min_steps", ["0"])[0])
     exclude, include = _filters(opts)
     header = ["run dir", "W&B", "module", "commit", "step", *cols]
@@ -1328,6 +1344,8 @@ def training_table(root: Path, opts: dict[str, list[str]]) -> str:
         network = (model.get("network") or {}).get("class_path", "?")
         module = str(model.get("class_path") or f"flat:{network}").rsplit(".", 1)[-1]
         if modules and module not in modules:
+            continue
+        if encoders and fit_encoder(config) not in encoders:
             continue
         history = wandb_history(run_dir)
         steps = [

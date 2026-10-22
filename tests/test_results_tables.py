@@ -128,6 +128,36 @@ def test_last_val_mean_uses_last_n():
     assert rt.last_val_mean(history, "val/missing") is None
 
 
+def fit_dir(root: Path, name: str, model: dict) -> Path:
+    run = root / name
+    (run / "wandb").mkdir(parents=True)
+    (run / "config.yaml").write_text(yaml.safe_dump({"model": model}))
+    return run
+
+
+def test_training_table_filters_by_encoder(tmp_path, monkeypatch):
+    def net(**init_args):
+        return {"class_path": "x.Net", "init_args": init_args}
+
+    module = "sipe.model.consensus_gen.ConsensusGenModule"
+    fit_dir(tmp_path, "r_h0", {"class_path": module,
+            "init_args": {"network": net(encoder="h0-mini")}})
+    fit_dir(tmp_path, "r_uni", {"class_path": module,
+            "init_args": {"network": net(encoder="uni2-h")}})
+    fit_dir(tmp_path, "r_flat", {"network": net(encoder="conch-v1.5")})
+    fit_dir(tmp_path, "r_old", {"network": net(backbone_name="hf-hub:x/H0-mini")})
+    history = [{"trainer/global_step": 5, "val/a": 0.5}]
+    monkeypatch.setattr(rt, "wandb_history", lambda run_dir: history)
+
+    def runs(encoders):
+        table = rt.training_table(tmp_path, {"cols": ["a"], "encoder": encoders})
+        return {n for n in ("r_h0", "r_uni", "r_flat", "r_old") if f"{n}`" in table}
+
+    assert runs(["h0-mini"]) == {"r_h0", "r_old"}
+    assert runs(["uni2-h", "conch-v1.5"]) == {"r_uni", "r_flat"}
+    assert runs([]) == {"r_h0", "r_uni", "r_flat", "r_old"}
+
+
 def test_content_table_reads_summary(tmp_path):
     run = bench_dir(tmp_path, "s_content", "scorpion_content_dependence")
     row = {
