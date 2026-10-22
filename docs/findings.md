@@ -64,15 +64,22 @@ the same way vs GAP: READ −0.034 / −0.031 / −0.035, COAD +0.014 / +0.025 /
 `runs/bench/2026-10-15_07-47-25_lxbelshark_8823_cgm_v1s_7b71`). Read HEST as average
 preserved plus a task trade-off of the pairing unit; don't attribute it to a model class.
 
-**15. Backbones differ far more in PLISM robustness than maps do; compare within a
+**15. Backbones and poolings differ far more in PLISM robustness than maps do; compare within a
 backbone.** Raw UNI2-h CLS is at 0.043 on all PLISM pairs vs 0.227 for H0-mini GAP, and our
 `--posthoc` identity row reproduces the official plismbench UNI2-h output exactly
 (0.317 / 0.073 / 0.015 / 0.043; `runs/bench/2026-10-21_02-32-59_lxbelshark_2f49_uni2h_cls_ref`
-vs `../plism-benchmark/output/metrics/8139_tiles/uni2h`), so the gap is the backbone, not the
-pipeline. With joint-shift pairs at the floor (0.015), CGM's gain over G0 on UNI2-h is mostly
-inter-scanner (+0.041 vs +0.011 joint), the reverse of H0-mini (`docs/progress.md`, claim
-10). Keep one block set per backbone (`include=` / `exclude=*uni2h*`) and report gains as
-differences to that backbone's own raw and G0 rows. For a PLISM `--smoke` run, the slides
+vs `../plism-benchmark/output/metrics/8139_tiles/uni2h`), so the gap is not our pipeline.
+It is mostly the **pooling**, not the backbone (2026-10-22): UNI2-h on patch-token GAP is at
+0.333 on all pairs, above H0-mini GAP, +0.290 [+0.255, +0.324] over UNI2-h CLS on 100% of
+pairs (`runs/bench/2026-10-21_19-32-12_lxbelshark_819b_uni2h_gap_ref`; H0-mini showed the
+same, GAP much better than CLS). With joint-shift pairs at the floor (0.015 on CLS), CGM's
+gain over G0 on UNI2-h CLS is mostly inter-scanner (+0.041 vs +0.011 joint), the reverse of
+H0-mini; on UNI2-h GAP it has H0-mini's profile (joint +0.015, inter-scanner +0.004 near
+ceiling) and the same all-pairs size as on CLS, +0.014 (`docs/progress.md`, claims 10, 11).
+So the gain's profile over shift types follows where the raw embedding sits, not the
+backbone. Keep one block set per backbone and pooling (`include=` / `exclude=*uni2h*`,
+`*uni2h_gap*`) and report gains as differences to that set's own raw and G0 rows; state the
+pooling with every backbone number. For a PLISM `--smoke` run, the slides
 must give scanner, stain and joint pairs, or plismbench's aggregation fails
 (`docs/benchmarks.md`).
 
