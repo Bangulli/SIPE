@@ -80,7 +80,7 @@ general.
 In flight: nothing.
 
 To launch (user, 2026-10-23): scanner-count sensitivity on H0-mini (not a paper claim
-yet; plan and status in `docs/experiment-log.md`, section 1), `ARMS=V1-S PLISM_MODELS="g0 v1s eraser" scripts/scanner_count_run.sh` (V1-S only first).
+yet; plan and status in `docs/experiment-log.md`, section 1), `ARMS=V1-S PLISM_MODELS="g0 v1s" scripts/scanner_count_run.sh` (V1-S only first; eraser and CGM-init on PLISM later if needed).
 
 On hold (user, 2026-10-23, not launched): CONCH v1.5 on patch-token GAP
 (`ENCODER=conch-v1.5 POOLING=gap scripts/backbone_run.sh`; would write
