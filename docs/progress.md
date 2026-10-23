@@ -77,11 +77,14 @@ general.
 
 ## 3. Runs in flight and remaining tasks
 
-In flight (2026-10-23, launched by the user): CONCH v1.5 on patch-token GAP, pooling
-sensitivity as for UNI2-h (`ENCODER=conch-v1.5 POOLING=gap scripts/backbone_run.sh`; manifest
-`runs/conch15_gap_manifest.env`, tags `conch15_gap_*`; reuses the head run's cache, which holds
-`gap`). The CONCH head blocks already exclude `*conch15_gap*`; when done, add a CONCH GAP block
-set as for UNI2-h GAP.
+In flight: nothing.
+
+On hold (user, 2026-10-23, not launched): CONCH v1.5 on patch-token GAP
+(`ENCODER=conch-v1.5 POOLING=gap scripts/backbone_run.sh`; would write
+`runs/conch15_gap_manifest.env`, tags `conch15_gap_*`, already excluded from the CONCH head
+blocks). Reason: CONCH was run because the plismbench leaderboard ranks it well, but that row is
+CONCH v1 (`../plism-benchmark/README.md`, leaderboard metric 0.498), not v1.5 with TRIDENT's
+loader; our v1.5 head row is at 0.410 (CONCH leaderboard block, `docs/findings.md` 16).
 
 Open (user decision): UNI2-h CLS, the official embedding, is far below UNI2-h GAP on PLISM
 for every map (claim 11). Whether the paper's UNI2-h rows stay on CLS with GAP as a
