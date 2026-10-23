@@ -29,6 +29,9 @@ Sources, all under runs/ (gitignored, so every row names the dir it came from):
     selected.json (sipe.eval.cgm_select)
   - leave-one-scanner-out (Experiment 7): runs/bench/*/summary_{val,test}.csv +
     contrasts_{val,test}.csv (sipe.eval.loso)
+  - scanner-count study: runs/bench/*/summary_{val,test}.csv + contrasts_*.csv
+    (sipe.eval.scanner_count); PLISM runs tagged sc_<model>_<subset>
+    (block scanner_count_plism)
   - training: runs/<run>/wandb/*run-*/*.wandb (local W&B history; no API key needed)
 
 The docs (`DOCS`: progress.md for the ISBI paper, experiment-log.md for the rest) hold
@@ -55,6 +58,8 @@ Options on the opening marker (space-separated key=value):
                             pairs with one of these stains on either side (e.g. HR),
                             then aggregate as usual
   split=<val|test>          loso only: show only that split (default: both)
+  full=<model>:<tag>[,...]  scanner_count_plism: existing all-scanner PLISM runs
+                            (e.g. full=G0:mixture_G0_K1,V1-S:cgm_v1s_7b71)
   ref=<tag> tags=<tag>,...  hest_pairs: HEST runs paired per (task, fold, gene) with ref
 
   uv run python -m sipe.eval.results_tables          # print every table
@@ -1249,6 +1254,146 @@ def loso_table(root: Path, opts: dict[str, list[str]]) -> str:
     )
 
 
+# --- scanner-count study ---------------------------------------------------------
+
+
+def _sc_cell(c: pd.DataFrame, est: str, n: int, pairs: str, ci: bool) -> str:
+    r = c.loc[(c["estimator"] == est) & (c["n"] == n) & (c["pairs"] == pairs)
+              & ((c["name"] == "mean") | (c["subset"] == "full"))]  # fmt: skip
+    if r.empty:
+        return "–"
+    r = r.iloc[0]
+    text = f"{r['diff']:+.4f}"
+    return text + (f" [{r['ci_low']:+.4f}, {r['ci_high']:+.4f}]" if ci else "")
+
+
+def scanner_count_table(root: Path, opts: dict[str, list[str]]) -> str:
+    header = [
+        "split", "model", "n scanners", "subsets", "top-1 all (min–max)",
+        "Δ vs G0, all [95% CI]", "Δ vs G0, seen", "Δ vs G0, unseen", "bench run dir",
+        "SIPE commit",
+    ]  # fmt: skip
+    rows = []
+    for run in _bench_runs(root, "scorpion_scanner_count", *_filters(opts)):
+        source = [f"`{_rel(run.dir)}`", run.source_cells()[2]]
+        split = str(run.config.get("split", "val"))
+        if not (run.dir / f"contrasts_{split}.csv").exists():
+            rows.append([split, "no results", *["–"] * (len(header) - 4), *source])
+            continue
+        summary = pd.read_csv(run.dir / f"summary_{split}.csv")
+        c = pd.read_csv(run.dir / f"contrasts_{split}.csv")
+        c = c.loc[c["metric"] == "top_1_accuracy"]
+        top = summary.loc[summary["pairs"] == "all"]
+        for (est, n), g in top.groupby(["estimator", "n"], sort=False):
+            vals = g["top_1_accuracy"]
+            spread = f" ({vals.min():.4f}–{vals.max():.4f})" if len(g) > 1 else ""
+            rows.append([
+                split, est, str(n), "full" if (g["subset"] == "full").all()
+                else str(len(g)), f"{vals.mean():.4f}{spread}",
+                _sc_cell(c, est, n, "all", True), _sc_cell(c, est, n, "seen", False),
+                _sc_cell(c, est, n, "unseen", False), *source,
+            ])  # fmt: skip
+    return (
+        _table(header, rows)
+        + "\n\nScanner-count study on SCORPION (`sipe.eval.scanner_count`): each map"
+        " is fitted on the train rows of n scanners of the universe (every subset for"
+        " the closed-form maps G0, CGM-init, eraser λ = 0.5; the fits given for"
+        " V0-S / V1-S); full = all train scanners. Scored on the split's pairs of"
+        " universe scanners: all = every such pair (the same for every subset), seen ="
+        " both scanners in the subset, unseen = the others. top-1 = mean over the"
+        " subsets of size n (min–max over subsets); Δ vs G0 = map minus G0 fitted on"
+        " the same subset, averaged over the subsets, slide-bootstrap interval with the"
+        " same draws for every subset (`contrasts_<split>.csv`). An analysis of fixed"
+        " configurations: nothing is selected."
+    )
+
+
+def _sc_tag(tag: str) -> tuple[str, str] | None:
+    """sc_<estimator>_<subset> -> (estimator, subset); None for other tags."""
+    if not tag.startswith("sc_"):
+        return None
+    est, _, subset = tag[3:].rpartition("_")
+    names = {"g0": "G0", "cgminit": "CGM-init", "eraser": "eraser"}
+    if est in names:
+        return names[est], subset
+    arm = est.split("_")[0]  # v1s_<id> -> V1-S
+    return arm[:2].upper() + ("-S" if arm.endswith("s") else ""), subset
+
+
+def scanner_count_plism_table(root: Path, opts: dict[str, list[str]]) -> str:
+    from sipe.eval.plism_pairs import (
+        bootstrap_mean_ci,
+        merge_runs,
+        slide_bootstrap_weights,
+    )
+
+    exclude, include = _filters(opts)
+    found = []  # (estimator, subset, tag, run, metrics.csv)
+    for run in _bench_runs(root, "plism", exclude, include):
+        tag = str(run.config.get("tag"))
+        parsed = _sc_tag(tag)
+        paths = sorted(run.dir.glob(f"metrics/*_tiles/{tag}/metrics.csv"))
+        if parsed and paths:
+            found.append((*parsed, tag, run, paths[-1]))
+    for item in opts.get("full", []):  # full=<estimator>:<tag>
+        est, _, tag = item.partition(":")
+        run, path = _plism_run_by_tag(root, tag, exclude)
+        found.append((est, "full", tag, run, path))
+    if not found:
+        return "(no PLISM runs with sc_* tags yet)"
+    latest = {(e, s): (t, r, p) for e, s, t, r, p in found}  # newest run per key
+    pairs = merge_runs([(t, pd.read_csv(p)) for t, _, p in latest.values()])
+    weights = slide_bootstrap_weights(pairs, PAIR_BOOTSTRAPS)
+    groups = (("all", None), ("inter-scanner", "inter-scanner"),
+              ("inter-staining", "inter-staining"), ("joint", "joint"))  # fmt: skip
+    header = ["model", "n scanners", "subsets",
+              *[f"top-1 {g}" for g, _ in groups], "Δ vs G0, all [95% CI]",
+              "Δ vs G0, inter-scanner [95% CI]", "pairs better (all)"]  # fmt: skip
+    keys = pd.DataFrame([(e, s, t) for (e, s), (t, _, _) in latest.items()],
+                        columns=["est", "subset", "tag"])  # fmt: skip
+    keys["n"] = [5 if s == "full" else len(s.split("-")) for s in keys["subset"]]
+    order = ["G0", "eraser", "CGM-init", "V0-S", "V1-S"]
+    keys["rank"] = [order.index(e) if e in order else len(order) for e in keys["est"]]
+    rows = []
+    keys = keys.sort_values(["rank", "n"])
+    for (est, n), g in keys.groupby(["est", "n"], sort=False):
+        top1 = pairs[[f"{t}__top_1" for t in g["tag"]]].mean(axis=1)
+        cells = []
+        for _, shift in groups:
+            mask = pairs["shift"] == shift if shift else pairs["shift"].notna()
+            cells.append(_fmt(float(top1[mask].mean())))
+        g0 = keys.loc[(keys["est"] == "G0")].set_index("subset")["tag"]
+        deltas = [pairs[f"{t}__top_1"] - pairs[f"{g0[s]}__top_1"]
+                  for s, t in zip(g["subset"], g["tag"]) if s in g0.index]  # fmt: skip
+        if est == "G0" or len(deltas) != len(g):
+            d_cells = ["–", "–", "–"]
+        else:
+            delta = pd.concat(deltas, axis=1).mean(axis=1).to_numpy()
+            d_cells = []
+            for shift in (None, "inter-scanner"):
+                mask = (pairs["shift"] == shift if shift else pairs["shift"].notna()
+                        ).to_numpy()  # fmt: skip
+                lo, hi = bootstrap_mean_ci(delta[mask], weights[:, mask])
+                d_cells.append(f"{delta[mask].mean():+.3f} [{lo:+.3f}, {hi:+.3f}]")
+            d_cells.append(f"{(delta > 0).mean():.0%}")
+        subsets = "full" if n == 5 else str(len(g))
+        rows.append([est, str(n), subsets, *cells, *d_cells])
+    runs = sorted({_rel(r.dir) for t, r, _ in latest.values()})
+    return (
+        _table(header, rows)
+        + "\n\nScanner-count study on PLISM: maps fitted on n SCORPION scanners"
+        " (`sipe.eval.scanner_count`, PLISM through `sipe.bench.plism_apply`; tags"
+        " `sc_<model>_<subset>`; full = the existing all-scanner runs given by"
+        " `full=`). top-1 = mean over slide pairs of the mean over the subsets of size"
+        " n; Δ vs G0 = per pair, map minus G0 of the same subset, averaged over the"
+        " subsets, then over pairs; 95% CI = slide-level bootstrap"
+        f" ({PAIR_BOOTSTRAPS} draws, seed 0) as in the per-pair blocks; pairs better ="
+        " share of pairs with Δ > 0. One fit per subset. Runs: "
+        + ", ".join(f"`{r}`" for r in runs)
+        + "."
+    )
+
+
 # --- training runs (local W&B history) -----------------------------------------
 
 
@@ -1386,6 +1531,8 @@ TABLES = {
     "augattr": aug_attribution_table,
     "cgm": cgm_select_table,
     "loso": loso_table,
+    "scanner_count": scanner_count_table,
+    "scanner_count_plism": scanner_count_plism_table,
     "training": training_table,
 }
 

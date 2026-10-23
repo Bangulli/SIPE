@@ -198,6 +198,8 @@ def main(argv: list[str] | None = None) -> Path:
         if not (run / MAP_FILENAME).exists():
             raise FileNotFoundError(f"{run / MAP_FILENAME} (not a CGM fit dir?)")
         info = fit_info(run)
+        if info["scanners"] is not None:
+            raise ValueError(f"{run} keeps a scanner subset (sipe.eval.scanner_count).")
         held = info["hold_out_scanner"] or FULL
         fits.append({"name": f"{info['arm']}_{run.name.rsplit('_', 1)[-1]}",
                      "estimator": info["arm"], "held_out": held,

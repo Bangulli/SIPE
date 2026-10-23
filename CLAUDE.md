@@ -215,6 +215,19 @@ W&B), and each row must name the run dir it came from.
   full-data references. Readout: pairs of the split with j (`unseen`), map^-j - G0^-j and
   map^-j - map^full, with slide-bootstrap intervals. `cgm_select` refuses LOSO fits.
   Pairing unit: tile-level pairs over the kept scanners. Table block `loso`.
+- Scanner-count sensitivity (no selection): `uv run python -m sipe.eval.scanner_count --tag <tag>
+  --features-from <feature cache> --universe <scanners> [--sizes 2 3] [--split val|test]
+  --runs <CGM fit dirs>`. Fits G0 / CGM-init / eraser (λ=0.5) on every subset of the
+  universe in the run; trained fits are `sipe fit` with `--data.init_args.scanners=[a,b]
+  --data.init_args.views=<n> --data.init_args.batch_size=<512/n>` (keep-list on train only,
+  as `hold_out_scanner`; `scripts/scanner_count_run.sh` runs everything). Pairs scored on
+  the universe scanners: all / seen / unseen; map[S] − G0[S] per subset and mean per n.
+  Writes `plism_jobs.tsv`. Table blocks `scanner_count`, `scanner_count_plism` (PLISM tags
+  `sc_<model>_<subset>`). `cgm_select` and `loso` refuse subset fits.
+- PLISM for a post-hoc map without the backbone: `bench/run python -m
+  sipe.bench.plism_apply --features-from <raw PLISM run> --posthoc <map> --tag <tag>`
+  applies the map to that run's stored raw features (encoder/pooling checked), then the
+  official metrics (~35 min instead of a full extraction).
 - CGM augmentation attribution (no training): `uv run python -m sipe.eval.aug_attribution
   --tag <tag> --features-from <feature cache> --aug-caches geo=<cache> ... [--maps
   label=<map>] [--retrieval-only]`. Closed-form {G0, CGM-init (= the V0-S init)} ×

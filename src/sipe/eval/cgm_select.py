@@ -87,11 +87,13 @@ def fit_info(run_dir: Path) -> dict[str, Any]:
         k: v for k, v in config.get("trainer", {}).items()
         if k not in ("logger", "callbacks", "default_root_dir")
     }  # fmt: skip
-    # `hold_out_scanner` (LOSO) was added later, default None: configs written before
-    # it lack the key, so drop the default to keep seeds of one configuration together.
+    # `hold_out_scanner` (LOSO) and `scanners` (scanner count) were added later,
+    # default None: configs written before lack the keys, so drop the defaults to keep
+    # seeds of one configuration together.
     data = copy.deepcopy(config.get("data") or {})
-    if (data.get("init_args") or {}).get("hold_out_scanner", "") is None:
-        del data["init_args"]["hold_out_scanner"]
+    for key in ("hold_out_scanner", "scanners"):
+        if (data.get("init_args") or {}).get(key, "") is None:
+            del data["init_args"][key]
     key = json.dumps(
         {"model": model, "data": data, "trainer": trainer},
         sort_keys=True,
@@ -105,6 +107,7 @@ def fit_info(run_dir: Path) -> dict[str, Any]:
         "hold_out_scanner": (config.get("data") or {}).get("init_args", {}).get(
             "hold_out_scanner"
         ),
+        "scanners": (config.get("data") or {}).get("init_args", {}).get("scanners"),
         "config_key": key,
     }
 
@@ -162,9 +165,10 @@ def main(argv: list[str] | None = None) -> Path:
         if not (run / MAP_FILENAME).exists():
             raise FileNotFoundError(f"{run / MAP_FILENAME} (not a CGM fit dir?)")
         info = fit_info(run)
-        if info["hold_out_scanner"] is not None:
-            raise ValueError(f"{run} is a leave-one-scanner-out fit (sipe.eval.loso), "
-                             "not a selection candidate.")  # fmt: skip
+        if info["hold_out_scanner"] is not None or info["scanners"] is not None:
+            raise ValueError(f"{run} is fitted on a subset of the scanners "
+                             "(sipe.eval.loso / sipe.eval.scanner_count), not a "
+                             "selection candidate.")  # fmt: skip
         fits.append({"name": f"{info['arm']}_{run.name.rsplit('_', 1)[-1]}",
                      "run_dir": str(run), **info})  # fmt: skip
     fits = pd.DataFrame(fits)

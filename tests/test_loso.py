@@ -122,7 +122,7 @@ def test_cgm_select_refuses_loso_fits(tmp_path, monkeypatch):
     _write_loso_fit(tmp_path / "f_aaaa", CGMMap(10, 0), "AT2")
     assert fit_info(tmp_path / "f_aaaa")["hold_out_scanner"] == "AT2"
     _fake_runs(monkeypatch, cs, tmp_path)
-    with pytest.raises(ValueError, match="leave-one-scanner-out"):
+    with pytest.raises(ValueError, match="subset of the scanners"):
         cs.main(["--tag", "t", "--features-from", str(tmp_path), "--runs",
                  str(tmp_path / "f_aaaa"), "--device", "-1"])  # fmt: skip
 

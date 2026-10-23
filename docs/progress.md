@@ -79,6 +79,9 @@ general.
 
 In flight: nothing.
 
+To launch (user, 2026-10-23): scanner-count sensitivity on H0-mini (not a paper claim
+yet; plan and status in `docs/experiment-log.md`, section 1), `scripts/scanner_count_run.sh`.
+
 On hold (user, 2026-10-23, not launched): CONCH v1.5 on patch-token GAP
 (`ENCODER=conch-v1.5 POOLING=gap scripts/backbone_run.sh`; would write
 `runs/conch15_gap_manifest.env`, tags `conch15_gap_*`, already excluded from the CONCH head

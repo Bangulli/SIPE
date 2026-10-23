@@ -162,6 +162,9 @@ class SCORPIONDataModule(L.LightningDataModule):
     ``hold_out_scanner`` (leave-one-scanner-out, `sipe.eval.loso`) drops that
     scanner's rows from the train split only, after the split, so the WSI split and
     the domain indices (built from all scanners) are unchanged; val/test keep it.
+    ``scanners`` (scanner-count study, `sipe.eval.scanner_count`) is the keep-list
+    version: train keeps only these scanners' rows, same rules otherwise. Both may be
+    set; a scanner must then pass both.
     """
 
     def __init__(
@@ -188,6 +191,7 @@ class SCORPIONDataModule(L.LightningDataModule):
         persistent_workers: bool = True,
         drop_last: bool = True,
         hold_out_scanner: str | None = None,
+        scanners: list[str] | None = None,
     ) -> None:
         super().__init__()
         self.save_hyperparameters()
@@ -240,6 +244,7 @@ class SCORPIONDataModule(L.LightningDataModule):
         self.persistent_workers = bool(persistent_workers)
         self.drop_last = bool(drop_last)
         self.hold_out_scanner = hold_out_scanner
+        self.scanners = None if scanners is None else [str(s) for s in scanners]
 
         self.domain_names: tuple[str, ...] = ()
         self.domain_to_index: dict[str, int] = {}
@@ -427,6 +432,14 @@ class SCORPIONDataModule(L.LightningDataModule):
             train = train.loc[
                 train[self.domain_column].astype(str) != self.hold_out_scanner
             ]
+        if self.scanners is not None:
+            if unknown := sorted(set(self.scanners) - set(self.domain_to_index)):
+                raise ValueError(
+                    f"scanners {unknown} are not known domains: {self.domain_names}."
+                )
+            if len(set(self.scanners)) < 2:
+                raise ValueError("scanners: keep at least 2 (pairs need 2 views).")
+            train = train.loc[train[self.domain_column].astype(str).isin(self.scanners)]
 
         self._prepared_metadata = metadata
         self.train_metadata = train.reset_index(drop=True)
