@@ -173,6 +173,17 @@ from its pair-alignment loss (translation-only ablation `runs/2026-10-13_19-12-1
 and its SCORPION val gain appears almost before training. Closed-form paired estimators
 (eraser, G0) beat PairedVAE on PLISM in every row.
 
+**17. Fewer training scanners lower both G0 and CGM, but not CGM's lead.** Fitted on 2 of the
+4 SCORPION scanners without P1000, G0 drops on PLISM all-pairs top-1 vs all five
+(0.262 vs 0.294) and V1-S loses about as much (0.291 vs 0.321); V1-S − G0 of the same subset
+stays +0.029 [+0.024, +0.033] (+0.028 with all five) and is positive in all 10 subsets,
+also on PLISM pairs of scanners not in the subset. On SCORPION test the gain is largest at
+n = 2 (+0.0227 vs +0.0124), mostly on unseen pairs. So more scanners help every estimator;
+a trained map does not need more of them than G0 does. Evidence: blocks `scanner_count*`
+in `docs/experiment-log.md` (`runs/bench/2026-10-23_14-59-24_lxbelshark_13af_scorpion_scanner_count_test`,
+`runs/bench/*_sc_*`); one fit per subset. Engineering: PLISM for a post-hoc map does not need
+the backbone (`sipe.bench.plism_apply`, ~23 min/map; reproduces G0 per pair to 2.5e-4).
+
 ## Engineering
 
 **11. Paired augmentation relies on seed replay.** The scanner views of a tile share their

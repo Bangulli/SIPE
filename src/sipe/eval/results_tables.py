@@ -31,7 +31,7 @@ Sources, all under runs/ (gitignored, so every row names the dir it came from):
     contrasts_{val,test}.csv (sipe.eval.loso)
   - scanner-count study: runs/bench/*/summary_{val,test}.csv + contrasts_*.csv
     (sipe.eval.scanner_count); PLISM runs tagged sc_<model>_<subset>
-    (block scanner_count_plism)
+    (blocks scanner_count_plism, scanner_count_plism_seen)
   - training: runs/<run>/wandb/*run-*/*.wandb (local W&B history; no API key needed)
 
 The docs (`DOCS`: progress.md for the ISBI paper, experiment-log.md for the rest) hold
@@ -58,7 +58,7 @@ Options on the opening marker (space-separated key=value):
                             pairs with one of these stains on either side (e.g. HR),
                             then aggregate as usual
   split=<val|test>          loso only: show only that split (default: both)
-  full=<model>:<tag>[,...]  scanner_count_plism: existing all-scanner PLISM runs
+  full=<model>:<tag>[,...]  scanner_count_plism(_seen): existing all-scanner PLISM runs
                             (e.g. full=G0:mixture_G0_K1,V1-S:cgm_v1s_7b71)
   ref=<tag> tags=<tag>,...  hest_pairs: HEST runs paired per (task, fold, gene) with ref
 
@@ -81,6 +81,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
 import yaml
 
@@ -1320,12 +1321,14 @@ def _sc_tag(tag: str) -> tuple[str, str] | None:
     return arm[:2].upper() + ("-S" if arm.endswith("s") else ""), subset
 
 
-def scanner_count_plism_table(root: Path, opts: dict[str, list[str]]) -> str:
-    from sipe.eval.plism_pairs import (
-        bootstrap_mean_ci,
-        merge_runs,
-        slide_bootstrap_weights,
-    )
+def _sc_plism_load(root: Path, opts: dict[str, list[str]]):
+    """Scanner-count PLISM runs: (latest, pairs, weights, keys) or None.
+
+    latest = {(estimator, subset): (tag, run, metrics.csv)}, newest run per key; pairs
+    = the runs merged per slide pair; weights = slide-bootstrap pair weights; keys =
+    one row per run (est, subset, tag, n, rank), sorted by model then n.
+    """
+    from sipe.eval.plism_pairs import merge_runs, slide_bootstrap_weights
 
     exclude, include = _filters(opts)
     found = []  # (estimator, subset, tag, run, metrics.csv)
@@ -1340,22 +1343,31 @@ def scanner_count_plism_table(root: Path, opts: dict[str, list[str]]) -> str:
         run, path = _plism_run_by_tag(root, tag, exclude)
         found.append((est, "full", tag, run, path))
     if not found:
-        return "(no PLISM runs with sc_* tags yet)"
+        return None
     latest = {(e, s): (t, r, p) for e, s, t, r, p in found}  # newest run per key
     pairs = merge_runs([(t, pd.read_csv(p)) for t, _, p in latest.values()])
     weights = slide_bootstrap_weights(pairs, PAIR_BOOTSTRAPS)
-    groups = (("all", None), ("inter-scanner", "inter-scanner"),
-              ("inter-staining", "inter-staining"), ("joint", "joint"))  # fmt: skip
-    header = ["model", "n scanners", "subsets",
-              *[f"top-1 {g}" for g, _ in groups], "Δ vs G0, all [95% CI]",
-              "Δ vs G0, inter-scanner [95% CI]", "pairs better (all)"]  # fmt: skip
     keys = pd.DataFrame([(e, s, t) for (e, s), (t, _, _) in latest.items()],
                         columns=["est", "subset", "tag"])  # fmt: skip
     keys["n"] = [5 if s == "full" else len(s.split("-")) for s in keys["subset"]]
     order = ["G0", "eraser", "CGM-init", "V0-S", "V1-S"]
     keys["rank"] = [order.index(e) if e in order else len(order) for e in keys["est"]]
+    return latest, pairs, weights, keys.sort_values(["rank", "n"])
+
+
+def scanner_count_plism_table(root: Path, opts: dict[str, list[str]]) -> str:
+    from sipe.eval.plism_pairs import bootstrap_mean_ci
+
+    loaded = _sc_plism_load(root, opts)
+    if loaded is None:
+        return "(no PLISM runs with sc_* tags yet)"
+    latest, pairs, weights, keys = loaded
+    groups = (("all", None), ("inter-scanner", "inter-scanner"),
+              ("inter-staining", "inter-staining"), ("joint", "joint"))  # fmt: skip
+    header = ["model", "n scanners", "subsets",
+              *[f"top-1 {g}" for g, _ in groups], "Δ vs G0, all [95% CI]",
+              "Δ vs G0, inter-scanner [95% CI]", "pairs better (all)"]  # fmt: skip
     rows = []
-    keys = keys.sort_values(["rank", "n"])
     for (est, n), g in keys.groupby(["est", "n"], sort=False):
         top1 = pairs[[f"{t}__top_1" for t in g["tag"]]].mean(axis=1)
         cells = []
@@ -1391,6 +1403,73 @@ def scanner_count_plism_table(root: Path, opts: dict[str, list[str]]) -> str:
         " share of pairs with Δ > 0. One fit per subset. Runs: "
         + ", ".join(f"`{r}`" for r in runs)
         + "."
+    )
+
+
+# PLISM scanner -> SCORPION scanner of the same model (the Hamamatsu ones are not in
+# SCORPION; SCORPION's DP200 and P1000 are not in PLISM).
+PLISM_TO_SCORPION = {"AT2": "AT2", "GT450": "GT450", "P": "Philips"}
+SCORPION_SCANNERS = ("AT2", "DP200", "GT450", "P1000", "Philips")
+
+
+def scanner_count_plism_seen_table(root: Path, opts: dict[str, list[str]]) -> str:
+    from sipe.eval.plism_pairs import bootstrap_mean_ci
+
+    loaded = _sc_plism_load(root, opts)
+    if loaded is None:
+        return "(no PLISM runs with sc_* tags yet)"
+    _, pairs, weights, keys = loaded
+    inter = (pairs["shift"] == "inter-scanner").to_numpy()
+    g0 = keys.loc[keys["est"] == "G0"].set_index("subset")["tag"]
+
+    def n_seen(subset: str) -> np.ndarray:
+        fit = set(SCORPION_SCANNERS if subset == "full" else subset.split("-"))
+        return sum(
+            pairs[c].map(lambda x: PLISM_TO_SCORPION.get(x) in fit).to_numpy(int)
+            for c in ("scanner_a", "scanner_b")
+        )
+
+    labels = {2: "both seen", 1: "one seen", 0: "neither seen"}
+    header = ["model", "n scanners", "PLISM scanners seen at fit", "pairs", "G0 top-1",
+              "model top-1", "Δ vs G0 [95% CI]", "pairs better"]  # fmt: skip
+    rows = []
+    for (est, n), g in keys.groupby(["est", "n"], sort=False):
+        if est == "G0" or not set(g["subset"]) <= set(g0.index):
+            continue
+        seen = np.stack([n_seen(sub) for sub in g["subset"]], axis=1)
+        top = np.stack([pairs[f"{t}__top_1"].to_numpy() for t in g["tag"]], axis=1)
+        ref = np.stack(
+            [pairs[f"{g0[sub]}__top_1"].to_numpy() for sub in g["subset"]], axis=1
+        )
+        for k, label in labels.items():
+            m = (seen == k) & inter[:, None]  # [pairs, subsets]
+            cnt = m.sum(axis=1)
+            keep = cnt > 0
+            if not keep.any():
+                continue
+            # per pair: mean over the subsets in which the pair falls in this group
+            mt = (top * m).sum(axis=1)[keep] / cnt[keep]
+            rt = (ref * m).sum(axis=1)[keep] / cnt[keep]
+            delta = mt - rt
+            lo, hi = bootstrap_mean_ci(delta, weights[:, keep])
+            rows.append([est, str(n), label, str(int(keep.sum())),
+                         _fmt(float(rt.mean())), _fmt(float(mt.mean())),
+                         f"{delta.mean():+.3f} [{lo:+.3f}, {hi:+.3f}]",
+                         f"{(delta > 0).mean():.0%}"])  # fmt: skip
+    if not rows:
+        return "(no scanner-count PLISM runs with a G0 of the same subset yet)"
+    return (
+        _table(header, rows)
+        + "\n\nScanner-count study on PLISM, inter-scanner pairs (same stain, two"
+        " scanners) split by how many of the pair's two PLISM scanners were in the"
+        " map's fit subset. PLISM scanners matched to SCORPION by model: AT2 = AT2,"
+        " GT450 = GT450, P = Philips (same model, not the same instrument); the"
+        " Hamamatsu scanners (S60, S210, S360, SQ) are never seen, and DP200 / P1000"
+        " are not in PLISM. Per pair: mean over the subsets of size n in which the"
+        " pair falls in the group (a pair can be in several groups at the same n);"
+        " Δ = map minus G0 of the same subset; 95% CI = slide-level bootstrap"
+        f" ({PAIR_BOOTSTRAPS} draws, seed 0); pairs = number of PLISM slide pairs in"
+        " the group. Same runs as the scanner_count_plism block."
     )
 
 
@@ -1533,6 +1612,7 @@ TABLES = {
     "loso": loso_table,
     "scanner_count": scanner_count_table,
     "scanner_count_plism": scanner_count_plism_table,
+    "scanner_count_plism_seen": scanner_count_plism_seen_table,
     "training": training_table,
 }
 

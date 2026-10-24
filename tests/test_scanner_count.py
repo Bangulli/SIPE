@@ -234,3 +234,34 @@ def test_scanner_count_plism_table(tmp_path):
         next(x for x in table.splitlines() if x.startswith("| G0 | 2 |")).count("–")
         == 3
     )
+
+
+def test_scanner_count_plism_seen_table(tmp_path):
+    from test_plism_pairs import fake_metrics
+    from test_results_tables import bench_dir
+
+    import sipe.eval.results_tables as rt
+
+    # fake pairs: inter-scanner pair GMH_S60 / GMH_P; P = SCORPION Philips
+    runs = {"sc_g0_AT2-Philips": 0, "sc_g0_AT2-GT450": 1,
+            "sc_v1s_aaaa_AT2-Philips": 2, "sc_v1s_bbbb_AT2-GT450": 3}  # fmt: skip
+    for tag, seed in runs.items():
+        out = bench_dir(tmp_path, tag, "plism") / "metrics" / "8139_tiles" / tag
+        out.mkdir(parents=True)
+        fake_metrics(seed).to_csv(out / "metrics.csv", index=False)
+    table = rt.scanner_count_plism_seen_table(tmp_path, {})
+    t = {s: fake_metrics(s)["top_1_accuracy"] for s in runs.values()}
+    d_ap, d_ag = t[2] - t[0], t[3] - t[1]  # V1-S - G0 on AT2-Philips / AT2-GT450
+    pairs = fake_metrics(0)
+    inter = pairs.index[(pairs["staining_a"] == pairs["staining_b"])
+                        & (pairs["scanner_a"] != pairs["scanner_b"])]  # fmt: skip
+    gmh = next(i for i in inter if pairs.loc[i, "staining_a"] == "GMH")  # S60 / P
+    hr = next(i for i in inter if pairs.loc[i, "staining_a"] == "HR")  # S60 / AT2
+    # GMH: one seen with AT2-Philips, neither with AT2-GT450; HR: one seen with both
+    one = (d_ap[gmh] + (d_ap[hr] + d_ag[hr]) / 2) / 2
+    neither = d_ag[gmh]
+    rows = {r.split("|")[3].strip(): r for r in table.splitlines()
+            if r.startswith("| V1-S | 2 |")}  # fmt: skip
+    assert set(rows) == {"one seen", "neither seen"}
+    assert "| 2 | " in rows["one seen"] and f"{one:+.3f} [" in rows["one seen"]
+    assert f"{neither:+.3f} [" in rows["neither seen"]
