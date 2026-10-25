@@ -5,7 +5,7 @@ the **SCORPION multi-scanner dataset** and evaluated on PLISM (robustness) and H
 Started as a port of https://github.com/Bangulli/SIPE (SIPE/CATS); that phase is closed (see
 "History" below).
 
-**Plan: `docs/roadmap.md`** (target: 4-page ISBI submission, deadline 2026-10-26).
+**Plan: `docs/roadmap.md`** (target: 4-page ISBI submission, deadline 2026-11-02, moved from 2026-10-26).
 **Core question:** can a scanner-agnostic, statistically constrained *nonlinear* estimator beat
 the optimal global linear soft-shrinkage map on the robustness-vs-preservation trade-off, and
 still transfer to PLISM? The roadmap fixes the order: finish soft shrinkage → content-dependence

@@ -28,7 +28,7 @@
 
 # Experiment roadmap: from soft shrinkage to generative acquisition modeling
 
-**Project:** SCORPION → PLISM / HEST · **Target:** 4-page ISBI submission (planned deadline: 26 October 2026)  
+**Project:** SCORPION → PLISM / HEST · **Target:** 4-page ISBI submission (planned deadline: 26 October 2026, moved to 2 November 2026)  
 **Status:** Working research plan, not a claim that the proposed models will outperform the baseline  
 **Decision rule:** Select a paper direction from *generalization and preservation results*, not from architectural elegance or training-set fit.
 

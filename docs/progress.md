@@ -1,6 +1,6 @@
 # ISBI paper progress (as of 2026-10-25)
 
-Working state of the 4-page ISBI submission (deadline 2026-10-26; plan: `docs/roadmap.md`,
+Working state of the 4-page ISBI submission (deadline 2026-11-02, 23:59 US Eastern; moved from 2026-10-26, checked on biomedicalimaging.org/2027 on 2026-10-25; plan: `docs/roadmap.md`,
 CGM as built: `docs/experiment7.md`). This file only holds what the paper needs: scope,
 claims with their evidence, runs in flight and the paper tables.
 - `docs/experiment-log.md`: every roadmap experiment (status table, decisions D0–D4 with
@@ -69,27 +69,26 @@ Inference is one global map on one H0-mini GAP embedding: no scanner ID, no pair
 | 10 | (second backbone, one seed, nothing re-selected) CGM's gain over G0 on PLISM carries over to UNI2-h (CLS) | UNI2-h tables (section 4): raw UNI2-h CLS is far less robust than H0-mini GAP, all pairs 0.043 (`runs/bench/2026-10-21_02-32-59_lxbelshark_2f49_uni2h_cls_ref`; identical to the official plismbench `../plism-benchmark/output/metrics/8139_tiles/uni2h`, 0.317 / 0.073 / 0.015 / 0.043). G0 0.060 (`runs/bench/2026-10-21_05-18-27_lxbelshark_1d58_uni2h_cls_g0`), V1-S 03e2 0.074 (`runs/bench/2026-10-21_02-32-59_lxbelshark_911a_cgm_v1s_uni2h_03e2`). V1-S vs G0, all pairs +0.014 [+0.012, +0.016], better on 91% of pairs; inter-scanner +0.041 [+0.035, +0.048] (99%), inter-staining +0.017 [+0.014, +0.020], joint +0.011 [+0.009, +0.014]; without HR all pairs +0.016 [+0.014, +0.018] (100%). Unlike H0-mini (claim 2) the largest gain is inter-scanner, joint pairs sit near the floor (0.015 raw). Leaderboard metric (medians, UNI2-h leaderboard blocks): raw 0.332, G0 0.415, V1-S 0.479; without HR 0.354 / 0.438 / 0.504. SCORPION (`runs/bench/2026-10-21_02-09-08_lxbelshark_34e8_scorpion_uni2h_cgm_select`): val top-1 raw 0.4278, G0 0.9589, V1-S 0.9742; test 0.3790 / 0.8980 / 0.9320. HEST average: raw 0.380 (`runs/bench/2026-10-21_07-17-58_lxbelshark_f6ee_uni2h_cls_ref`), G0 0.378, V1-S 0.374 (`runs/bench/2026-10-21_07-17-58_lxbelshark_70dc_cgm_v1s_uni2h_03e2`); paired V1-S vs raw −0.006 [−0.016, +0.004], vs G0 −0.004 [−0.012, +0.003]; per task vs raw, gene-bootstrap intervals exclude 0 for SKCM −0.032, READ −0.023, CCRCC −0.021, HCC −0.010 (down) and IDC +0.008 (up); COAD +0.017 [+0.000, +0.034] | read 2026-10-21: PLISM gain transfers (smaller in absolute terms, from a much lower raw level); HEST average not significantly lower, but per-task costs are larger than on H0-mini (SKCM −0.032 vs −0.021) and CCRCC drops, which H0-mini did not show. One seed, H0-mini hyperparameters |
 | 11 | (pooling sensitivity: UNI2-h on patch-token GAP, one seed, nothing re-selected) CGM's gain over G0 does not depend on the CLS pooling | UNI2-h GAP tables (section 4; run dirs in `runs/uni2h_gap_manifest.env`, all at bb132c4, clean): raw GAP is far more robust than raw CLS, all pairs 0.333 vs 0.043, +0.290 [+0.255, +0.324], better on 100% of pairs (`runs/bench/2026-10-21_19-32-12_lxbelshark_819b_uni2h_gap_ref`), and above H0-mini GAP (0.227, claim 4). G0 0.378 (`runs/bench/2026-10-21_22-47-00_lxbelshark_e1bd_uni2h_gap_g0`), V1-S b116 0.392 (`runs/bench/2026-10-21_19-32-12_lxbelshark_c2bc_cgm_v1s_uni2h_gap_b116`). V1-S vs G0, all pairs +0.014 [+0.013, +0.016], better on 99% of pairs; inter-scanner +0.004 [+0.002, +0.006] (84%; G0 already at 0.928), inter-staining +0.012 [+0.010, +0.014], joint +0.015 [+0.014, +0.017] (100%). V1-S on GAP vs V1-S on CLS, all pairs +0.318 [+0.285, +0.350]. Leaderboard metric (medians): raw 0.776, G0 0.799, V1-S 0.810. SCORPION (`runs/bench/2026-10-21_18-41-26_lxbelshark_074f_scorpion_uni2h_gap_cgm_select`), near ceiling: val top-1 raw 0.9685, G0 0.9850, V1-S 0.9867; test 0.9476 / 0.9750 / 0.9771. HEST average: raw 0.387 (`runs/bench/2026-10-22_01-11-20_lxbelshark_71d7_uni2h_gap_ref`), G0 0.387 (`runs/bench/2026-10-22_02-48-24_lxbelshark_fdf6_uni2h_gap_g0`), V1-S 0.381 (`runs/bench/2026-10-22_01-11-21_lxbelshark_699b_cgm_v1s_uni2h_gap_b116`); paired G0 vs raw +0.000 [−0.003, +0.003]; V1-S vs raw −0.006 [−0.013, −0.001] (9/29 folds better), vs G0 −0.007 [−0.011, −0.003]; per task vs raw, gene-bootstrap intervals exclude 0 for SKCM −0.023, COAD −0.017, LYMPH_IDC −0.010, READ −0.008, PAAD −0.006 (down). In-loop training (`runs/2026-10-21_14-24-01_lxbelshark_b116`, 5999/6000): nonlinear_rel 0.012 vs 0.058 on CLS (03e2) | read 2026-10-22: the all-pairs gain over G0 is the same as on CLS (+0.014), with H0-mini's profile (joint largest, inter-scanner near ceiling) rather than CLS's. The pooling, not the map, sets UNI2-h's raw robustness level: every GAP row beats every CLS row. HEST: G0 free, V1-S a small cost whose interval excludes 0 here (on CLS it did not). One seed |
 | 12 | (third backbone, one seed, nothing re-selected) CGM's gain over G0 on PLISM carries over to CONCH v1.5 (official head) | CONCH v1.5 tables (section 4; run dirs in `runs/conch15_manifest.env`; benchmarks at b613327 except G0 HEST at dd507ce (docs-only change), fit at bb132c4, all clean): raw head is weak on PLISM, all pairs 0.047 (`runs/bench/2026-10-22_17-14-14_lxbelshark_735a_conch15_head_ref`; inter-scanner 0.326, joint 0.023), close to UNI2-h CLS (0.043). G0 0.084 (`runs/bench/2026-10-22_19-41-27_lxbelshark_5b5b_conch15_head_g0`), V1-S e78e 0.103 (`runs/bench/2026-10-22_17-14-14_lxbelshark_b87a_cgm_v1s_conch15_e78e`). V1-S vs G0, all pairs +0.019 [+0.017, +0.022], better on 96% of pairs; inter-scanner +0.065 [+0.057, +0.073] (100%), inter-staining +0.014 [+0.012, +0.016], joint +0.016 [+0.014, +0.019]; without HR all pairs +0.022 [+0.020, +0.025] (100%). Leaderboard metric (medians): raw 0.410, G0 0.534, V1-S 0.580. SCORPION (`runs/bench/2026-10-22_16-08-16_lxbelshark_18b1_scorpion_conch15_cgm_select`), far from ceiling: val top-1 raw 0.1702, G0 0.7002, V1-S 0.8077 (+0.1075 over G0); test 0.1435 / 0.6163 / 0.7417. In-loop training (`runs/2026-10-22_10-28-08_lxbelshark_e78e`, 5999/6000): nonlinear_rel 0.120 (UNI2-h CLS 0.058, GAP 0.012). HEST average: raw 0.348 (`runs/bench/2026-10-22_22-13-02_lxbelshark_56da_conch15_head_ref`), G0 0.351 (`runs/bench/2026-10-23_01-13-05_lxbelshark_4513_conch15_head_g0`), V1-S 0.351 (`runs/bench/2026-10-22_22-13-02_lxbelshark_3560_cgm_v1s_conch15_e78e`); paired V1-S vs raw +0.003 [−0.001, +0.007] (18/29 folds better), vs G0 +0.001 [−0.002, +0.003]; G0 vs raw +0.003 [−0.001, +0.006]. Per task vs raw, gene-bootstrap intervals exclude 0 for CCRCC +0.010 and PRAD +0.013 (up), none down; vs G0 only IDC −0.002 [−0.003, −0.000] | read 2026-10-22 (SCORPION + PLISM) and 2026-10-23 (HEST): the gain over G0 transfers and is the largest of the three backbones in absolute terms (+0.019 all pairs); like UNI2-h CLS, from a low raw level the gain is mostly inter-scanner. HEST kept: no task significantly below raw (unlike UNI2-h, claims 10, 11). One seed, H0-mini hyperparameters |
+| 13 | (analysis on H0-mini, nothing selected; likely in the paper, user 2026-10-25) CGM's lead over G0 does not depend on the number of training scanners | Scanner-count tables (section 4): maps fitted on n = 2, 3, 4 of AT2 / DP200 / GT450 / Philips (every subset; P1000 excluded for its registration offset) and on all five; fixed image budget of 512 per step, so fewer scanners does not mean less data. SCORPION test (`runs/bench/2026-10-24_18-06-13_lxbelshark_29f2_scorpion_scanner_count_test`): V1-S − G0 of the same subset +0.0227 [+0.0187, +0.0268] at n = 2, +0.0164 at n = 3, +0.0126 at n = 4, +0.0124 with all five; at n = 2 +0.0249 on pairs with an unseen scanner vs +0.0119 on seen pairs. V0-S − G0 +0.0197 [+0.0157, +0.0238] at n = 2, +0.0052 with all five. PLISM all pairs: G0 0.262 / 0.279 / 0.289 / 0.294 for n = 2 / 3 / 4 / 5, V1-S 0.291 / 0.310 / 0.320 / 0.321, V0-S 0.290 / 0.307 / 0.316 / 0.318; V1-S − G0 +0.029 [+0.024, +0.033] at n = 2, +0.028 with all five (99% / 98% of pairs); V0-S − G0 +0.028 [+0.023, +0.032] at n = 2, +0.025 with all five. Inter-scanner: V1-S − G0 +0.022 [+0.015, +0.032] at n = 2 vs +0.012 with all five. Both trained maps beat the G0 of their own subset in all 10 subsets (per-subset PLISM block in `docs/experiment-log.md`). PLISM pairs whose two scanners were not in the fit subset (AT2, GT450, P = Philips matched by model; n = 2): V1-S +0.022 [+0.015, +0.032], V0-S +0.022 [+0.014, +0.031]. PLISM for the sc_* maps through `sipe.bench.plism_apply` on stored raw features; check `runs/bench/2026-10-23_15-00-18_lxbelshark_f206_scapply_check_g0_full` = `mixture_G0_K1` per pair (max abs top-1 difference 2.5e-4) | read 2026-10-24 (V1-S) and 2026-10-25 (V0-S): every model gains from more scanners, the trained maps do not need more of them than G0; on PLISM the linear V0-S has almost all of the lead at every n (claim 6), on SCORPION the nonlinear share is smaller at n = 2 than with all five. One fit per subset, n = 4 a single subset; the seen / unseen PLISM groups differ in pair difficulty, so only "positive on unseen scanners" is solid |
 
 Caveats to state in the paper: one SCORPION split (5 val and 5 test WSIs), SCORPION val is
 near ceiling (top-1 differences of a few thousandths); hyperparameters not tuned; V2-S, the
-no-aug fits, the UNI2-h fits and the CONCH v1.5 fit have one seed; LOSO on SCORPION is not unseen-scanner generalization in
+no-aug fits, the UNI2-h fits, the CONCH v1.5 fit and the scanner-count fits (one per subset) have one seed; LOSO on SCORPION is not unseen-scanner generalization in
 general.
 
 ## 3. Runs in flight and remaining tasks
 
-In flight: nothing.
+In flight: CONCH v1.5 GAP (below).
 
-Done 2026-10-23, read 2026-10-24: scanner-count sensitivity on H0-mini (V1-S and G0 fitted on
-2 or 3 of AT2 / DP200 / GT450 / Philips; not a paper claim, user decision; reading and run
-dirs in `docs/experiment-log.md`, sections 1 and 3). V1-S stays above the G0 of the same subset
-at every n on SCORPION test (+0.0227 at n = 2, +0.0124 with all five) and on PLISM (all pairs
-+0.029 [+0.024, +0.033] at n = 2, +0.028 with all five; `scanner_count_plism` block). V0-S
-on the same subsets done 2026-10-24, read 2026-10-25: PLISM V0-S − G0 +0.028 [+0.023, +0.032]
-at n = 2, +0.025 with all five, so the linear map carries almost all of the gain at every n,
-as in claim 6 / finding 9.
+Done 2026-10-24, read 2026-10-25: scanner-count sensitivity on H0-mini (V1-S, V0-S and the
+closed-form maps fitted on 2 or 3 of AT2 / DP200 / GT450 / Philips), now claim 13; likely in
+the paper (user 2026-10-25), as one small table or a curve (top-1 vs n for G0, V0-S, V1-S).
+Not run: PLISM for the eraser / CGM-init on subsets
+(`STEPS=3 PLISM_MODELS="eraser cgminit" scripts/scanner_count_run.sh`, 22 maps, ~4 h), seeds
+per subset.
 
-On hold (user, 2026-10-23, not launched): CONCH v1.5 on patch-token GAP
-(`ENCODER=conch-v1.5 POOLING=gap scripts/backbone_run.sh`; would write
+In flight (user, launched 2026-10-25 on lxbelshark, after the deadline moved; on hold since 2026-10-23): CONCH v1.5 on patch-token GAP
+(`POOLING=gap ENCODER=conch-v1.5 scripts/backbone_run.sh`; writes
 `runs/conch15_gap_manifest.env`, tags `conch15_gap_*`, already excluded from the CONCH head
 blocks). Reason: CONCH was run because the plismbench leaderboard ranks it well, but that row is
 CONCH v1 (`../plism-benchmark/README.md`, leaderboard metric 0.498), not v1.5 with TRIDENT's
@@ -189,7 +188,7 @@ selection unchanged (no-aug 7e3c). It replaces e198 in the `cgm` block.
   were each run twice (identical results); the duplicates b84e and d2b8 are excluded from the
   block. Read 2026-10-20 into claims 3 and 7.
 - Done 2026-10-20: PLISM oracle with `--center zero` (`runs/bench/2026-10-20_15-40-09_lxbelshark_6505_plism_oracle_condmean_gap_zero`), read into claim 9.
-- Optional analysis, done 2026-10-23 for V1-S (see the in-flight note above):
+- Optional analysis, done (V1-S 2026-10-23, V0-S 2026-10-24), claim 13:
   scanner-count curve (how many training scanners G0 / CGM need, with a fixed-view-budget
   arm to separate scanner diversity from data size); design in `docs/experiment-log.md`,
   section 3. Closed form is cheap (minutes); trained points cost ~1 h each.
@@ -1156,6 +1155,128 @@ SCORPION val, clean features, probes trained on train (– = `--retrieval-only`;
 Leave-one-scanner-out on SCORPION val or test (`sipe.eval.loso`): each map^-j is fitted on train without scanner j (consensus over the 4 others); unseen = scanner pairs of the split that include j, seen = the other pairs (`summary_<split>.csv`). Δ vs G0^-j = minus G0 fitted the same way (K = 1, α = 1); Δ vs full fit = minus the same estimator fitted on all 5 scanners (the cost of not seeing j). Intervals: slide bootstrap over the 5 WSIs of the split (`contrasts_<split>.csv`); mean rows average the per-j contrasts. An analysis of frozen models: nothing is selected.
 
 <!-- /results:loso -->
+
+### Scanner-count sensitivity, SCORPION (claim 13; val, then test read once; nothing selected)
+
+<!-- results:scanner_count exclude=*smoke*,*_4e72_*,*_13af_* -->
+<!-- generated by `uv run python -m sipe.eval.results_tables --write`; do not edit -->
+
+| split | model | n scanners | subsets | top-1 all (min–max) | Δ vs G0, all [95% CI] | Δ vs G0, seen | Δ vs G0, unseen | bench run dir | SIPE commit |
+|---|---|---|---|---|---|---|---|---|---|
+| val | raw | 5 | full | 0.8814 | – | – | – | `runs/bench/2026-10-24_18-05-13_lxbelshark_965c_scorpion_scanner_count_val` | 540a465 |
+| val | G0 | 5 | full | 0.9813 | – | – | – | `runs/bench/2026-10-24_18-05-13_lxbelshark_965c_scorpion_scanner_count_val` | 540a465 |
+| val | CGM-init | 5 | full | 0.9833 | +0.0019 [+0.0004, +0.0036] | +0.0019 | – | `runs/bench/2026-10-24_18-05-13_lxbelshark_965c_scorpion_scanner_count_val` | 540a465 |
+| val | eraser | 5 | full | 0.9760 | -0.0054 [-0.0092, -0.0017] | -0.0054 | – | `runs/bench/2026-10-24_18-05-13_lxbelshark_965c_scorpion_scanner_count_val` | 540a465 |
+| val | G0 | 2 | 6 | 0.9650 (0.9527–0.9798) | – | – | – | `runs/bench/2026-10-24_18-05-13_lxbelshark_965c_scorpion_scanner_count_val` | 540a465 |
+| val | CGM-init | 2 | 6 | 0.9757 (0.9647–0.9864) | +0.0107 [+0.0028, +0.0190] | +0.0063 | +0.0116 | `runs/bench/2026-10-24_18-05-13_lxbelshark_965c_scorpion_scanner_count_val` | 540a465 |
+| val | eraser | 2 | 6 | 0.9566 (0.9500–0.9690) | -0.0084 [-0.0148, -0.0029] | -0.0076 | -0.0086 | `runs/bench/2026-10-24_18-05-13_lxbelshark_965c_scorpion_scanner_count_val` | 540a465 |
+| val | G0 | 3 | 4 | 0.9772 (0.9709–0.9814) | – | – | – | `runs/bench/2026-10-24_18-05-13_lxbelshark_965c_scorpion_scanner_count_val` | 540a465 |
+| val | CGM-init | 3 | 4 | 0.9821 (0.9757–0.9852) | +0.0048 [+0.0009, +0.0090] | +0.0038 | +0.0058 | `runs/bench/2026-10-24_18-05-13_lxbelshark_965c_scorpion_scanner_count_val` | 540a465 |
+| val | eraser | 3 | 4 | 0.9702 (0.9645–0.9739) | -0.0070 [-0.0124, -0.0022] | -0.0068 | -0.0072 | `runs/bench/2026-10-24_18-05-13_lxbelshark_965c_scorpion_scanner_count_val` | 540a465 |
+| val | G0 | 4 | 1 | 0.9819 | – | – | – | `runs/bench/2026-10-24_18-05-13_lxbelshark_965c_scorpion_scanner_count_val` | 540a465 |
+| val | CGM-init | 4 | 1 | 0.9845 | +0.0026 [+0.0004, +0.0050] | +0.0026 | – | `runs/bench/2026-10-24_18-05-13_lxbelshark_965c_scorpion_scanner_count_val` | 540a465 |
+| val | eraser | 4 | 1 | 0.9754 | -0.0065 [-0.0110, -0.0021] | -0.0065 | – | `runs/bench/2026-10-24_18-05-13_lxbelshark_965c_scorpion_scanner_count_val` | 540a465 |
+| val | V0-S | 2 | 6 | 0.9764 (0.9653–0.9857) | +0.0115 [+0.0033, +0.0200] | +0.0057 | +0.0126 | `runs/bench/2026-10-24_18-05-13_lxbelshark_965c_scorpion_scanner_count_val` | 540a465 |
+| val | V0-S | 3 | 4 | 0.9823 (0.9775–0.9850) | +0.0051 [+0.0012, +0.0101] | +0.0034 | +0.0068 | `runs/bench/2026-10-24_18-05-13_lxbelshark_965c_scorpion_scanner_count_val` | 540a465 |
+| val | V1-S | 2 | 6 | 0.9786 (0.9678–0.9881) | +0.0137 [+0.0040, +0.0236] | +0.0083 | +0.0147 | `runs/bench/2026-10-24_18-05-13_lxbelshark_965c_scorpion_scanner_count_val` | 540a465 |
+| val | V1-S | 3 | 4 | 0.9861 (0.9806–0.9889) | +0.0089 [+0.0023, +0.0168] | +0.0076 | +0.0101 | `runs/bench/2026-10-24_18-05-13_lxbelshark_965c_scorpion_scanner_count_val` | 540a465 |
+| val | V1-S | 4 | 1 | 0.9895 | +0.0076 [+0.0015, +0.0150] | +0.0076 | – | `runs/bench/2026-10-24_18-05-13_lxbelshark_965c_scorpion_scanner_count_val` | 540a465 |
+| val | V0-S | 4 | 1 | 0.9847 | +0.0028 [+0.0004, +0.0065] | +0.0028 | – | `runs/bench/2026-10-24_18-05-13_lxbelshark_965c_scorpion_scanner_count_val` | 540a465 |
+| val | V1-S | 5 | full | 0.9889 | +0.0076 [+0.0014, +0.0151] | +0.0076 | – | `runs/bench/2026-10-24_18-05-13_lxbelshark_965c_scorpion_scanner_count_val` | 540a465 |
+| val | V0-S | 5 | full | 0.9838 | +0.0024 [+0.0001, +0.0060] | +0.0024 | – | `runs/bench/2026-10-24_18-05-13_lxbelshark_965c_scorpion_scanner_count_val` | 540a465 |
+| test | raw | 5 | full | 0.7907 | – | – | – | `runs/bench/2026-10-24_18-06-13_lxbelshark_29f2_scorpion_scanner_count_test` | 540a465 |
+| test | G0 | 5 | full | 0.9752 | – | – | – | `runs/bench/2026-10-24_18-06-13_lxbelshark_29f2_scorpion_scanner_count_test` | 540a465 |
+| test | CGM-init | 5 | full | 0.9783 | +0.0031 [+0.0016, +0.0044] | +0.0031 | – | `runs/bench/2026-10-24_18-06-13_lxbelshark_29f2_scorpion_scanner_count_test` | 540a465 |
+| test | eraser | 5 | full | 0.9691 | -0.0061 [-0.0084, -0.0035] | -0.0061 | – | `runs/bench/2026-10-24_18-06-13_lxbelshark_29f2_scorpion_scanner_count_test` | 540a465 |
+| test | G0 | 2 | 6 | 0.9384 (0.9184–0.9640) | – | – | – | `runs/bench/2026-10-24_18-06-13_lxbelshark_29f2_scorpion_scanner_count_test` | 540a465 |
+| test | CGM-init | 2 | 6 | 0.9560 (0.9342–0.9746) | +0.0176 [+0.0155, +0.0197] | +0.0088 | +0.0194 | `runs/bench/2026-10-24_18-06-13_lxbelshark_29f2_scorpion_scanner_count_test` | 540a465 |
+| test | eraser | 2 | 6 | 0.9250 (0.9024–0.9490) | -0.0134 [-0.0150, -0.0117] | -0.0099 | -0.0140 | `runs/bench/2026-10-24_18-06-13_lxbelshark_29f2_scorpion_scanner_count_test` | 540a465 |
+| test | G0 | 3 | 4 | 0.9646 (0.9537–0.9715) | – | – | – | `runs/bench/2026-10-24_18-06-13_lxbelshark_29f2_scorpion_scanner_count_test` | 540a465 |
+| test | CGM-init | 3 | 4 | 0.9727 (0.9631–0.9788) | +0.0081 [+0.0055, +0.0108] | +0.0060 | +0.0103 | `runs/bench/2026-10-24_18-06-13_lxbelshark_29f2_scorpion_scanner_count_test` | 540a465 |
+| test | eraser | 3 | 4 | 0.9554 (0.9435–0.9620) | -0.0091 [-0.0111, -0.0073] | -0.0087 | -0.0096 | `runs/bench/2026-10-24_18-06-13_lxbelshark_29f2_scorpion_scanner_count_test` | 540a465 |
+| test | G0 | 4 | 1 | 0.9757 | – | – | – | `runs/bench/2026-10-24_18-06-13_lxbelshark_29f2_scorpion_scanner_count_test` | 540a465 |
+| test | CGM-init | 4 | 1 | 0.9804 | +0.0047 [+0.0025, +0.0071] | +0.0047 | – | `runs/bench/2026-10-24_18-06-13_lxbelshark_29f2_scorpion_scanner_count_test` | 540a465 |
+| test | eraser | 4 | 1 | 0.9680 | -0.0077 [-0.0102, -0.0052] | -0.0077 | – | `runs/bench/2026-10-24_18-06-13_lxbelshark_29f2_scorpion_scanner_count_test` | 540a465 |
+| test | V0-S | 2 | 6 | 0.9581 (0.9343–0.9747) | +0.0197 [+0.0157, +0.0238] | +0.0089 | +0.0219 | `runs/bench/2026-10-24_18-06-13_lxbelshark_29f2_scorpion_scanner_count_test` | 540a465 |
+| test | V0-S | 3 | 4 | 0.9751 (0.9683–0.9800) | +0.0106 [+0.0068, +0.0148] | +0.0070 | +0.0142 | `runs/bench/2026-10-24_18-06-13_lxbelshark_29f2_scorpion_scanner_count_test` | 540a465 |
+| test | V1-S | 2 | 6 | 0.9611 (0.9368–0.9774) | +0.0227 [+0.0187, +0.0268] | +0.0119 | +0.0249 | `runs/bench/2026-10-24_18-06-13_lxbelshark_29f2_scorpion_scanner_count_test` | 540a465 |
+| test | V1-S | 3 | 4 | 0.9809 (0.9751–0.9847) | +0.0164 [+0.0114, +0.0221] | +0.0125 | +0.0202 | `runs/bench/2026-10-24_18-06-13_lxbelshark_29f2_scorpion_scanner_count_test` | 540a465 |
+| test | V1-S | 4 | 1 | 0.9883 | +0.0126 [+0.0085, +0.0169] | +0.0126 | – | `runs/bench/2026-10-24_18-06-13_lxbelshark_29f2_scorpion_scanner_count_test` | 540a465 |
+| test | V0-S | 4 | 1 | 0.9822 | +0.0065 [+0.0039, +0.0090] | +0.0065 | – | `runs/bench/2026-10-24_18-06-13_lxbelshark_29f2_scorpion_scanner_count_test` | 540a465 |
+| test | V1-S | 5 | full | 0.9877 | +0.0124 [+0.0080, +0.0169] | +0.0124 | – | `runs/bench/2026-10-24_18-06-13_lxbelshark_29f2_scorpion_scanner_count_test` | 540a465 |
+| test | V0-S | 5 | full | 0.9804 | +0.0052 [+0.0025, +0.0079] | +0.0052 | – | `runs/bench/2026-10-24_18-06-13_lxbelshark_29f2_scorpion_scanner_count_test` | 540a465 |
+
+Scanner-count study on SCORPION (`sipe.eval.scanner_count`): each map is fitted on the train rows of n scanners of the universe (every subset for the closed-form maps G0, CGM-init, eraser λ = 0.5; the fits given for V0-S / V1-S); full = all train scanners. Scored on the split's pairs of universe scanners: all = every such pair (the same for every subset), seen = both scanners in the subset, unseen = the others. top-1 = mean over the subsets of size n (min–max over subsets); Δ vs G0 = map minus G0 fitted on the same subset, averaged over the subsets, slide-bootstrap interval with the same draws for every subset (`contrasts_<split>.csv`). An analysis of fixed configurations: nothing is selected.
+
+<!-- /results:scanner_count -->
+
+### Scanner-count sensitivity, PLISM (claim 13; top-1, mean over slide pairs)
+
+<!-- results:scanner_count_plism exclude=*smoke* full=G0:mixture_G0_K1,eraser:softshrink_gap_lam0.5,CGM-init:aug_cgminit_clean_all,V0-S:cgm_v0s_a602,V1-S:cgm_v1s_7b71 -->
+<!-- generated by `uv run python -m sipe.eval.results_tables --write`; do not edit -->
+
+| model | n scanners | subsets | top-1 all | top-1 inter-scanner | top-1 inter-staining | top-1 joint | Δ vs G0, all [95% CI] | Δ vs G0, inter-scanner [95% CI] | pairs better (all) |
+|---|---|---|---|---|---|---|---|---|---|
+| G0 | 2 | 6 | 0.262 | 0.862 | 0.281 | 0.209 | – | – | – |
+| G0 | 3 | 4 | 0.279 | 0.878 | 0.292 | 0.227 | – | – | – |
+| G0 | 4 | 1 | 0.289 | 0.885 | 0.299 | 0.238 | – | – | – |
+| G0 | 5 | full | 0.294 | 0.887 | 0.303 | 0.243 | – | – | – |
+| eraser | 5 | full | 0.281 | 0.873 | 0.299 | 0.229 | -0.013 [-0.015, -0.010] | -0.014 [-0.017, -0.010] | 20% |
+| CGM-init | 5 | full | 0.300 | 0.892 | 0.306 | 0.249 | +0.006 [+0.005, +0.007] | +0.005 [+0.004, +0.007] | 96% |
+| V0-S | 2 | 6 | 0.290 | 0.883 | 0.297 | 0.239 | +0.028 [+0.023, +0.032] | +0.021 [+0.014, +0.031] | 99% |
+| V0-S | 3 | 4 | 0.307 | 0.894 | 0.309 | 0.257 | +0.028 [+0.023, +0.032] | +0.016 [+0.010, +0.024] | 99% |
+| V0-S | 4 | 1 | 0.316 | 0.898 | 0.317 | 0.267 | +0.027 [+0.023, +0.031] | +0.012 [+0.007, +0.019] | 99% |
+| V0-S | 5 | full | 0.318 | 0.897 | 0.319 | 0.270 | +0.025 [+0.021, +0.028] | +0.010 [+0.005, +0.017] | 98% |
+| V1-S | 2 | 6 | 0.291 | 0.884 | 0.298 | 0.240 | +0.029 [+0.024, +0.033] | +0.022 [+0.015, +0.032] | 99% |
+| V1-S | 3 | 4 | 0.310 | 0.896 | 0.311 | 0.260 | +0.031 [+0.026, +0.035] | +0.018 [+0.011, +0.027] | 99% |
+| V1-S | 4 | 1 | 0.320 | 0.901 | 0.320 | 0.272 | +0.031 [+0.026, +0.035] | +0.015 [+0.010, +0.024] | 99% |
+| V1-S | 5 | full | 0.321 | 0.899 | 0.321 | 0.273 | +0.028 [+0.024, +0.032] | +0.012 [+0.007, +0.020] | 98% |
+
+Scanner-count study on PLISM: maps fitted on n SCORPION scanners (`sipe.eval.scanner_count`, PLISM through `sipe.bench.plism_apply`; tags `sc_<model>_<subset>`; full = the existing all-scanner runs given by `full=`). top-1 = mean over slide pairs of the mean over the subsets of size n; Δ vs G0 = per pair, map minus G0 of the same subset, averaged over the subsets, then over pairs; 95% CI = slide-level bootstrap (2000 draws, seed 0) as in the per-pair blocks; pairs better = share of pairs with Δ > 0. One fit per subset. Runs: `runs/bench/2026-10-13_21-54-02_lxbelshark_e26b_softshrink_gap_lam0.5`, `runs/bench/2026-10-14_07-10-49_lxbelshark_0721_mixture_G0_K1`, `runs/bench/2026-10-14_23-36-54_lxbelshark_22f4_cgm_v1s_7b71`, `runs/bench/2026-10-15_10-03-00_lxbelshark_ae3c_cgm_v0s_a602`, `runs/bench/2026-10-16_14-32-16_lxbelshark_8ef2_aug_cgminit_clean_all`, `runs/bench/2026-10-23_15-00-18_lxbelshark_d13b_sc_g0_AT2-DP200`, `runs/bench/2026-10-23_15-23-31_lxbelshark_990f_sc_g0_AT2-Philips`, `runs/bench/2026-10-23_15-23-34_lxbelshark_b99a_sc_g0_AT2-GT450`, `runs/bench/2026-10-23_15-46-37_lxbelshark_246e_sc_g0_DP200-Philips`, `runs/bench/2026-10-23_15-46-46_lxbelshark_5013_sc_g0_DP200-GT450`, `runs/bench/2026-10-23_16-10-07_lxbelshark_163a_sc_g0_GT450-Philips`, `runs/bench/2026-10-23_16-10-20_lxbelshark_5a9a_sc_g0_AT2-DP200-GT450`, `runs/bench/2026-10-23_16-33-23_lxbelshark_361b_sc_g0_AT2-DP200-Philips`, `runs/bench/2026-10-23_16-33-32_lxbelshark_b248_sc_g0_AT2-GT450-Philips`, `runs/bench/2026-10-23_16-56-37_lxbelshark_c5e9_sc_g0_DP200-GT450-Philips`, `runs/bench/2026-10-23_16-57-00_lxbelshark_ae4e_sc_g0_AT2-DP200-GT450-Philips`, `runs/bench/2026-10-23_17-19-55_lxbelshark_fa32_sc_v1s_fcdc_AT2-DP200`, `runs/bench/2026-10-23_17-20-08_lxbelshark_cb23_sc_v1s_4357_AT2-DP200-GT450`, `runs/bench/2026-10-23_17-43-11_lxbelshark_6b1a_sc_v1s_e1f0_AT2-DP200-Philips`, `runs/bench/2026-10-23_17-43-17_lxbelshark_336a_sc_v1s_3af8_AT2-GT450`, `runs/bench/2026-10-23_18-06-26_lxbelshark_e317_sc_v1s_9684_AT2-Philips`, `runs/bench/2026-10-23_18-06-32_lxbelshark_3689_sc_v1s_f679_AT2-GT450-Philips`, `runs/bench/2026-10-23_18-29-50_lxbelshark_bd77_sc_v1s_b20e_DP200-GT450-Philips`, `runs/bench/2026-10-23_18-30-04_lxbelshark_ce49_sc_v1s_8f7a_DP200-GT450`, `runs/bench/2026-10-23_18-53-03_lxbelshark_bba7_sc_v1s_57ed_GT450-Philips`, `runs/bench/2026-10-23_18-53-18_lxbelshark_437a_sc_v1s_f2ff_DP200-Philips`, `runs/bench/2026-10-23_19-16-45_lxbelshark_6be2_sc_v1s_a560_AT2-DP200-GT450-Philips`, `runs/bench/2026-10-24_18-07-09_lxbelshark_36ed_sc_v0s_d6f8_AT2-DP200-GT450`, `runs/bench/2026-10-24_18-07-09_lxbelshark_a575_sc_v0s_7b78_AT2-DP200`, `runs/bench/2026-10-24_18-30-26_lxbelshark_f426_sc_v0s_2cc9_AT2-DP200-Philips`, `runs/bench/2026-10-24_18-30-30_lxbelshark_7ec2_sc_v0s_920c_AT2-GT450`, `runs/bench/2026-10-24_18-53-33_lxbelshark_7e09_sc_v0s_b3cb_AT2-GT450-Philips`, `runs/bench/2026-10-24_18-53-41_lxbelshark_3a78_sc_v0s_ed05_AT2-Philips`, `runs/bench/2026-10-24_19-16-54_lxbelshark_fe27_sc_v0s_da54_DP200-GT450-Philips`, `runs/bench/2026-10-24_19-16-55_lxbelshark_13f0_sc_v0s_ee3e_DP200-GT450`, `runs/bench/2026-10-24_19-40-02_lxbelshark_4d92_sc_v0s_10b7_DP200-Philips`, `runs/bench/2026-10-24_19-40-07_lxbelshark_8efd_sc_v0s_a044_GT450-Philips`, `runs/bench/2026-10-24_20-03-10_lxbelshark_a111_sc_v0s_4b28_AT2-DP200-GT450-Philips`.
+
+<!-- /results:scanner_count_plism -->
+
+### Scanner-count sensitivity, PLISM inter-scanner pairs by scanners seen at fit time (claim 13)
+
+<!-- results:scanner_count_plism_seen exclude=*smoke* full=G0:mixture_G0_K1,eraser:softshrink_gap_lam0.5,CGM-init:aug_cgminit_clean_all,V0-S:cgm_v0s_a602,V1-S:cgm_v1s_7b71 -->
+<!-- generated by `uv run python -m sipe.eval.results_tables --write`; do not edit -->
+
+| model | n scanners | PLISM scanners seen at fit | pairs | G0 top-1 | model top-1 | Δ vs G0 [95% CI] | pairs better |
+|---|---|---|---|---|---|---|---|
+| eraser | 5 | both seen | 39 | 0.825 | 0.804 | -0.021 [-0.030, -0.014] | 0% |
+| eraser | 5 | one seen | 156 | 0.873 | 0.858 | -0.015 [-0.019, -0.012] | 0% |
+| eraser | 5 | neither seen | 78 | 0.945 | 0.939 | -0.007 [-0.011, -0.004] | 0% |
+| CGM-init | 5 | both seen | 39 | 0.825 | 0.833 | +0.008 [+0.005, +0.011] | 100% |
+| CGM-init | 5 | one seen | 156 | 0.873 | 0.879 | +0.006 [+0.004, +0.008] | 96% |
+| CGM-init | 5 | neither seen | 78 | 0.945 | 0.948 | +0.003 [+0.001, +0.006] | 86% |
+| V0-S | 2 | both seen | 39 | 0.799 | 0.832 | +0.033 [+0.020, +0.048] | 100% |
+| V0-S | 2 | one seen | 195 | 0.833 | 0.858 | +0.025 [+0.017, +0.033] | 95% |
+| V0-S | 2 | neither seen | 273 | 0.860 | 0.882 | +0.022 [+0.014, +0.031] | 93% |
+| V0-S | 3 | both seen | 39 | 0.814 | 0.836 | +0.023 [+0.013, +0.034] | 97% |
+| V0-S | 3 | one seen | 195 | 0.853 | 0.871 | +0.018 [+0.012, +0.025] | 91% |
+| V0-S | 3 | neither seen | 234 | 0.886 | 0.900 | +0.014 [+0.008, +0.023] | 85% |
+| V0-S | 4 | both seen | 39 | 0.821 | 0.839 | +0.017 [+0.010, +0.026] | 95% |
+| V0-S | 4 | one seen | 156 | 0.871 | 0.884 | +0.013 [+0.008, +0.021] | 80% |
+| V0-S | 4 | neither seen | 78 | 0.945 | 0.953 | +0.008 [+0.002, +0.021] | 82% |
+| V0-S | 5 | both seen | 39 | 0.825 | 0.838 | +0.013 [+0.007, +0.020] | 92% |
+| V0-S | 5 | one seen | 156 | 0.873 | 0.883 | +0.010 [+0.005, +0.018] | 72% |
+| V0-S | 5 | neither seen | 78 | 0.945 | 0.952 | +0.007 [+0.001, +0.020] | 76% |
+| V1-S | 2 | both seen | 39 | 0.799 | 0.835 | +0.036 [+0.022, +0.051] | 100% |
+| V1-S | 2 | one seen | 195 | 0.833 | 0.860 | +0.026 [+0.018, +0.035] | 96% |
+| V1-S | 2 | neither seen | 273 | 0.860 | 0.883 | +0.022 [+0.015, +0.032] | 95% |
+| V1-S | 3 | both seen | 39 | 0.814 | 0.840 | +0.026 [+0.015, +0.039] | 97% |
+| V1-S | 3 | one seen | 195 | 0.853 | 0.874 | +0.021 [+0.014, +0.029] | 93% |
+| V1-S | 3 | neither seen | 234 | 0.886 | 0.902 | +0.016 [+0.010, +0.026] | 91% |
+| V1-S | 4 | both seen | 39 | 0.821 | 0.844 | +0.022 [+0.014, +0.033] | 97% |
+| V1-S | 4 | one seen | 156 | 0.871 | 0.888 | +0.017 [+0.010, +0.025] | 87% |
+| V1-S | 4 | neither seen | 78 | 0.945 | 0.955 | +0.010 [+0.002, +0.026] | 88% |
+| V1-S | 5 | both seen | 39 | 0.825 | 0.842 | +0.016 [+0.009, +0.025] | 95% |
+| V1-S | 5 | one seen | 156 | 0.873 | 0.886 | +0.013 [+0.007, +0.022] | 81% |
+| V1-S | 5 | neither seen | 78 | 0.945 | 0.954 | +0.009 [+0.002, +0.025] | 82% |
+
+Scanner-count study on PLISM, inter-scanner pairs (same stain, two scanners) split by how many of the pair's two PLISM scanners were in the map's fit subset. PLISM scanners matched to SCORPION by model: AT2 = AT2, GT450 = GT450, P = Philips (same model, not the same instrument); the Hamamatsu scanners (S60, S210, S360, SQ) are never seen, and DP200 / P1000 are not in PLISM. Per pair: mean over the subsets of size n in which the pair falls in the group (a pair can be in several groups at the same n); Δ = map minus G0 of the same subset; 95% CI = slide-level bootstrap (2000 draws, seed 0); pairs = number of PLISM slide pairs in the group. Same runs as the scanner_count_plism block.
+
+<!-- /results:scanner_count_plism_seen -->
 
 ### Second backbone: UNI2-h (CLS token), raw / G0 / V1-S
 
