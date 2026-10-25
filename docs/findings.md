@@ -179,8 +179,10 @@ and its SCORPION val gain appears almost before training. Closed-form paired est
 stays +0.029 [+0.024, +0.033] (+0.028 with all five) and is positive in all 10 subsets,
 also on PLISM pairs of scanners not in the subset. On SCORPION test the gain is largest at
 n = 2 (+0.0227 vs +0.0124), mostly on unseen pairs. So more scanners help every estimator;
-a trained map does not need more of them than G0 does. Evidence: blocks `scanner_count*`
-in `docs/experiment-log.md` (`runs/bench/2026-10-23_14-59-24_lxbelshark_13af_scorpion_scanner_count_test`,
+a trained map does not need more of them than G0 does. The trained linear V0-S has almost
+all of it at every n (PLISM +0.028 [+0.023, +0.032] at n = 2 vs V1-S +0.029), as with all
+scanners (finding 9). Evidence: blocks `scanner_count*`
+in `docs/experiment-log.md` (`runs/bench/2026-10-24_18-06-13_lxbelshark_29f2_scorpion_scanner_count_test`,
 `runs/bench/*_sc_*`); one fit per subset. Engineering: PLISM for a post-hoc map does not need
 the backbone (`sipe.bench.plism_apply`, ~23 min/map; reproduces G0 per pair to 2.5e-4).
 
