@@ -145,6 +145,37 @@ def _fake_runs(monkeypatch, module, tmp_path):
     return runs
 
 
+def test_cgm_init_noise_weight_scales_the_noise():
+    rng = np.random.default_rng(0)
+    views = rng.normal(size=(300, 3, 6)) + 2 * rng.normal(size=(300, 1, 6))
+    base = cgm_init_map(views, torch.device("cpu"))
+    torch.testing.assert_close(
+        cgm_init_map(views, torch.device("cpu"), noise_weight=1.0).M, base.M
+    )
+    head = ConsensusGenerativeHead(6, 3, per_scanner=True, encoder_hidden_dim=0)
+    head.init_from_moments(
+        torch.from_numpy(views.reshape(-1, 6)),
+        torch.arange(3).repeat(300),
+        torch.arange(300).repeat_interleave(3),
+        ridge=1e-3,
+    )
+    L = head.map.L.double()
+    B = head.noise_factor()[0].double()
+    noise = B @ B.T
+    # M = L^T marginal^-1  ->  marginal = M^-1 L^T; beta adds (beta - 1) noise.
+    marginal = torch.linalg.solve(head.map.M.double(), L.T)
+    beta = 3.5
+    expected = torch.linalg.solve(marginal + (beta - 1) * noise, L).T
+    weighted = cgm_init_map(views, torch.device("cpu"), noise_weight=beta)
+    torch.testing.assert_close(weighted.M.double(), expected, rtol=1e-6, atol=1e-8)
+    torch.testing.assert_close(weighted.L, base.L)
+    # More noise -> stronger shrinkage of the map's linear part.
+    x = torch.randn(50, 6, dtype=torch.float64)
+    T1 = base.L.double() @ base.M.double()
+    Tb = weighted.L.double() @ weighted.M.double()
+    assert (x @ Tb.T).norm() < (x @ T1.T).norm()
+
+
 def test_aug_attribution_main(tmp_path, monkeypatch):
     import sipe.eval.aug_attribution as aa
 
@@ -154,10 +185,11 @@ def test_aug_attribution_main(tmp_path, monkeypatch):
     run_dir = aa.main(
         ["--tag", "t", "--features-from", str(tmp_path),
          "--aug-caches", f"geo={tmp_path / 'geo'}", "--n-units", "20", "tiles", "all",
-         "--alphas", "0.5", "2", "--reference-map", "none", "--device", "-1"]
+         "--alphas", "0.5", "2", "--init-noise-weights", "1", "3.5",
+         "--reference-map", "none", "--device", "-1"]
     )  # fmt: skip
     arms = json.loads((run_dir / "arms.json").read_text())
-    expected = {f"{e}|{d}|{n}" for e in ("G0", "CGM-init")
+    expected = {f"{e}|{d}|{n}" for e in ("G0", "CGM-init", "CGM-init(b=3.5)")
                 for d, n in (("clean", "20"), ("clean", "all"), ("geo", "20"),
                              ("geo", "tiles"), ("geo", "all"))}  # fmt: skip
     assert set(arms) == expected
@@ -172,6 +204,10 @@ def test_aug_attribution_main(tmp_path, monkeypatch):
 
     table = aug_attribution_table(runs, {})
     assert "| CGM-init | geo | 20 |" in table and "| raw |" in table
+    assert "| CGM-init(b=3.5) | clean | all |" in table
+    assert arms["CGM-init(b=3.5)|clean|all"]["map"] == "map_CGM-init-b3.5_clean_all.pt"
+    assert arms["CGM-init|clean|all"]["map"] == "map_CGM-init_clean_all.pt"
+    assert torch.load(run_dir / "map_CGM-init-b3.5_clean_all.pt")["noise_weight"] == 3.5
 
 
 # --- CGM selection ------------------------------------------------------------

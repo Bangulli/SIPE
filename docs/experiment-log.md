@@ -254,6 +254,29 @@ The ISBI-facing summary of these items is in `docs/progress.md` (section 2, clai
   Decision 2026-10-18 (user): the paper keeps the augmented V1-S (augmentation is part of
   the recipe, fixed before selection; the selection is over arms); the no-aug fit is an
   ablation reported next to claim 7 (`docs/progress.md`).
+  Test readout of the clean arms, 2026-10-27 (`runs/bench/2026-10-27_16-04-22_claude-box_b5c6_scorpion_aug_attribution_clean_test`,
+  `--n-units all --alphas 1.0 --test --retrieval-only`, no augmented caches): CGM-init|clean|all
+  test top-1 0.9674 vs G0|clean|all 0.9645 (+0.0029; raw 0.8020, eraser 0.9588, as `cgm_select`
+  aae8); val reproduces eda5 (0.9808 / 0.9787). The `augattr` parser now reads `summary_test.csv`.
+  Noise-weighted init, 2026-10-27 (why does ELBO training help the linear map?). A scratch
+  diagnostic (not a run; numbers not cited) found that the trained V0-S shrinks much harder
+  than its init (learned noise trace about 1.5x the moment estimate) and that the closed form
+  with the within-tile noise scaled by beta, S (S + beta W + O)^-1, is closest to V0-S a602
+  at beta about 3.5 (flat over 3.25-4; G0 at alpha 4.5-5 equally close); about 16% of
+  V0-S's correction stays unexplained. Implemented as `init_from_moments(noise_weight=)`
+  (default 1 = unchanged training init) and `aug_attribution --init-noise-weights`; run
+  `runs/bench/2026-10-27_18-03-25_claude-box_3e81_scorpion_aug_attribution_noise_weight`
+  (clean, all tiles, beta 1 and 3.5, V0-S a602 in the same run, val + test read once):
+  CGM-init(b=3.5) val top-1 0.9836 vs V0-S 0.9807 and CGM-init 0.9808; test 0.9709 vs
+  0.9682 and 0.9674; relative change 0.311 vs 0.321 for V0-S (val, `summary_*.csv`).
+  beta was matched to a trained map, not selected on val: an analysis row. In progress:
+  PLISM of `map_CGM-init-b3.5_clean_all.pt` (tag `aug_cgminit_clean_all_b3.5`, user).
+  Residual-only arm, 2026-10-27: V1-S with `--model.init_args.linear_lr=0` (M, L, b, delta,
+  posterior and noise factors stay at the moment init; only the encoder residual r trains;
+  smoke-checked that only `map.r.*` moves). Fit `runs/2026-10-27_18-13-25_lxbelshark_c688`
+  (W&B yokp8prl, 5999/6000): in-loop val top-1 0.985 = V1-S 7b71, scanner probe 0.350 vs
+  0.298, nonlinear_rel 0.086 vs 0.072 (CGM training table). In progress: `cgm_select`
+  (SCORPION val/test) and PLISM (`plism_apply`) of its `map_cgm.pt` (user).
   Step 2 done 2026-10-15 (`runs/bench/2026-10-15_19-36-05_lxbelshark_eda5_scorpion_aug_attribution`,
   augmentation-attribution table, val retrieval only): CGM-init|clean|all 0.9808 = V0-S_a602
   0.9807, i.e. the V0-S estimator on clean data, without training and without augmentation,

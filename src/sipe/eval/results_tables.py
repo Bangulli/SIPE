@@ -1068,7 +1068,8 @@ def aug_attribution_table(root: Path, opts: dict[str, list[str]]) -> str:
     header = [
         "model", "data", "units", "views", "G0 α", "val top-1", "val Δtop-1 vs G0",
         "val top-5", "val scanner probe logreg / MLP", "val region probe",
-        "rel. change", "bench run dir", "SIPE commit",
+        "rel. change", "test top-1", "test Δtop-1 vs G0",
+        "bench run dir", "SIPE commit",
     ]  # fmt: skip
     rows = []
     for run in _bench_runs(root, "scorpion_aug_attribution", *_filters(opts)):
@@ -1079,6 +1080,12 @@ def aug_attribution_table(root: Path, opts: dict[str, list[str]]) -> str:
         arms = _read_json(run.dir / "arms.json")
         summary = pd.read_csv(run.dir / "summary_val.csv")
         g0 = summary.loc[summary["name"] == "G0|clean|all", "top_1_accuracy"]
+        test_path = run.dir / "summary_test.csv"
+        test = (
+            pd.read_csv(test_path).set_index("name")["top_1_accuracy"]
+            if test_path.exists()
+            else pd.Series(dtype=float)
+        )
         for _, r in summary.iterrows():
             arm = arms.get(r["name"], {})
             delta = (
@@ -1099,6 +1106,14 @@ def aug_attribution_table(root: Path, opts: dict[str, list[str]]) -> str:
                     _probes(r),
                     _fmt(r.get("region_probe_acc")),
                     _fmt(r.get("relative_change")),
+                    _fmt(test.get(r["name"]), 4),
+                    (
+                        f"{test[r['name']] - test['G0|clean|all']:+.4f}"
+                        if r["name"] in test.index
+                        and "G0|clean|all" in test.index
+                        and r["name"] not in ("raw", "reference")
+                        else "–"
+                    ),
                     *source,
                 ]
             )
@@ -1115,7 +1130,8 @@ def aug_attribution_table(root: Path, opts: dict[str, list[str]]) -> str:
         " Δ vs G0|clean|all (= the G0 of the mixture sweep when α = 1). Explanatory"
         " ablation: nothing is selected across arms; the PLISM readout uses the"
         " saved `map_<estimator>_<data>_<units>.pt`. Other rows (raw, reference, V0-S,"
-        " ...) are map files evaluated in the same run."
+        " ...) are map files evaluated in the same run. Test (`--test`, read once,"
+        " `summary_test.csv`, probes trained on val as in `cgm_select`): – = not read."
     )
 
 

@@ -10,6 +10,10 @@ without training (docs/experiment-log.md, Exp 7 history, 2026-10-15):
 - estimators: `G0` (consensus shrinkage of `sipe.estimators.mixture`, K = 1;
   alpha by the 95% rule on val, as `mixture_sweep`) and `CGM-init` (the V0-S init map,
   r = h = 0, `init_ridge` as configs/consensus_gen.yaml; no hyperparameter);
+  `--init-noise-weights b ...` adds `CGM-init(b=<b>)` arms: the same init with the
+  within-tile noise scaled by b (`init_from_moments(noise_weight=b)`; stronger
+  shrinkage). b = 1 is `CGM-init`. An analysis knob, chosen outside this driver
+  (e.g. matched to a trained map), never selected here;
 - data: `clean` (train split of `--features-from`) and every `--aug-caches
   label=dir` (`sipe.features.extract`); a unit = one tile (clean) or one tile copy
   (augmented, all scanner views share the transform);
@@ -115,9 +119,13 @@ def g0_map(model: Mixture, alpha: float) -> MixtureShrinkageMap:
 
 
 def cgm_init_map(
-    views: np.ndarray, device: torch.device, ridge: float = CGM_INIT_RIDGE
+    views: np.ndarray,
+    device: torch.device,
+    ridge: float = CGM_INIT_RIDGE,
+    noise_weight: float = 1.0,
 ) -> CGMMap:
-    """The V0-S map at init (linear encoder, per-scanner likelihood), closed form."""
+    """The V0-S map at init (linear encoder, per-scanner likelihood), closed form;
+    `noise_weight` scales the within-tile noise (1 = the training init)."""
     n, s, d = views.shape
     head = ConsensusGenerativeHead(d, num_scanners=s, per_scanner=True,
                                    encoder_hidden_dim=0).to(device)  # fmt: skip
@@ -126,6 +134,7 @@ def cgm_init_map(
         torch.arange(s, device=device).repeat(n),
         torch.arange(n, device=device).repeat_interleave(s),
         ridge=ridge,
+        noise_weight=noise_weight,
     )
     return head.map.cpu().eval()
 
@@ -178,6 +187,8 @@ def main(argv: list[str] | None = None) -> Path:
     parser.add_argument("--alphas", nargs="+", type=float, default=list(DEFAULT_ALPHAS))
     parser.add_argument("--ridge", type=float, default=1e-4, help="G0 ridge.")
     parser.add_argument("--init-ridge", type=float, default=CGM_INIT_RIDGE)
+    parser.add_argument("--init-noise-weights", nargs="+", type=float, default=[1.0],
+                        help="CGM-init noise weights b (1 = CGM-init).")  # fmt: skip
     parser.add_argument("--select-gain-frac", type=float, default=0.95)
     parser.add_argument("--maps", nargs="*", default=[],
                         help="label=<map file> evaluated alongside.")  # fmt: skip
@@ -249,7 +260,17 @@ def main(argv: list[str] | None = None) -> Path:
         for size in sizes:
             rows = select_units(meta, size, tiles, args.seed)
             views = unit_views(x, rows)
-            for est in args.estimators:
+            variants = [
+                (est, None) for est in args.estimators if est == "G0"
+            ] + [
+                (est, b)
+                for est in args.estimators
+                if est == "CGM-init"
+                for b in args.init_noise_weights
+            ]
+            for est, beta in variants:
+                if beta is not None and beta != 1.0:
+                    est = f"CGM-init(b={beta:g})"
                 name = f"{est}|{data_label}|{size}"
                 info = {
                     "estimator": est,
@@ -258,7 +279,8 @@ def main(argv: list[str] | None = None) -> Path:
                     "units": len(views),
                     "views": len(views) * views.shape[1],
                 }
-                stem = f"map_{est}_{data_label}_{size}.pt"
+                file_est = est if beta in (None, 1.0) else f"CGM-init-b{beta:g}"
+                stem = f"map_{file_est}_{data_label}_{size}.pt"
                 if est == "G0":
                     model = g0_model(views, args.ridge)
                     grid = []
@@ -284,12 +306,13 @@ def main(argv: list[str] | None = None) -> Path:
                              variant="G0", K=1, alpha=alpha, data=data_label,
                              n_units=size, encoder=encoder)  # fmt: skip
                 else:
-                    fmap = cgm_init_map(views, device, args.init_ridge)
+                    fmap = cgm_init_map(views, device, args.init_ridge, beta)
+                    info["noise_weight"] = beta
                     save_map(run_dir / stem, fmap,
                              {"dim": fmap.dim, "encoder_hidden_dim": 0,
                               "generator_hidden_dim": 0},
                              arm="V0-S init", init_ridge=args.init_ridge,
-                             data=data_label, n_units=size,
+                             noise_weight=beta, data=data_label, n_units=size,
                              encoder=encoder)  # fmt: skip
                 maps[name] = fmap
                 arms[name] = {**info, "map": stem}

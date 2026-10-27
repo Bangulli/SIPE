@@ -154,11 +154,15 @@ class ConsensusGenerativeHead(nn.Module):
         scanners: torch.Tensor,
         locations: torch.Tensor,
         ridge: float = 1e-3,
+        noise_weight: float = 1.0,
     ) -> dict[str, float]:
         """Linear-Gaussian init from train views x [n, dim] (float64 inside).
 
         `locations` groups the views of a tile (any integer ids). Returns a few
-        diagnostics (traces) for logging.
+        diagnostics (traces) for logging. `noise_weight` (beta) scales the
+        within-tile noise covariance before it enters the model (marginal =
+        signal + beta * noise + offsets; B_k B_k^T = beta * noise): a closed-form
+        analysis knob for stronger shrinkage; 1 = the moment solution (training).
         """
         x = x.double()
         dim = self.dim
@@ -201,7 +205,7 @@ class ConsensusGenerativeHead(nn.Module):
 
         floor = ridge * float(torch.trace(total)) / dim
         signal = _psd_clip(signal, floor)
-        noise = _psd_clip(within, floor)
+        noise = noise_weight * _psd_clip(within, floor)
         L = _sqrtm(signal)
         marginal = signal + noise + offset_cov
         M = torch.linalg.solve(marginal, L).T  # L^T marginal^-1 (L, marginal sym.)
@@ -390,8 +394,9 @@ class ContentShiftHead(ConsensusGenerativeHead):
         scanners: torch.Tensor,
         locations: torch.Tensor,
         ridge: float = 1e-3,
+        noise_weight: float = 1.0,
     ) -> dict[str, float]:
-        stats = super().init_from_moments(x, scanners, locations, ridge)
+        stats = super().init_from_moments(x, scanners, locations, ridge, noise_weight)
         weights = torch.bincount(scanners, minlength=self.num_scanners).double()
         self.scanner_weight.copy_(weights / weights.sum())
         # L = C^(1/2) is symmetric with the eigenvectors of C.
