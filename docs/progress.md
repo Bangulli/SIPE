@@ -94,7 +94,27 @@ In flight / to launch (user, 2026-10-27; details in `docs/experiment-log.md`, Ex
   to V0-S, not selected (analysis row). Open: PLISM of G0 at its val-best α and of the
   eraser at its val-best λ (finding 18); paper scope under discussion (user).
 - Residual-only arm (fit `runs/2026-10-27_18-13-25_lxbelshark_c688`, `linear_lr=0`, done):
-  `cgm_select` and PLISM (`plism_apply`) not run yet.
+  PLISM running (user, 2026-10-27; `plism_apply`, tag `cgm_v1s_resonly_c688`); to read:
+  add the tag to the per-pair blocks vs G0 and vs V0-S. `cgm_select` only if the ablation
+  table keeps a SCORPION column (in-loop val is not the shared protocol, finding 3).
+- Tuned linear baselines (finding 18; selection = best SCORPION val top-1,
+  `--select-gain-frac 1.0`), running (user, 2026-10-27): `scripts/g0_tuned_run.sh` (G0,
+  expect α=8) and `DELTAS=slide|tile scripts/eraser_tuned_run.sh` (expect λ=100 or 30/300
+  slide, λ=1 tile); each fits, then PLISM (`plism_apply`) + HEST. Run dirs in
+  `runs/tuned_baselines_manifest.env`; tags `mixture_G0_K1_a<α>`,
+  `softshrink_gap_<slide|tile>_lam<λ>`. To read: check the selected value and region guard
+  in `selected.json`, add the tags to the PLISM / per-pair / HEST blocks. G0 α=4 sensitivity
+  not run (only if α=8 surprises).
+
+Paper outline proposed by the user 2026-10-27 (tentative, depends on the tuned baselines):
+(1) CGM V1-S beats the closed forms on PLISM, against the *tuned* G0 and erasers; (2)
+ablation: the closed-form init with stronger attenuation (β=3.5) recovers most of the
+trained linear gain, i.e. much of training is attenuation, learned without choosing a
+strength on SCORPION val; (3) the nonlinear residual (V1-S vs V0-S, residual-only arm); (4)
+backbones table on GAP features for UNI2-h and CONCH v1.5 (raw, tuned linear baselines,
+V1-S; no ablations), which settles the open pooling question in favor of GAP. Needs, if
+confirmed: the tuned baselines on the UNI2-h / CONCH GAP caches (scripts take only the
+H0-mini cache for now; `soft_shrinkage_sweep` on a non-H0-mini cache untested).
 
 Done 2026-10-24, read 2026-10-25: scanner-count sensitivity on H0-mini (V1-S, V0-S and the
 closed-form maps fitted on 2 or 3 of AT2 / DP200 / GT450 / Philips), now claim 13; likely in
