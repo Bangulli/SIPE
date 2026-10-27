@@ -27,6 +27,23 @@ top-1 differences of a few thousandths decided nothing that held on PLISM:
 - Use SCORPION val to select within one method family and as a sanity check; claim gains
   on PLISM per slide pair with the slide-bootstrap intervals. 5 val and 5 test WSIs.
 
+**18. "Smallest strength at 95% of the gain over raw" picks under-shrunk linear maps.** The
+gain over raw H0-mini is about 0.09 val top-1, so the 5% slack (about 0.005) is larger than
+every difference between good linear maps, and the rule stops at the weakest one inside the
+slack. G0, val top-1 by α (`runs/bench/2026-10-13_21-47-56_claude-box_6fdf_scorpion_mixture_gap/sweep_val.csv`):
+α=1 0.9787 (selected, "smallest α"), 2 0.9813, 4 0.9829, 8 0.9833 (best), 16 0.9823. Eraser,
+by λ (`runs/bench/2026-10-13_17-45-08_lxbelshark_db10_scorpion_softshrink_h0mini_gap_gain95/sweep_val.csv`):
+λ=0.5 0.9731 (selected), 10 0.9768, 100 0.9771 (best). G0 at its val-best α (8) is above
+trained V0-S a602 on val (0.9807, finding 1 list), and the noise-weighted CGM init that best
+matches V0-S corresponds to α about 4.5–5 (`docs/experiment-log.md`, Exp 7, 2026-10-27).
+CGM arms were selected against G0 (gain about 0.009, slack about 0.0005), so baselines and
+CGM were not selected on the same footing. PLISM confirms that stronger closed-form
+shrinkage helps: the CGM init with the noise scaled by β=3.5 is +0.017 [+0.014, +0.020] over
+G0 (all pairs), −0.008 [−0.009, −0.006] below trained V0-S
+(`runs/bench/2026-10-27_20-10-51_lxbelshark_ec6a_aug_cgminit_clean_all_b3.5`), while val
+ranks it above V0-S (0.9836 vs 0.9807). Not yet known: PLISM of G0 at α > 1 or the eraser
+at λ > 0.5.
+
 **2. PLISM's HR stain is a protocol outlier.** HR is Harris hematoxylin applied overnight
 (more than 24 h; checked on the images by the user, 2026-10-15). Its cross-stain pairs sit
 near zero for every method (G0 0.007 vs 0.357 for the other inter-staining pairs,

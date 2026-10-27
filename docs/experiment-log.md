@@ -269,8 +269,12 @@ The ISBI-facing summary of these items is in `docs/progress.md` (section 2, clai
   (clean, all tiles, beta 1 and 3.5, V0-S a602 in the same run, val + test read once):
   CGM-init(b=3.5) val top-1 0.9836 vs V0-S 0.9807 and CGM-init 0.9808; test 0.9709 vs
   0.9682 and 0.9674; relative change 0.311 vs 0.321 for V0-S (val, `summary_*.csv`).
-  beta was matched to a trained map, not selected on val: an analysis row. In progress:
-  PLISM of `map_CGM-init-b3.5_clean_all.pt` (tag `aug_cgminit_clean_all_b3.5`, user).
+  beta was matched to a trained map, not selected on val: an analysis row. PLISM done
+  (`runs/bench/2026-10-27_20-10-51_lxbelshark_ec6a_aug_cgminit_clean_all_b3.5`, per-pair
+  blocks): all pairs 0.311, +0.017 [+0.014, +0.020] over G0, −0.008 [−0.009, −0.006] vs V0-S
+  a602 (6% of pairs better; joint −0.008, inter-scanner −0.002 [−0.004, −0.001]). The init at
+  β=1 is −0.019 vs V0-S, so β=3.5 closes most of the gap; training still adds about 0.008 on
+  PLISM while val ranks β=3.5 above V0-S (finding 1).
   Residual-only arm, 2026-10-27: V1-S with `--model.init_args.linear_lr=0` (M, L, b, delta,
   posterior and noise factors stay at the moment init; only the encoder residual r trains;
   smoke-checked that only `map.r.*` moves). Fit `runs/2026-10-27_18-13-25_lxbelshark_c688`
