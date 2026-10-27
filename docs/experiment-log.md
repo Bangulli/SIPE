@@ -279,8 +279,16 @@ The ISBI-facing summary of these items is in `docs/progress.md` (section 2, clai
   posterior and noise factors stay at the moment init; only the encoder residual r trains;
   smoke-checked that only `map.r.*` moves). Fit `runs/2026-10-27_18-13-25_lxbelshark_c688`
   (W&B yokp8prl, 5999/6000): in-loop val top-1 0.985 = V1-S 7b71, scanner probe 0.350 vs
-  0.298, nonlinear_rel 0.086 vs 0.072 (CGM training table). In progress: `cgm_select`
-  (SCORPION val/test) and PLISM (`plism_apply`) of its `map_cgm.pt` (user).
+  0.298, nonlinear_rel 0.086 vs 0.072 (CGM training table). PLISM read 2026-10-27
+  (`runs/bench/2026-10-27_22-01-38_lxbelshark_5850_cgm_v1s_resonly_c688`, per-pair blocks in
+  `docs/progress.md`): all pairs 0.305, +0.012 [+0.010, +0.014] over G0, −0.013
+  [−0.015, −0.011] vs V0-S a602, −0.016 [−0.018, −0.014] vs V1-S 7b71; the β=1 init is
+  +0.006 over G0, so r adds about +0.006 but the frozen β=1 linear part caps it below the
+  β=3.5 init (+0.017). The in-loop val equality with V1-S (0.985) does not carry to PLISM.
+  `cgm_select` (`runs/bench/2026-10-27_22-03-51_lxbelshark_01f7_scorpion_cgm_resonly_c688`):
+  no outputs yet. Follow-up: `init_noise_weight` hparam in `ConsensusGenModule` (passed to
+  `init_from_moments`, written into `map_cgm.pt`; default 1 = unchanged), for a
+  residual-only fit on the β=3.5 init (command in `docs/progress.md` §3).
   Step 2 done 2026-10-15 (`runs/bench/2026-10-15_19-36-05_lxbelshark_eda5_scorpion_aug_attribution`,
   augmentation-attribution table, val retrieval only): CGM-init|clean|all 0.9808 = V0-S_a602
   0.9807, i.e. the V0-S estimator on clean data, without training and without augmentation,
@@ -939,6 +947,8 @@ Held-out test split; probes trained on val (`summary.csv`).
 | softshrink_gap_tile | gap | tile | 0.4 | 0.963 | 0.993 | 0.905 | 0.777 | 0.986 | smallest lambda with val top-1 gain >= 0.95 x best gain | `runs/bench/2026-10-14_09-21-09_lxbelshark_c54b_scorpion_softshrink_gap_tile` | 4b6e266 |
 | softshrink_gap_region | gap | region | 0 | 0.802 | 0.919 | 0.956 | 0.939 | 0.974 | raw | `runs/bench/2026-10-14_19-02-29_lxbelshark_71bb_scorpion_softshrink_gap_region` | 67e83ee |
 | softshrink_gap_region | gap | region | 0.7 | 0.971 | 0.994 | 0.720 | 0.393 | 0.987 | smallest lambda with val top-1 gain >= 0.95 x best gain | `runs/bench/2026-10-14_19-02-29_lxbelshark_71bb_scorpion_softshrink_gap_region` | 67e83ee |
+| softshrink_gap_tile_valbest | – | tile | – | – | – | – | – | – | no test yet (3 val λ rows) | `runs/bench/2026-10-27_21-31-38_lxbelshark_50cd_scorpion_softshrink_gap_tile_valbest` | f2f0b90 |
+| softshrink_gap_slide_valbest | – | slide | – | – | – | – | – | – | no test yet (2 val λ rows) | `runs/bench/2026-10-27_21-31-39_lxbelshark_e14c_scorpion_softshrink_gap_slide_valbest` | f2f0b90 |
 
 Test split, proxy protocol (`summary_test.csv`); λ selected on val, rule in the note (`selected.json`).
 
@@ -1044,6 +1054,7 @@ least-squares predictor of the tile consensus).
 | G1 K=8 | 0.50 | 0.50 | – | 0.973 (0.975) | 0.985 | 1.087 | 0.252 | 0.879 / 0.820 | 0.957 | 0.990 | 0.648 / 0.489 | 0.985 | – | `runs/bench/2026-10-13_21-47-56_claude-box_6fdf_scorpion_mixture_gap` | 9ee82ff* |
 | G2-scale K=8 | 0.50 | 0.50 | – | 0.973 (0.975) | 0.985 | 1.111 | 0.260 | 0.879 / 0.819 | 0.958 | 0.991 | 0.649 / 0.496 | 0.986 | – | `runs/bench/2026-10-13_21-47-56_claude-box_6fdf_scorpion_mixture_gap` | 9ee82ff* |
 | G2 K=8 | 0.50 | 0.50 | 0.25 | 0.981 (0.983) | 0.987 | 1.193 | 0.280 | 0.879 / 0.822 | 0.968 | 0.994 | 0.558 / 0.418 | 0.989 | – | `runs/bench/2026-10-13_21-47-56_claude-box_6fdf_scorpion_mixture_gap` | 9ee82ff* |
+| no results | – | – | – | – | – | – | – | – | – | – | – | – | – | `runs/bench/2026-10-27_21-31-39_lxbelshark_ac86_scorpion_mixture_G0_valbest` | f2f0b90 |
 
 Val: selection split, scanner/region probes trained on train (`summary_val.csv`); α chosen by the 95%-of-best-val-top-1-gain rule, β by the val consensus likelihood, γ by the val residual likelihood (`selected.json`, `likelihood.csv`). ll = mean held-out log-likelihood, nats/dim: resid = residuals under N_k of their consensus cluster, x = single views under the mixture marginal. Gate = single-view argmax p(k|x) vs the consensus cluster, and share of tiles whose 5 views gate to one cluster (α=1 map, `gating.csv`). Test: proxy protocol, probes trained on val (`summary_test.csv`). Reference = soft-shrinkage eraser map evaluated in the same run.
 

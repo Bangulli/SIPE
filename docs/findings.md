@@ -24,6 +24,10 @@ top-1 differences of a few thousandths decided nothing that held on PLISM:
   7e3c 0.9876 / 0.9780 vs 7b71 0.9852 / 0.9756; V0-S 3fa4 0.9832 vs a602 0.9807,
   `runs/bench/2026-10-17_11-24-40_lxbelshark_e198_scorpion_cgm_select_all`) and lower on PLISM (−0.002 [−0.002, −0.001] and −0.001 [−0.002, −0.000]). The
   clean-feature SCORPION protocol matches the no-aug training distribution.
+- Residual-only V1-S (linear part frozen at the β=1 init, fit
+  `runs/2026-10-27_18-13-25_lxbelshark_c688`): in-loop val top-1 0.985, equal to V1-S 7b71
+  (CGM training table; in-loop, not the shared protocol), but −0.016 [−0.018, −0.014] below it
+  on PLISM all pairs (`runs/bench/2026-10-27_22-01-38_lxbelshark_5850_cgm_v1s_resonly_c688`).
 - Use SCORPION val to select within one method family and as a sanity check; claim gains
   on PLISM per slide pair with the slide-bootstrap intervals. 5 val and 5 test WSIs.
 

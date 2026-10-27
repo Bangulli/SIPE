@@ -16,7 +16,9 @@ alignment losses. Pairing unit: tile-level pairs. Scanner labels enter only the
 likelihood (delta_k, B_k), never the map.
 
 on_fit_start sets the linear-Gaussian solution from `init_batches` train batches
-(skipped on resume). Every checkpoint save also writes `map_cgm.pt` in the run dir,
+(skipped on resume); `init_noise_weight` (beta, default 1 = the moment solution)
+scales the within-tile noise of that init, as `init_from_moments(noise_weight=)`.
+Every checkpoint save also writes `map_cgm.pt` in the run dir,
 a `--posthoc` module map file for sipe.bench.plism / sipe.bench.hest.
 
 Validation: PLISM-style cross-scanner retrieval top-1 (SCORPION proxy) on f(x) and
@@ -61,6 +63,7 @@ class ConsensusGenModule(FrozenBackboneModule):
         residual_penalty: float = 1e-3,
         init_batches: int = 40,
         init_ridge: float = 1e-3,
+        init_noise_weight: float = 1.0,
         freeze_backbone: bool = True,
         image_key: str = "image",
         domain_key: str = "domain",
@@ -131,6 +134,7 @@ class ConsensusGenModule(FrozenBackboneModule):
             torch.cat(scanners).to(self.device),
             torch.cat(locations).to(self.device),
             ridge=self.hparams.init_ridge,
+            noise_weight=self.hparams.init_noise_weight,
         )
         for logger in self.loggers:
             logger.log_metrics(stats, step=0)
@@ -186,6 +190,7 @@ class ConsensusGenModule(FrozenBackboneModule):
                 **network.head.fit_metadata(),
                 "kl_weight": float(hp.kl_weight),
                 "residual_penalty": float(hp.residual_penalty),
+                "init_noise_weight": float(hp.init_noise_weight),
                 "global_step": int(self.global_step),
             },
             path,
