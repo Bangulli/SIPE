@@ -1,4 +1,4 @@
-# Findings: what the acquisition-shrinkage phase taught us (as of 2026-10-21)
+# Findings: what the acquisition-shrinkage phase taught us (as of 2026-10-27)
 
 Lessons that outlive single runs: about the benchmarks, the protocols, the data and what
 did or did not work. Each one names its evidence (run dir, or the table in
@@ -79,7 +79,7 @@ ceiling) and the same all-pairs size as on CLS, +0.014 (`docs/progress.md`, clai
 So the gain's profile over shift types follows where the raw embedding sits, not the
 backbone. CONCH v1.5 on its official head is also low (all pairs 0.047, joint 0.023;
 `runs/bench/2026-10-22_17-14-14_lxbelshark_735a_conch15_head_ref`) and its V1-S gain over G0
-is again mostly inter-scanner (+0.065 vs +0.016 joint; `docs/progress.md`, claim 12). Keep one block set per backbone and pooling (`include=` / `exclude=*uni2h*`,
+is again mostly inter-scanner (+0.065 vs +0.016 joint; `docs/progress.md`, claim 12). On CONCH v1.5 too, GAP beats the official pooling (2026-10-27): raw GAP all pairs 0.095 vs 0.047 for the head, +0.048 [+0.042, +0.056] (`runs/bench/2026-10-26_00-43-42_lxbelshark_0e13_conch15_gap_ref`), and also on HEST (+0.016 [+0.006, +0.029]); V1-S's gain over G0 is positive in every shift type there (all pairs +0.041; `docs/progress.md`, claim 14). So for all three backbones the official or CLS-style embedding is the less scanner-robust one, and GAP is the better default for retrieval-type robustness; decide the pooling before reading maps, never on PLISM. Keep one block set per backbone and pooling (`include=` / `exclude=*uni2h*`,
 `*uni2h_gap*`, `*conch15*`) and report gains as differences to that set's own raw and G0 rows; state the
 pooling with every backbone number. For a PLISM `--smoke` run, the slides
 must give scanner, stain and joint pairs, or plismbench's aggregation fails
