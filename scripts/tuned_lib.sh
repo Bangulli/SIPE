@@ -10,6 +10,10 @@
 #   STEPS             "all" (default) or a list of 0 preflight, 1 fit, 2 PLISM + HEST,
 #                     3 PLISM only, 4 HEST only; later steps read the manifest
 #   DRY=1             print the commands instead of running them
+#   CACHE             SCORPION feature cache to fit on (default: H0-mini GAP)
+#   PLISM_RAW         raw PLISM run whose stored features plism_apply maps (same encoder
+#                     and pooling as CACHE; default: H0-mini GAP)
+#   MANIFEST          manifest of run dirs (default runs/tuned_baselines_manifest.env)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -19,9 +23,9 @@ WORKERS="${WORKERS:-8}"
 HEST_BENCH_DATA="${HEST_BENCH_DATA:-/mnt/nas7/data/Personal/Valentin/HEST/eval/bench_data}"
 STEPS="${STEPS:-all}"
 DRY="${DRY:-0}"
-CACHE=runs/bench/2026-10-13_15-44-35_lxbelshark_d6f7_scorpion_softshrink_h0mini_gap
-PLISM_RAW=runs/bench/2026-10-13_10-02-08_lxbelshark_053f_h0_mini_gap_ref
-MANIFEST=runs/tuned_baselines_manifest.env
+CACHE="${CACHE:-runs/bench/2026-10-13_15-44-35_lxbelshark_d6f7_scorpion_softshrink_h0mini_gap}"
+PLISM_RAW="${PLISM_RAW:-runs/bench/2026-10-13_10-02-08_lxbelshark_053f_h0_mini_gap_ref}"
+MANIFEST="${MANIFEST:-runs/tuned_baselines_manifest.env}"
 # One log dir per invocation (pid: parallel invocations started in the same second).
 LOGS="runs/tuned_baselines_logs/$(date +%Y-%m-%d_%H-%M-%S)_$(basename "$0" .sh)_$$"
 mkdir -p runs/bench "$LOGS"
@@ -48,10 +52,15 @@ get() {  # value of a manifest key, or fail
     [ -n "$v" ] || { log "missing $1 in $MANIFEST (run its step first)"; exit 1; }
     echo "$v"
 }
-newest() {  # newest dir of a tag created by this invocation
+newest() {  # <tag> [marker]: newest dir of a tag created by this invocation; with a marker
+    # (metrics = PLISM, results = HEST), only dirs containing it: PLISM and HEST of one tag run
+    # in parallel and each writes its own dir
     local d
-    d=$(ls -dt runs/bench/*_"$1" 2>/dev/null | head -1 || true)
-    [ -n "$d" ] && [ "$d" -nt "$STAMP" ] && echo "$d" || true
+    for d in $(ls -dt runs/bench/*_"$1" 2>/dev/null || true); do
+        [ -z "${2:-}" ] || [ -e "$d/$2" ] || continue
+        [ "$d" -nt "$STAMP" ] && echo "$d"
+        return
+    done
 }
 json_get() {  # <file> <python expression on `s`> (selected.json)
     uv run python -c "import json; s = json.load(open('$1')); print($2)"
@@ -74,7 +83,7 @@ plism() {  # <gpu> <map file> <tag>
     log "PLISM $3 on GPU $1 (~35 min)"
     run "$LOGS/plism_$3.log" env CUDA_VISIBLE_DEVICES="$1" bench/run python -m \
         sipe.bench.plism_apply --features-from "$PLISM_RAW" --posthoc "$2" --tag "$3"
-    record "PLISM_$3" "$(newest "$3")"
+    record "PLISM_$3" "$(newest "$3" metrics)"
 }
 
 hest() {  # <gpu> <map file> <tag>
@@ -83,7 +92,7 @@ hest() {  # <gpu> <map file> <tag>
         sipe.bench.hest --posthoc "$2" --tag "$3" --datasets '*' \
         --bench-data-root "$HEST_BENCH_DATA" \
         --num-workers "$( [ "$WORKERS" -eq 0 ] && echo 0 || echo 1 )"
-    record "HEST_$3" "$(newest "$3")"
+    record "HEST_$3" "$(newest "$3" results)"
 }
 
 bench_both() {  # <map file> <tag>: PLISM on GPU0 and HEST on GPU1 in parallel

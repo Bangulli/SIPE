@@ -71,6 +71,7 @@ Inference is one global map on one H0-mini GAP embedding: no scanner ID, no pair
 | 12 | (third backbone, one seed, nothing re-selected) CGM's gain over G0 on PLISM carries over to CONCH v1.5 (official head) | CONCH v1.5 tables (section 4; run dirs in `runs/conch15_manifest.env`; benchmarks at b613327 except G0 HEST at dd507ce (docs-only change), fit at bb132c4, all clean): raw head is weak on PLISM, all pairs 0.047 (`runs/bench/2026-10-22_17-14-14_lxbelshark_735a_conch15_head_ref`; inter-scanner 0.326, joint 0.023), close to UNI2-h CLS (0.043). G0 0.084 (`runs/bench/2026-10-22_19-41-27_lxbelshark_5b5b_conch15_head_g0`), V1-S e78e 0.103 (`runs/bench/2026-10-22_17-14-14_lxbelshark_b87a_cgm_v1s_conch15_e78e`). V1-S vs G0, all pairs +0.019 [+0.017, +0.022], better on 96% of pairs; inter-scanner +0.065 [+0.057, +0.073] (100%), inter-staining +0.014 [+0.012, +0.016], joint +0.016 [+0.014, +0.019]; without HR all pairs +0.022 [+0.020, +0.025] (100%). Leaderboard metric (medians): raw 0.410, G0 0.534, V1-S 0.580. SCORPION (`runs/bench/2026-10-22_16-08-16_lxbelshark_18b1_scorpion_conch15_cgm_select`), far from ceiling: val top-1 raw 0.1702, G0 0.7002, V1-S 0.8077 (+0.1075 over G0); test 0.1435 / 0.6163 / 0.7417. In-loop training (`runs/2026-10-22_10-28-08_lxbelshark_e78e`, 5999/6000): nonlinear_rel 0.120 (UNI2-h CLS 0.058, GAP 0.012). HEST average: raw 0.348 (`runs/bench/2026-10-22_22-13-02_lxbelshark_56da_conch15_head_ref`), G0 0.351 (`runs/bench/2026-10-23_01-13-05_lxbelshark_4513_conch15_head_g0`), V1-S 0.351 (`runs/bench/2026-10-22_22-13-02_lxbelshark_3560_cgm_v1s_conch15_e78e`); paired V1-S vs raw +0.003 [−0.001, +0.007] (18/29 folds better), vs G0 +0.001 [−0.002, +0.003]; G0 vs raw +0.003 [−0.001, +0.006]. Per task vs raw, gene-bootstrap intervals exclude 0 for CCRCC +0.010 and PRAD +0.013 (up), none down; vs G0 only IDC −0.002 [−0.003, −0.000] | read 2026-10-22 (SCORPION + PLISM) and 2026-10-23 (HEST): the gain over G0 transfers and is the largest of the three backbones in absolute terms (+0.019 all pairs); like UNI2-h CLS, from a low raw level the gain is mostly inter-scanner. HEST kept: no task significantly below raw (unlike UNI2-h, claims 10, 11). One seed, H0-mini hyperparameters |
 | 13 | (analysis on H0-mini, nothing selected; likely in the paper, user 2026-10-25) CGM's lead over G0 does not depend on the number of training scanners | Scanner-count tables (section 4): maps fitted on n = 2, 3, 4 of AT2 / DP200 / GT450 / Philips (every subset; P1000 excluded for its registration offset) and on all five; fixed image budget of 512 per step, so fewer scanners does not mean less data. SCORPION test (`runs/bench/2026-10-24_18-06-13_lxbelshark_29f2_scorpion_scanner_count_test`): V1-S − G0 of the same subset +0.0227 [+0.0187, +0.0268] at n = 2, +0.0164 at n = 3, +0.0126 at n = 4, +0.0124 with all five; at n = 2 +0.0249 on pairs with an unseen scanner vs +0.0119 on seen pairs. V0-S − G0 +0.0197 [+0.0157, +0.0238] at n = 2, +0.0052 with all five. PLISM all pairs: G0 0.262 / 0.279 / 0.289 / 0.294 for n = 2 / 3 / 4 / 5, V1-S 0.291 / 0.310 / 0.320 / 0.321, V0-S 0.290 / 0.307 / 0.316 / 0.318; V1-S − G0 +0.029 [+0.024, +0.033] at n = 2, +0.028 with all five (99% / 98% of pairs); V0-S − G0 +0.028 [+0.023, +0.032] at n = 2, +0.025 with all five. Inter-scanner: V1-S − G0 +0.022 [+0.015, +0.032] at n = 2 vs +0.012 with all five. Both trained maps beat the G0 of their own subset in all 10 subsets (per-subset PLISM block in `docs/experiment-log.md`). PLISM pairs whose two scanners were not in the fit subset (AT2, GT450, P = Philips matched by model; n = 2): V1-S +0.022 [+0.015, +0.032], V0-S +0.022 [+0.014, +0.031]. PLISM for the sc_* maps through `sipe.bench.plism_apply` on stored raw features; check `runs/bench/2026-10-23_15-00-18_lxbelshark_f206_scapply_check_g0_full` = `mixture_G0_K1` per pair (max abs top-1 difference 2.5e-4) | read 2026-10-24 (V1-S) and 2026-10-25 (V0-S): every model gains from more scanners, the trained maps do not need more of them than G0; on PLISM the linear V0-S has almost all of the lead at every n (claim 6), on SCORPION the nonlinear share is smaller at n = 2 than with all five. One fit per subset, n = 4 a single subset; the seen / unseen PLISM groups differ in pair difficulty, so only "positive on unseen scanners" is solid |
 | 14 | (pooling sensitivity: CONCH v1.5 on patch-token GAP, one seed, nothing re-selected) CGM's gain over G0 on CONCH v1.5 does not depend on the official head | CONCH v1.5 GAP tables (section 4; run dirs in `runs/conch15_gap_manifest.env`; fit and G0 at 98d5bdf, the rest at 816db3e (docs-only change), all clean): raw GAP is more robust than the raw head, all pairs 0.095 vs 0.047, +0.048 [+0.042, +0.056], better on 93% of pairs (`runs/bench/2026-10-26_00-43-42_lxbelshark_0e13_conch15_gap_ref`), but far below H0-mini GAP (0.227, claim 4) and UNI2-h GAP (0.333, claim 11). G0 0.164 (`runs/bench/2026-10-26_03-13-22_lxbelshark_26a4_conch15_gap_g0`), V1-S 1ee1 0.206 (`runs/bench/2026-10-26_00-43-42_lxbelshark_6c45_cgm_v1s_conch15_gap_1ee1`). V1-S vs G0, all pairs +0.041 [+0.036, +0.047], better on 99% of pairs; inter-scanner +0.058 [+0.048, +0.068] (100%), inter-staining +0.031 [+0.026, +0.036], joint +0.042 [+0.035, +0.048]; without HR all pairs G0 0.190, V1-S 0.238. V1-S on GAP vs V1-S on the head, all pairs +0.103 [+0.090, +0.117]. Leaderboard metric (medians): raw 0.519, G0 0.644, V1-S 0.699. SCORPION (`runs/bench/2026-10-26_00-06-32_lxbelshark_cea6_scorpion_conch15_gap_cgm_select`): val top-1 raw 0.3685, G0 0.9558, V1-S 0.9792 (+0.0234 over G0); test 0.3008 / 0.9172 / 0.9567. In-loop training (`runs/2026-10-25_18-34-14_lxbelshark_1ee1`, 5999/6000): nonlinear_rel 0.070 (head 0.120). HEST average: raw 0.364 (`runs/bench/2026-10-26_05-46-52_lxbelshark_92c3_conch15_gap_ref`), G0 0.362 (`runs/bench/2026-10-26_07-13-24_lxbelshark_f668_conch15_gap_g0`), V1-S 0.358 (`runs/bench/2026-10-26_05-46-52_lxbelshark_039c_cgm_v1s_conch15_gap_1ee1`); paired G0 vs raw −0.002 [−0.006, +0.002]; V1-S vs raw −0.007 [−0.014, +0.000] (9/29 folds better), vs G0 −0.004 [−0.009, −0.000]; per task vs raw, gene-bootstrap intervals exclude 0 for READ −0.025, SKCM −0.025, LYMPH_IDC −0.008, IDC −0.006 (down). Raw GAP vs raw head on HEST +0.016 [+0.006, +0.029] (22/29 folds) | read 2026-10-27: the gain over G0 transfers and is larger than on the head (+0.041 vs +0.019 all pairs), positive in every shift type; as for UNI2-h, the pooling sets the raw level (GAP above head on PLISM and on HEST). HEST: G0 free, V1-S a small cost like UNI2-h GAP (vs raw the interval touches 0, vs G0 it excludes 0 barely). One seed, H0-mini hyperparameters |
+| 15 | V1-S beats every *tuned* linear baseline on PLISM | vs the tuned G0 α=8 (`runs/bench/2026-10-28_01-54-30_lxbelshark_d718_mixture_G0_K1_a8`, 0.314): V1-S +0.008 [+0.006, +0.009] (7b71, 89% of pairs), +0.008 (8ed0, 91%), +0.007 (ac94, 86%), positive in every group, without HR +0.009; V0-S +0.004 to +0.005 (3 seeds). Tuned erasers below the tuned G0: tile λ=1 0.312 (−0.002 [−0.002, −0.001]), slide λ=100 0.290. SCORPION test: V1-S 0.9756 vs tuned G0 0.9707; V0-S 0.9682 is *below* the tuned G0 on SCORPION val and test (finding 1) | done 2026-10-28 (paper headline) |
 
 Caveats to state in the paper: one SCORPION split (5 val and 5 test WSIs), SCORPION val is
 near ceiling (top-1 differences of a few thousandths); hyperparameters not tuned; V2-S, the
@@ -146,7 +147,10 @@ In flight / to launch (user, 2026-10-27; details in `docs/experiment-log.md`, Ex
   --features-from runs/bench/2026-10-13_10-02-08_lxbelshark_053f_h0_mini_gap_ref --posthoc
   runs/bench/2026-10-28_08-21-40_claude-box_bc46_scorpion_aug_attribution_fp_beta/map_CGM-fp-per_scanner-k1-b1.5_clean_all.pt
   --tag cgm_fp_k1_b1.5_bc46`; k=2 β=1 (already on PLISM) is tied with it on val.
-- To launch (user, 2026-10-28): V0-S recipe sensitivity (does training's +0.004 over the
+- Fit done 2026-10-28 (11999/12000, maps every 2000 steps; PLISM not run yet): `runs/2026-10-28_10-04-49_lxbelshark_bc3a`
+  (W&B zny5eyu6), the 12k-step V0-S below; the paper's limitations say the budget
+  sensitivity is not tested, update them if this lands before the deadline.
+  Launched (user, 2026-10-28): V0-S recipe sensitivity (does training's +0.004 over the
   tuned G0 depend on the step budget? in-loop val is flat for V0-S, 0.9796–0.9809 over the
   whole a602 run, so a val stopping rule cannot answer it). New option
   `--model.init_args.map_every_n_steps` (keeps `map_cgm_step<step>.pt`; training unchanged).
@@ -158,14 +162,42 @@ In flight / to launch (user, 2026-10-27; details in `docs/experiment-log.md`, Ex
   the tags to the per-pair block vs the tuned G0; 6000 ≈ 12000 ≈ 0.318 = plateau (recipe
   safe); 12000 above = the paper recipe is under-trained (conservative); 12000 below = the
   6000 budget is a hand-picked sweet spot, to be stated.
-- Tuned linear baselines (finding 18; selection = best SCORPION val top-1,
-  `--select-gain-frac 1.0`), running (user, 2026-10-27): `scripts/g0_tuned_run.sh` (G0,
-  expect α=8) and `DELTAS=slide|tile scripts/eraser_tuned_run.sh` (expect λ=100 or 30/300
-  slide, λ=1 tile); each fits, then PLISM (`plism_apply`) + HEST. Run dirs in
-  `runs/tuned_baselines_manifest.env`; tags `mixture_G0_K1_a<α>`,
-  `softshrink_gap_<slide|tile>_lam<λ>`. To read: check the selected value and region guard
-  in `selected.json`, add the tags to the PLISM / per-pair / HEST blocks. G0 α=4 sensitivity
-  not run (only if α=8 surprises).
+- Done, read 2026-10-28: tuned linear baselines (finding 18; selection = best SCORPION val
+  top-1, `--select-gain-frac 1.0`; run dirs in `runs/tuned_baselines_manifest.env`; no
+  selection at a grid edge, region guard not violated, `selected.json`): G0 α=8 (val 0.9833,
+  test 0.9707), eraser slide λ=100 (val 0.9771, test 0.9660), eraser tile λ=1 (val 0.9813,
+  test 0.9679). PLISM all pairs (PLISM table): 0.314 / 0.290 / 0.312 (λ=0.5 slide 0.281,
+  λ=0.4 tile 0.304); without HR 0.362 / 0.334 / 0.360. HEST average (HEST table): 0.362 /
+  0.361 / 0.364. Per pair vs the tuned G0 (block "PLISM per slide pair vs the tuned G0",
+  tags added 2026-10-28): tile eraser −0.002 [−0.002, −0.001], slide eraser −0.024
+  [−0.028, −0.019], G0 α=1 −0.020 [−0.024, −0.017]; V0 +0.002 [+0.001, +0.002], V1 +0.007
+  [+0.005, +0.008], V2-S +0.009 [+0.008, +0.011], no-aug V1-S +0.006 [+0.005, +0.007]. So the
+  tuned G0 is the strongest linear map; claim 15.
+
+Decision 2026-10-28 (user): the paper reports only tuned baselines: main table = raw, eraser
+tile λ=1, G0 α=8, V0-S, V1-S, oracle (G0 α=1 and the slide eraser dropped; slide λ=100 named
+once in the setup, PLISM 0.290 vs tile 0.312). Ablation table without the G0 α=1 row.
+Ablation table (user 2026-10-28): Δ vs V1-S 7b71 (the per-pair block ref=cgm_v1s_7b71, tags added
+for the tuned G0, inits, V0, V0-S seeds, tile eraser), with absolute top-1 and V1-S seeds 43/44 as rows.
+V2-S row added to the paper's main table (user 2026-10-28): SCORPION test 0.9748, PLISM from
+`runs/bench/2026-10-15_21-23-35_lxbelshark_60b4_cgm_v2s_920f`; HEST done and read 2026-10-28:
+average 0.362 (`runs/bench/2026-10-28_11-30-27_lxbelshark_536f_cgm_v2s_920f`; V1-S 0.363, raw
+0.364; HEST table). V2-S is in the table unbolded with a dagger: not selected on SCORPION val.
+Fixed 2026-10-28: `scripts/tuned_lib.sh` recorded the PLISM dir as HEST_* for the tuned
+baselines (PLISM and HEST of one tag run in parallel, `newest` picked the newest dir of the
+tag); manifest corrected (HEST = `..._0d33`, `..._8ca2`, `..._c687`); the generated tables were
+never affected (they glob the run dirs).
+Scanner-count paragraph removed from the paper (user 2026-10-28: G0 there is α=1 only, little
+space; claim 13 stays here, not in the paper). LOSO also removed (user 2026-10-28: vs G0 α=1 only, SCORPION-only; claim 8 stays here).
+Still on G0 α=1, marked TODO in `paper.tex`: the backbones table (the limitations no longer
+say "G0 not tuned on the other backbones"; put it back if the tuned runs are not done). To launch (user) for the backbones table, tuned G0 on the GAP caches
+(`scripts/g0_tuned_run.sh` now takes CACHE / PLISM_RAW / MANIFEST / TAG_PREFIX /
+REFERENCE_MAP; H0-mini defaults unchanged, checked with DRY=1):
+`CACHE=runs/bench/2026-10-20_21-55-38_lxbelshark_7578_uni2h_cache PLISM_RAW=runs/bench/2026-10-21_19-32-12_lxbelshark_819b_uni2h_gap_ref MANIFEST=runs/uni2h_gap_manifest.env TAG_PREFIX=uni2h_gap_g0 REFERENCE_MAP=none scripts/g0_tuned_run.sh`
+and the same with `CACHE=runs/bench/2026-10-22_10-28-12_lxbelshark_6f99_conch15_cache
+PLISM_RAW=runs/bench/2026-10-26_00-43-42_lxbelshark_0e13_conch15_gap_ref
+MANIFEST=runs/conch15_gap_manifest.env TAG_PREFIX=conch15_gap_g0`. To read: selected α
+(`selected.json`, grid edge), then per-pair blocks with `ref=<tuned tag>`.
 
 Paper outline proposed by the user 2026-10-27 (tentative, depends on the tuned baselines):
 (1) CGM V1-S beats the closed forms on PLISM, against the *tuned* G0 and erasers; (2)
@@ -295,7 +327,49 @@ selection unchanged (no-aug 7e3c). It replaces e198 in the `cgm` block.
   arm to separate scanner diversity from data size); design in `docs/experiment-log.md`,
   section 3. Closed form is cheap (minutes); trained points cost ~1 h each.
 
-Paper writing: not started.
+### Paper status (2026-10-28, authoritative; supersedes the scattered 2026-10-28 notes above)
+
+Draft: `paper-overleaf/paper.tex` + `refs.bib`, an Overleaf git repo. The user commits, pulls
+and pushes there; never commit in it (co-authors edit on Overleaf, which adds its own commits).
+Not compilable in claude-box (no LaTeX; TinyTeX install was denied): page count is checked
+by the user on Overleaf. Every number has a `%` comment naming its run dir.
+
+Content as of now (user decisions 2026-10-28):
+- Only tuned baselines (SCORPION val argmax). Table 1 (main): raw, eraser tile λ=1, G0 α=8,
+  V0-S, V1-S (bold = best among selected methods), V2-S with † "not selected: below V1-S on
+  SCORPION validation" (HEST 0.362, `runs/bench/2026-10-28_11-30-27_lxbelshark_536f_cgm_v2s_920f`),
+  condition-mean oracle. G0 α=1 and the slide eraser (λ=100, PLISM 0.290) are out of the
+  tables; the slide eraser is named once in the setup.
+- Table 2 (ablations): absolute PLISM top-1 (all, joint), Δ all vs V1-S 7b71 with CI, share
+  of pairs better than V1-S, SCORPION val; rows: tuned G0, CGM init, init α=3.5 (= noise weight
+  β=3.5 in code), descent 1/2 steps, residual only, V0, V0-S (seed 42; others in caption), V1,
+  V1-S ref + seeds 43/44, no-aug, V2-S. Source block: per-pair vs `cgm_v1s_7b71`
+  (tags added 2026-10-28).
+- Table 3 (backbones, GAP): H0-mini / UNI2-h / CONCH v1.5, raw / G0 / V1-S. G0 is still α=1
+  there (`% TODO` in paper.tex).
+- Removed: scanner-count paragraph (claim 13) and LOSO (claim 8): both compare with G0 α=1
+  only; kept here as claims, not in the paper.
+- Method states finding 19 ("Training budget": optimum = constant map, map = fixed 6,000-step
+  budget from the closed-form init). Limitations: one split, budget sensitivity untested,
+  one fit for ablation arms / other backbones, no claim on unseen scanner models.
+- Citations added: Srinidhi et al. 2021 (CPath DA survey; volume/pages from memory, unverified),
+  Lu et al. 2024 (CONCH).
+
+Remaining, in order:
+1. Tuned G0 on the GAP caches of UNI2-h and CONCH (user; commands in the "Decision 2026-10-28"
+   paragraph above, `scripts/g0_tuned_run.sh` with CACHE / PLISM_RAW / MANIFEST / TAG_PREFIX /
+   REFERENCE_MAP). Then: check `selected.json` (α, grid edge) and that the manifest's PLISM and
+   HEST entries are different dirs (first use of the fixed `newest <tag> <marker>`), add per-pair
+   blocks with `ref=<tuned tag>`, replace Table 3's G0 rows and Δ column, drop the `% TODO`.
+   If not done before the deadline: put "G0 was not tuned on the other backbones" back into
+   the limitations.
+2. PLISM of the 12k-step V0-S maps (user): `bench/run python -m sipe.bench.plism_apply
+   --features-from runs/bench/2026-10-13_10-02-08_lxbelshark_053f_h0_mini_gap_ref --posthoc
+   runs/2026-10-28_10-04-49_lxbelshark_bc3a/map_cgm_step<12000|06000|02000>.pt --tag
+   v0s_s12k_bc3a_s<step>`. Read vs a602 (6000-step endpoint, 0.318) and the tuned G0 (0.314);
+   update the limitation on budget sensitivity accordingly.
+3. User on Overleaf: page count (Table 2 has 16 rows), affiliation 2 incomplete, the user's
+   `% TODO: change the mean embedding notation`, ethics/acknowledgment sections commented out.
 
 ## 4. Paper tables (generated)
 
@@ -604,7 +678,7 @@ Each row against the strongest linear closed form (finding 18): G0 at its SCORPI
 val-best α=8. Ladder of the paper ablation: CGM-init (β=1, β=3.5 = its val argmax),
 closed-form iterates (finding 19), V0-S / V1-S (3 seeds each), residual-only.
 
-<!-- results:plism_pairs exclude=*smoke* ref=mixture_G0_K1_a8 tags=cgm_v1s_7b71,cgm_v1s_seed43_8ed0,cgm_v1s_seed44_ac94,cgm_v0s_a602,cgm_v0s_seed43_f119,cgm_v0s_seed44_946b,aug_cgminit_clean_all,aug_cgminit_clean_all_b3.5,cgm_fp_k1_6e3e,cgm_fp_k2_6e3e,cgm_v1s_resonly_c688 -->
+<!-- results:plism_pairs exclude=*smoke* ref=mixture_G0_K1_a8 tags=cgm_v1s_7b71,cgm_v1s_seed43_8ed0,cgm_v1s_seed44_ac94,cgm_v0s_a602,cgm_v0s_seed43_f119,cgm_v0s_seed44_946b,aug_cgminit_clean_all,aug_cgminit_clean_all_b3.5,cgm_fp_k1_6e3e,cgm_fp_k2_6e3e,cgm_v1s_resonly_c688,softshrink_gap_tile_lam1,softshrink_gap_slide_lam100,mixture_G0_K1,cgm_v0_5ee4,cgm_v1_73af,cgm_v2s_920f,cgm_v1s_noaug_7e3c -->
 <!-- generated by `uv run python -m sipe.eval.results_tables --write`; do not edit -->
 
 | method | pairs | n | top-1 | ref top-1 | Δ top-1 | 95% CI | pairs better | bench run dir |
@@ -675,6 +749,48 @@ closed-form iterates (finding 19), V0-S / V1-S (3 seeds each), residual-only.
 | cgm_v1s_resonly_c688 | all | 4095 | 0.305 | 0.314 | -0.008 | [-0.011, -0.006] | 20% | `runs/bench/2026-10-27_22-01-38_lxbelshark_5850_cgm_v1s_resonly_c688` |
 | cgm_v1s_resonly_c688 | inter-scanner, HR | 21 | 0.730 | 0.720 | +0.010 | [+0.003, +0.019] | 90% | `runs/bench/2026-10-27_22-01-38_lxbelshark_5850_cgm_v1s_resonly_c688` |
 | cgm_v1s_resonly_c688 | all, HR | 609 | 0.033 | 0.037 | -0.004 | [-0.005, -0.002] | 3% | `runs/bench/2026-10-27_22-01-38_lxbelshark_5850_cgm_v1s_resonly_c688` |
+| softshrink_gap_tile_lam1 | inter-scanner | 273 | 0.890 | 0.891 | -0.002 | [-0.003, -0.001] | 28% | `runs/bench/2026-10-28_09-10-20_lxbelshark_237c_softshrink_gap_tile_lam1` |
+| softshrink_gap_tile_lam1 | inter-staining | 546 | 0.312 | 0.313 | -0.001 | [-0.002, -0.001] | 23% | `runs/bench/2026-10-28_09-10-20_lxbelshark_237c_softshrink_gap_tile_lam1` |
+| softshrink_gap_tile_lam1 | scanner + staining | 3276 | 0.264 | 0.266 | -0.002 | [-0.003, -0.001] | 23% | `runs/bench/2026-10-28_09-10-20_lxbelshark_237c_softshrink_gap_tile_lam1` |
+| softshrink_gap_tile_lam1 | all | 4095 | 0.312 | 0.314 | -0.002 | [-0.002, -0.001] | 23% | `runs/bench/2026-10-28_09-10-20_lxbelshark_237c_softshrink_gap_tile_lam1` |
+| softshrink_gap_tile_lam1 | inter-scanner, HR | 21 | 0.718 | 0.720 | -0.003 | [-0.006, +0.000] | 14% | `runs/bench/2026-10-28_09-10-20_lxbelshark_237c_softshrink_gap_tile_lam1` |
+| softshrink_gap_tile_lam1 | all, HR | 609 | 0.036 | 0.037 | -0.001 | [-0.001, -0.000] | 2% | `runs/bench/2026-10-28_09-10-20_lxbelshark_237c_softshrink_gap_tile_lam1` |
+| softshrink_gap_slide_lam100 | inter-scanner | 273 | 0.877 | 0.891 | -0.014 | [-0.019, -0.010] | 10% | `runs/bench/2026-10-28_06-45-26_lxbelshark_49a0_softshrink_gap_slide_lam100` |
+| softshrink_gap_slide_lam100 | inter-staining | 546 | 0.308 | 0.313 | -0.005 | [-0.009, -0.001] | 38% | `runs/bench/2026-10-28_06-45-26_lxbelshark_49a0_softshrink_gap_slide_lam100` |
+| softshrink_gap_slide_lam100 | scanner + staining | 3276 | 0.238 | 0.266 | -0.028 | [-0.032, -0.023] | 13% | `runs/bench/2026-10-28_06-45-26_lxbelshark_49a0_softshrink_gap_slide_lam100` |
+| softshrink_gap_slide_lam100 | all | 4095 | 0.290 | 0.314 | -0.024 | [-0.028, -0.019] | 16% | `runs/bench/2026-10-28_06-45-26_lxbelshark_49a0_softshrink_gap_slide_lam100` |
+| softshrink_gap_slide_lam100 | inter-scanner, HR | 21 | 0.712 | 0.720 | -0.008 | [-0.031, +0.015] | 48% | `runs/bench/2026-10-28_06-45-26_lxbelshark_49a0_softshrink_gap_slide_lam100` |
+| softshrink_gap_slide_lam100 | all, HR | 609 | 0.037 | 0.037 | +0.000 | [-0.001, +0.001] | 52% | `runs/bench/2026-10-28_06-45-26_lxbelshark_49a0_softshrink_gap_slide_lam100` |
+| mixture_G0_K1 | inter-scanner | 273 | 0.887 | 0.891 | -0.004 | [-0.010, -0.000] | 40% | `runs/bench/2026-10-14_07-10-49_lxbelshark_0721_mixture_G0_K1` |
+| mixture_G0_K1 | inter-staining | 546 | 0.303 | 0.313 | -0.010 | [-0.014, -0.007] | 21% | `runs/bench/2026-10-14_07-10-49_lxbelshark_0721_mixture_G0_K1` |
+| mixture_G0_K1 | scanner + staining | 3276 | 0.243 | 0.266 | -0.023 | [-0.027, -0.020] | 3% | `runs/bench/2026-10-14_07-10-49_lxbelshark_0721_mixture_G0_K1` |
+| mixture_G0_K1 | all | 4095 | 0.294 | 0.314 | -0.020 | [-0.024, -0.017] | 8% | `runs/bench/2026-10-14_07-10-49_lxbelshark_0721_mixture_G0_K1` |
+| mixture_G0_K1 | inter-scanner, HR | 21 | 0.731 | 0.720 | +0.011 | [+0.004, +0.021] | 90% | `runs/bench/2026-10-14_07-10-49_lxbelshark_0721_mixture_G0_K1` |
+| mixture_G0_K1 | all, HR | 609 | 0.032 | 0.037 | -0.005 | [-0.009, -0.003] | 3% | `runs/bench/2026-10-14_07-10-49_lxbelshark_0721_mixture_G0_K1` |
+| cgm_v0_5ee4 | inter-scanner | 273 | 0.895 | 0.891 | +0.004 | [+0.003, +0.005] | 86% | `runs/bench/2026-10-16_22-17-16_lxbelshark_d926_cgm_v0_5ee4` |
+| cgm_v0_5ee4 | inter-staining | 546 | 0.316 | 0.313 | +0.003 | [+0.002, +0.004] | 69% | `runs/bench/2026-10-16_22-17-16_lxbelshark_d926_cgm_v0_5ee4` |
+| cgm_v0_5ee4 | scanner + staining | 3276 | 0.267 | 0.266 | +0.001 | [+0.000, +0.002] | 52% | `runs/bench/2026-10-16_22-17-16_lxbelshark_d926_cgm_v0_5ee4` |
+| cgm_v0_5ee4 | all | 4095 | 0.315 | 0.314 | +0.002 | [+0.001, +0.002] | 57% | `runs/bench/2026-10-16_22-17-16_lxbelshark_d926_cgm_v0_5ee4` |
+| cgm_v0_5ee4 | inter-scanner, HR | 21 | 0.728 | 0.720 | +0.008 | [+0.001, +0.015] | 95% | `runs/bench/2026-10-16_22-17-16_lxbelshark_d926_cgm_v0_5ee4` |
+| cgm_v0_5ee4 | all, HR | 609 | 0.036 | 0.037 | -0.001 | [-0.001, -0.000] | 7% | `runs/bench/2026-10-16_22-17-16_lxbelshark_d926_cgm_v0_5ee4` |
+| cgm_v1_73af | inter-scanner | 273 | 0.898 | 0.891 | +0.007 | [+0.005, +0.009] | 94% | `runs/bench/2026-10-17_00-15-28_lxbelshark_7a78_cgm_v1_73af` |
+| cgm_v1_73af | inter-staining | 546 | 0.320 | 0.313 | +0.007 | [+0.006, +0.009] | 95% | `runs/bench/2026-10-17_00-15-28_lxbelshark_7a78_cgm_v1_73af` |
+| cgm_v1_73af | scanner + staining | 3276 | 0.272 | 0.266 | +0.006 | [+0.005, +0.008] | 87% | `runs/bench/2026-10-17_00-15-28_lxbelshark_7a78_cgm_v1_73af` |
+| cgm_v1_73af | all | 4095 | 0.320 | 0.314 | +0.007 | [+0.005, +0.008] | 89% | `runs/bench/2026-10-17_00-15-28_lxbelshark_7a78_cgm_v1_73af` |
+| cgm_v1_73af | inter-scanner, HR | 21 | 0.731 | 0.720 | +0.011 | [+0.004, +0.019] | 100% | `runs/bench/2026-10-17_00-15-28_lxbelshark_7a78_cgm_v1_73af` |
+| cgm_v1_73af | all, HR | 609 | 0.038 | 0.037 | +0.001 | [+0.000, +0.002] | 74% | `runs/bench/2026-10-17_00-15-28_lxbelshark_7a78_cgm_v1_73af` |
+| cgm_v2s_920f | inter-scanner | 273 | 0.898 | 0.891 | +0.007 | [+0.005, +0.010] | 95% | `runs/bench/2026-10-15_21-23-35_lxbelshark_60b4_cgm_v2s_920f` |
+| cgm_v2s_920f | inter-staining | 546 | 0.322 | 0.313 | +0.009 | [+0.007, +0.011] | 93% | `runs/bench/2026-10-15_21-23-35_lxbelshark_60b4_cgm_v2s_920f` |
+| cgm_v2s_920f | scanner + staining | 3276 | 0.275 | 0.266 | +0.009 | [+0.008, +0.011] | 91% | `runs/bench/2026-10-15_21-23-35_lxbelshark_60b4_cgm_v2s_920f` |
+| cgm_v2s_920f | all | 4095 | 0.323 | 0.314 | +0.009 | [+0.008, +0.011] | 91% | `runs/bench/2026-10-15_21-23-35_lxbelshark_60b4_cgm_v2s_920f` |
+| cgm_v2s_920f | inter-scanner, HR | 21 | 0.726 | 0.720 | +0.006 | [-0.006, +0.016] | 81% | `runs/bench/2026-10-15_21-23-35_lxbelshark_60b4_cgm_v2s_920f` |
+| cgm_v2s_920f | all, HR | 609 | 0.038 | 0.037 | +0.001 | [+0.000, +0.002] | 66% | `runs/bench/2026-10-15_21-23-35_lxbelshark_60b4_cgm_v2s_920f` |
+| cgm_v1s_noaug_7e3c | inter-scanner | 273 | 0.898 | 0.891 | +0.007 | [+0.004, +0.010] | 94% | `runs/bench/2026-10-16_14-07-40_lxbelshark_3c28_cgm_v1s_noaug_7e3c` |
+| cgm_v1s_noaug_7e3c | inter-staining | 546 | 0.320 | 0.313 | +0.007 | [+0.006, +0.009] | 90% | `runs/bench/2026-10-16_14-07-40_lxbelshark_3c28_cgm_v1s_noaug_7e3c` |
+| cgm_v1s_noaug_7e3c | scanner + staining | 3276 | 0.272 | 0.266 | +0.006 | [+0.005, +0.007] | 82% | `runs/bench/2026-10-16_14-07-40_lxbelshark_3c28_cgm_v1s_noaug_7e3c` |
+| cgm_v1s_noaug_7e3c | all | 4095 | 0.320 | 0.314 | +0.006 | [+0.005, +0.007] | 84% | `runs/bench/2026-10-16_14-07-40_lxbelshark_3c28_cgm_v1s_noaug_7e3c` |
+| cgm_v1s_noaug_7e3c | inter-scanner, HR | 21 | 0.735 | 0.720 | +0.015 | [+0.007, +0.021] | 100% | `runs/bench/2026-10-16_14-07-40_lxbelshark_3c28_cgm_v1s_noaug_7e3c` |
+| cgm_v1s_noaug_7e3c | all, HR | 609 | 0.038 | 0.037 | +0.001 | [+0.000, +0.001] | 50% | `runs/bench/2026-10-16_14-07-40_lxbelshark_3c28_cgm_v1s_noaug_7e3c` |
 
 Reference: `mixture_G0_K1_a8` (`runs/bench/2026-10-28_01-54-30_lxbelshark_d718_mixture_G0_K1_a8`). Per slide pair top-1 (plismbench `metrics.csv`, mean of both directions); Δ = method minus reference, mean over the pairs of the group; 95% CI = percentile interval of a slide-level bootstrap (2000 draws, seed 0; pairs share slides, so slides are resampled and a pair counts once per drawn copy of each of its slides); pairs better = share of pairs with Δ > 0. HR = either slide has the HR stain. One fit per method, so the interval covers the slide sample only, not seeds.
 
@@ -682,7 +798,7 @@ Reference: `mixture_G0_K1_a8` (`runs/bench/2026-10-28_01-54-30_lxbelshark_d718_m
 
 Without HR:
 
-<!-- results:plism_pairs exclude=*smoke* drop_stain=HR ref=mixture_G0_K1_a8 tags=cgm_v1s_7b71,cgm_v1s_seed43_8ed0,cgm_v1s_seed44_ac94,cgm_v0s_a602,cgm_v0s_seed43_f119,cgm_v0s_seed44_946b,aug_cgminit_clean_all,aug_cgminit_clean_all_b3.5,cgm_fp_k1_6e3e,cgm_fp_k2_6e3e,cgm_v1s_resonly_c688 -->
+<!-- results:plism_pairs exclude=*smoke* drop_stain=HR ref=mixture_G0_K1_a8 tags=cgm_v1s_7b71,cgm_v1s_seed43_8ed0,cgm_v1s_seed44_ac94,cgm_v0s_a602,cgm_v0s_seed43_f119,cgm_v0s_seed44_946b,aug_cgminit_clean_all,aug_cgminit_clean_all_b3.5,cgm_fp_k1_6e3e,cgm_fp_k2_6e3e,cgm_v1s_resonly_c688,softshrink_gap_tile_lam1,softshrink_gap_slide_lam100,mixture_G0_K1,cgm_v0_5ee4,cgm_v1_73af,cgm_v2s_920f,cgm_v1s_noaug_7e3c -->
 <!-- generated by `uv run python -m sipe.eval.results_tables --write`; do not edit -->
 
 | method | pairs | n | top-1 | ref top-1 | Δ top-1 | 95% CI | pairs better | bench run dir |
@@ -731,6 +847,34 @@ Without HR:
 | cgm_v1s_resonly_c688 | inter-staining | 462 | 0.366 | 0.367 | -0.001 | [-0.004, +0.001] | 51% | `runs/bench/2026-10-27_22-01-38_lxbelshark_5850_cgm_v1s_resonly_c688` |
 | cgm_v1s_resonly_c688 | scanner + staining | 2772 | 0.300 | 0.312 | -0.012 | [-0.014, -0.009] | 14% | `runs/bench/2026-10-27_22-01-38_lxbelshark_5850_cgm_v1s_resonly_c688` |
 | cgm_v1s_resonly_c688 | all | 3486 | 0.353 | 0.362 | -0.009 | [-0.012, -0.007] | 23% | `runs/bench/2026-10-27_22-01-38_lxbelshark_5850_cgm_v1s_resonly_c688` |
+| softshrink_gap_tile_lam1 | inter-scanner | 252 | 0.904 | 0.905 | -0.002 | [-0.003, -0.001] | 29% | `runs/bench/2026-10-28_09-10-20_lxbelshark_237c_softshrink_gap_tile_lam1` |
+| softshrink_gap_tile_lam1 | inter-staining | 462 | 0.366 | 0.367 | -0.001 | [-0.002, -0.001] | 27% | `runs/bench/2026-10-28_09-10-20_lxbelshark_237c_softshrink_gap_tile_lam1` |
+| softshrink_gap_tile_lam1 | scanner + staining | 2772 | 0.310 | 0.312 | -0.002 | [-0.003, -0.001] | 27% | `runs/bench/2026-10-28_09-10-20_lxbelshark_237c_softshrink_gap_tile_lam1` |
+| softshrink_gap_tile_lam1 | all | 3486 | 0.360 | 0.362 | -0.002 | [-0.003, -0.001] | 27% | `runs/bench/2026-10-28_09-10-20_lxbelshark_237c_softshrink_gap_tile_lam1` |
+| softshrink_gap_slide_lam100 | inter-scanner | 252 | 0.891 | 0.905 | -0.015 | [-0.020, -0.010] | 7% | `runs/bench/2026-10-28_06-45-26_lxbelshark_49a0_softshrink_gap_slide_lam100` |
+| softshrink_gap_slide_lam100 | inter-staining | 462 | 0.361 | 0.367 | -0.006 | [-0.011, -0.002] | 31% | `runs/bench/2026-10-28_06-45-26_lxbelshark_49a0_softshrink_gap_slide_lam100` |
+| softshrink_gap_slide_lam100 | scanner + staining | 2772 | 0.279 | 0.312 | -0.033 | [-0.037, -0.029] | 6% | `runs/bench/2026-10-28_06-45-26_lxbelshark_49a0_softshrink_gap_slide_lam100` |
+| softshrink_gap_slide_lam100 | all | 3486 | 0.334 | 0.362 | -0.028 | [-0.032, -0.024] | 10% | `runs/bench/2026-10-28_06-45-26_lxbelshark_49a0_softshrink_gap_slide_lam100` |
+| mixture_G0_K1 | inter-scanner | 252 | 0.900 | 0.905 | -0.005 | [-0.011, -0.002] | 36% | `runs/bench/2026-10-14_07-10-49_lxbelshark_0721_mixture_G0_K1` |
+| mixture_G0_K1 | inter-staining | 462 | 0.357 | 0.367 | -0.011 | [-0.015, -0.007] | 25% | `runs/bench/2026-10-14_07-10-49_lxbelshark_0721_mixture_G0_K1` |
+| mixture_G0_K1 | scanner + staining | 2772 | 0.285 | 0.312 | -0.027 | [-0.030, -0.023] | 4% | `runs/bench/2026-10-14_07-10-49_lxbelshark_0721_mixture_G0_K1` |
+| mixture_G0_K1 | all | 3486 | 0.339 | 0.362 | -0.023 | [-0.026, -0.019] | 9% | `runs/bench/2026-10-14_07-10-49_lxbelshark_0721_mixture_G0_K1` |
+| cgm_v0_5ee4 | inter-scanner | 252 | 0.909 | 0.905 | +0.004 | [+0.002, +0.005] | 85% | `runs/bench/2026-10-16_22-17-16_lxbelshark_d926_cgm_v0_5ee4` |
+| cgm_v0_5ee4 | inter-staining | 462 | 0.371 | 0.367 | +0.004 | [+0.003, +0.005] | 81% | `runs/bench/2026-10-16_22-17-16_lxbelshark_d926_cgm_v0_5ee4` |
+| cgm_v0_5ee4 | scanner + staining | 2772 | 0.313 | 0.312 | +0.001 | [+0.000, +0.003] | 61% | `runs/bench/2026-10-16_22-17-16_lxbelshark_d926_cgm_v0_5ee4` |
+| cgm_v0_5ee4 | all | 3486 | 0.364 | 0.362 | +0.002 | [+0.001, +0.003] | 65% | `runs/bench/2026-10-16_22-17-16_lxbelshark_d926_cgm_v0_5ee4` |
+| cgm_v1_73af | inter-scanner | 252 | 0.912 | 0.905 | +0.006 | [+0.004, +0.009] | 94% | `runs/bench/2026-10-17_00-15-28_lxbelshark_7a78_cgm_v1_73af` |
+| cgm_v1_73af | inter-staining | 462 | 0.376 | 0.367 | +0.009 | [+0.007, +0.010] | 98% | `runs/bench/2026-10-17_00-15-28_lxbelshark_7a78_cgm_v1_73af` |
+| cgm_v1_73af | scanner + staining | 2772 | 0.319 | 0.312 | +0.007 | [+0.006, +0.009] | 90% | `runs/bench/2026-10-17_00-15-28_lxbelshark_7a78_cgm_v1_73af` |
+| cgm_v1_73af | all | 3486 | 0.370 | 0.362 | +0.008 | [+0.006, +0.009] | 92% | `runs/bench/2026-10-17_00-15-28_lxbelshark_7a78_cgm_v1_73af` |
+| cgm_v2s_920f | inter-scanner | 252 | 0.913 | 0.905 | +0.007 | [+0.005, +0.011] | 96% | `runs/bench/2026-10-15_21-23-35_lxbelshark_60b4_cgm_v2s_920f` |
+| cgm_v2s_920f | inter-staining | 462 | 0.378 | 0.367 | +0.010 | [+0.009, +0.012] | 99% | `runs/bench/2026-10-15_21-23-35_lxbelshark_60b4_cgm_v2s_920f` |
+| cgm_v2s_920f | scanner + staining | 2772 | 0.323 | 0.312 | +0.011 | [+0.010, +0.012] | 95% | `runs/bench/2026-10-15_21-23-35_lxbelshark_60b4_cgm_v2s_920f` |
+| cgm_v2s_920f | all | 3486 | 0.373 | 0.362 | +0.011 | [+0.009, +0.012] | 96% | `runs/bench/2026-10-15_21-23-35_lxbelshark_60b4_cgm_v2s_920f` |
+| cgm_v1s_noaug_7e3c | inter-scanner | 252 | 0.911 | 0.905 | +0.006 | [+0.004, +0.009] | 93% | `runs/bench/2026-10-16_14-07-40_lxbelshark_3c28_cgm_v1s_noaug_7e3c` |
+| cgm_v1s_noaug_7e3c | inter-staining | 462 | 0.376 | 0.367 | +0.009 | [+0.007, +0.010] | 97% | `runs/bench/2026-10-16_14-07-40_lxbelshark_3c28_cgm_v1s_noaug_7e3c` |
+| cgm_v1s_noaug_7e3c | scanner + staining | 2772 | 0.319 | 0.312 | +0.007 | [+0.006, +0.008] | 88% | `runs/bench/2026-10-16_14-07-40_lxbelshark_3c28_cgm_v1s_noaug_7e3c` |
+| cgm_v1s_noaug_7e3c | all | 3486 | 0.369 | 0.362 | +0.007 | [+0.006, +0.008] | 90% | `runs/bench/2026-10-16_14-07-40_lxbelshark_3c28_cgm_v1s_noaug_7e3c` |
 
 Reference: `mixture_G0_K1_a8` (`runs/bench/2026-10-28_01-54-30_lxbelshark_d718_mixture_G0_K1_a8`). Per slide pair top-1 (plismbench `metrics.csv`, mean of both directions); Δ = method minus reference, mean over the pairs of the group; 95% CI = percentile interval of a slide-level bootstrap (2000 draws, seed 0; pairs share slides, so slides are resampled and a pair counts once per drawn copy of each of its slides); pairs better = share of pairs with Δ > 0. HR = either slide has the HR stain. One fit per method, so the interval covers the slide sample only, not seeds. Pairs with the stain(s) HR on either side are dropped before grouping and bootstrapping.
 
@@ -860,7 +1004,7 @@ Reference: `cgm_v0s_a602` (`runs/bench/2026-10-15_10-03-00_lxbelshark_ae3c_cgm_v
 
 Seed 43 vs seed 42 of V1-S is the seed-to-seed scale for the V2-S row.
 
-<!-- results:plism_pairs exclude=*smoke* ref=cgm_v1s_7b71 tags=cgm_v1_73af,cgm_v1s_shift_e3c7,cgm_v1s_shift_aa1c,cgm_v2s_920f,cgm_v1s_seed43_8ed0,cgm_v1s_seed44_ac94,cgm_v1s_noaug_7e3c,cgm_v1s_resonly_c688,cgm_fp_k1_6e3e,cgm_fp_k2_6e3e,plism_oracle_condmean_gap,plism_oracle_condmean_gap_zero -->
+<!-- results:plism_pairs exclude=*smoke* ref=cgm_v1s_7b71 tags=cgm_v1_73af,cgm_v1s_shift_e3c7,cgm_v1s_shift_aa1c,cgm_v2s_920f,cgm_v1s_seed43_8ed0,cgm_v1s_seed44_ac94,cgm_v1s_noaug_7e3c,cgm_v1s_resonly_c688,cgm_fp_k1_6e3e,cgm_fp_k2_6e3e,plism_oracle_condmean_gap,plism_oracle_condmean_gap_zero,mixture_G0_K1_a8,aug_cgminit_clean_all,aug_cgminit_clean_all_b3.5,cgm_v0_5ee4,cgm_v0s_a602,cgm_v0s_seed43_f119,cgm_v0s_seed44_946b,softshrink_gap_tile_lam1 -->
 <!-- generated by `uv run python -m sipe.eval.results_tables --write`; do not edit -->
 
 | method | pairs | n | top-1 | ref top-1 | Δ top-1 | 95% CI | pairs better | bench run dir |
@@ -937,6 +1081,54 @@ Seed 43 vs seed 42 of V1-S is the seed-to-seed scale for the V2-S row.
 | plism_oracle_condmean_gap_zero | all | 4095 | 0.325 | 0.321 | +0.003 | [-0.003, +0.010] | 48% | `runs/bench/2026-10-20_15-40-09_lxbelshark_6505_plism_oracle_condmean_gap_zero` |
 | plism_oracle_condmean_gap_zero | inter-scanner, HR | 21 | 0.817 | 0.732 | +0.085 | [+0.013, +0.154] | 100% | `runs/bench/2026-10-20_15-40-09_lxbelshark_6505_plism_oracle_condmean_gap_zero` |
 | plism_oracle_condmean_gap_zero | all, HR | 609 | 0.074 | 0.038 | +0.036 | [+0.028, +0.043] | 100% | `runs/bench/2026-10-20_15-40-09_lxbelshark_6505_plism_oracle_condmean_gap_zero` |
+| mixture_G0_K1_a8 | inter-scanner | 273 | 0.891 | 0.899 | -0.008 | [-0.011, -0.005] | 3% | `runs/bench/2026-10-28_01-54-30_lxbelshark_d718_mixture_G0_K1_a8` |
+| mixture_G0_K1_a8 | inter-staining | 546 | 0.313 | 0.321 | -0.009 | [-0.010, -0.007] | 6% | `runs/bench/2026-10-28_01-54-30_lxbelshark_d718_mixture_G0_K1_a8` |
+| mixture_G0_K1_a8 | scanner + staining | 3276 | 0.266 | 0.273 | -0.007 | [-0.009, -0.006] | 12% | `runs/bench/2026-10-28_01-54-30_lxbelshark_d718_mixture_G0_K1_a8` |
+| mixture_G0_K1_a8 | all | 4095 | 0.314 | 0.321 | -0.008 | [-0.009, -0.006] | 10% | `runs/bench/2026-10-28_01-54-30_lxbelshark_d718_mixture_G0_K1_a8` |
+| mixture_G0_K1_a8 | inter-scanner, HR | 21 | 0.720 | 0.732 | -0.012 | [-0.020, -0.004] | 5% | `runs/bench/2026-10-28_01-54-30_lxbelshark_d718_mixture_G0_K1_a8` |
+| mixture_G0_K1_a8 | all, HR | 609 | 0.037 | 0.038 | -0.001 | [-0.002, -0.000] | 31% | `runs/bench/2026-10-28_01-54-30_lxbelshark_d718_mixture_G0_K1_a8` |
+| aug_cgminit_clean_all | inter-scanner | 273 | 0.892 | 0.899 | -0.007 | [-0.013, -0.003] | 24% | `runs/bench/2026-10-16_14-32-16_lxbelshark_8ef2_aug_cgminit_clean_all` |
+| aug_cgminit_clean_all | inter-staining | 546 | 0.306 | 0.321 | -0.016 | [-0.019, -0.013] | 5% | `runs/bench/2026-10-16_14-32-16_lxbelshark_8ef2_aug_cgminit_clean_all` |
+| aug_cgminit_clean_all | scanner + staining | 3276 | 0.249 | 0.273 | -0.024 | [-0.027, -0.021] | 1% | `runs/bench/2026-10-16_14-32-16_lxbelshark_8ef2_aug_cgminit_clean_all` |
+| aug_cgminit_clean_all | all | 4095 | 0.300 | 0.321 | -0.022 | [-0.025, -0.019] | 3% | `runs/bench/2026-10-16_14-32-16_lxbelshark_8ef2_aug_cgminit_clean_all` |
+| aug_cgminit_clean_all | inter-scanner, HR | 21 | 0.736 | 0.732 | +0.004 | [-0.005, +0.012] | 71% | `runs/bench/2026-10-16_14-32-16_lxbelshark_8ef2_aug_cgminit_clean_all` |
+| aug_cgminit_clean_all | all, HR | 609 | 0.033 | 0.038 | -0.005 | [-0.009, -0.003] | 2% | `runs/bench/2026-10-16_14-32-16_lxbelshark_8ef2_aug_cgminit_clean_all` |
+| aug_cgminit_clean_all_b3.5 | inter-scanner | 273 | 0.895 | 0.899 | -0.005 | [-0.008, -0.003] | 12% | `runs/bench/2026-10-27_20-10-51_lxbelshark_ec6a_aug_cgminit_clean_all_b3.5` |
+| aug_cgminit_clean_all_b3.5 | inter-staining | 546 | 0.311 | 0.321 | -0.010 | [-0.012, -0.008] | 1% | `runs/bench/2026-10-27_20-10-51_lxbelshark_ec6a_aug_cgminit_clean_all_b3.5` |
+| aug_cgminit_clean_all_b3.5 | scanner + staining | 3276 | 0.262 | 0.273 | -0.011 | [-0.013, -0.009] | 4% | `runs/bench/2026-10-27_20-10-51_lxbelshark_ec6a_aug_cgminit_clean_all_b3.5` |
+| aug_cgminit_clean_all_b3.5 | all | 4095 | 0.311 | 0.321 | -0.011 | [-0.012, -0.009] | 4% | `runs/bench/2026-10-27_20-10-51_lxbelshark_ec6a_aug_cgminit_clean_all_b3.5` |
+| aug_cgminit_clean_all_b3.5 | inter-scanner, HR | 21 | 0.730 | 0.732 | -0.002 | [-0.008, +0.004] | 33% | `runs/bench/2026-10-27_20-10-51_lxbelshark_ec6a_aug_cgminit_clean_all_b3.5` |
+| aug_cgminit_clean_all_b3.5 | all, HR | 609 | 0.035 | 0.038 | -0.003 | [-0.005, -0.002] | 1% | `runs/bench/2026-10-27_20-10-51_lxbelshark_ec6a_aug_cgminit_clean_all_b3.5` |
+| cgm_v0_5ee4 | inter-scanner | 273 | 0.895 | 0.899 | -0.004 | [-0.006, -0.003] | 4% | `runs/bench/2026-10-16_22-17-16_lxbelshark_d926_cgm_v0_5ee4` |
+| cgm_v0_5ee4 | inter-staining | 546 | 0.316 | 0.321 | -0.005 | [-0.006, -0.005] | 3% | `runs/bench/2026-10-16_22-17-16_lxbelshark_d926_cgm_v0_5ee4` |
+| cgm_v0_5ee4 | scanner + staining | 3276 | 0.267 | 0.273 | -0.006 | [-0.008, -0.005] | 7% | `runs/bench/2026-10-16_22-17-16_lxbelshark_d926_cgm_v0_5ee4` |
+| cgm_v0_5ee4 | all | 4095 | 0.315 | 0.321 | -0.006 | [-0.007, -0.005] | 6% | `runs/bench/2026-10-16_22-17-16_lxbelshark_d926_cgm_v0_5ee4` |
+| cgm_v0_5ee4 | inter-scanner, HR | 21 | 0.728 | 0.732 | -0.004 | [-0.007, -0.001] | 5% | `runs/bench/2026-10-16_22-17-16_lxbelshark_d926_cgm_v0_5ee4` |
+| cgm_v0_5ee4 | all, HR | 609 | 0.036 | 0.038 | -0.002 | [-0.003, -0.001] | 3% | `runs/bench/2026-10-16_22-17-16_lxbelshark_d926_cgm_v0_5ee4` |
+| cgm_v0s_a602 | inter-scanner | 273 | 0.897 | 0.899 | -0.003 | [-0.004, -0.002] | 14% | `runs/bench/2026-10-15_10-03-00_lxbelshark_ae3c_cgm_v0s_a602` |
+| cgm_v0s_a602 | inter-staining | 546 | 0.319 | 0.321 | -0.002 | [-0.003, -0.002] | 20% | `runs/bench/2026-10-15_10-03-00_lxbelshark_ae3c_cgm_v0s_a602` |
+| cgm_v0s_a602 | scanner + staining | 3276 | 0.270 | 0.273 | -0.003 | [-0.004, -0.003] | 13% | `runs/bench/2026-10-15_10-03-00_lxbelshark_ae3c_cgm_v0s_a602` |
+| cgm_v0s_a602 | all | 4095 | 0.318 | 0.321 | -0.003 | [-0.004, -0.003] | 14% | `runs/bench/2026-10-15_10-03-00_lxbelshark_ae3c_cgm_v0s_a602` |
+| cgm_v0s_a602 | inter-scanner, HR | 21 | 0.731 | 0.732 | -0.001 | [-0.005, +0.002] | 33% | `runs/bench/2026-10-15_10-03-00_lxbelshark_ae3c_cgm_v0s_a602` |
+| cgm_v0s_a602 | all, HR | 609 | 0.037 | 0.038 | -0.001 | [-0.001, -0.000] | 7% | `runs/bench/2026-10-15_10-03-00_lxbelshark_ae3c_cgm_v0s_a602` |
+| cgm_v0s_seed43_f119 | inter-scanner | 273 | 0.897 | 0.899 | -0.002 | [-0.004, -0.001] | 17% | `runs/bench/2026-10-20_19-00-45_lxbelshark_6098_cgm_v0s_seed43_f119` |
+| cgm_v0s_seed43_f119 | inter-staining | 546 | 0.320 | 0.321 | -0.002 | [-0.002, -0.001] | 28% | `runs/bench/2026-10-20_19-00-45_lxbelshark_6098_cgm_v0s_seed43_f119` |
+| cgm_v0s_seed43_f119 | scanner + staining | 3276 | 0.270 | 0.273 | -0.003 | [-0.004, -0.002] | 17% | `runs/bench/2026-10-20_19-00-45_lxbelshark_6098_cgm_v0s_seed43_f119` |
+| cgm_v0s_seed43_f119 | all | 4095 | 0.319 | 0.321 | -0.003 | [-0.003, -0.002] | 18% | `runs/bench/2026-10-20_19-00-45_lxbelshark_6098_cgm_v0s_seed43_f119` |
+| cgm_v0s_seed43_f119 | inter-scanner, HR | 21 | 0.733 | 0.732 | +0.001 | [-0.001, +0.005] | 48% | `runs/bench/2026-10-20_19-00-45_lxbelshark_6098_cgm_v0s_seed43_f119` |
+| cgm_v0s_seed43_f119 | all, HR | 609 | 0.038 | 0.038 | -0.000 | [-0.001, -0.000] | 23% | `runs/bench/2026-10-20_19-00-45_lxbelshark_6098_cgm_v0s_seed43_f119` |
+| cgm_v0s_seed44_946b | inter-scanner | 273 | 0.897 | 0.899 | -0.003 | [-0.004, -0.002] | 15% | `runs/bench/2026-10-20_19-05-48_lxbelshark_78be_cgm_v0s_seed44_946b` |
+| cgm_v0s_seed44_946b | inter-staining | 546 | 0.320 | 0.321 | -0.002 | [-0.003, -0.001] | 28% | `runs/bench/2026-10-20_19-05-48_lxbelshark_78be_cgm_v0s_seed44_946b` |
+| cgm_v0s_seed44_946b | scanner + staining | 3276 | 0.270 | 0.273 | -0.003 | [-0.004, -0.002] | 17% | `runs/bench/2026-10-20_19-05-48_lxbelshark_78be_cgm_v0s_seed44_946b` |
+| cgm_v0s_seed44_946b | all | 4095 | 0.319 | 0.321 | -0.003 | [-0.003, -0.002] | 19% | `runs/bench/2026-10-20_19-05-48_lxbelshark_78be_cgm_v0s_seed44_946b` |
+| cgm_v0s_seed44_946b | inter-scanner, HR | 21 | 0.732 | 0.732 | -0.000 | [-0.003, +0.004] | 33% | `runs/bench/2026-10-20_19-05-48_lxbelshark_78be_cgm_v0s_seed44_946b` |
+| cgm_v0s_seed44_946b | all, HR | 609 | 0.038 | 0.038 | -0.000 | [-0.000, +0.000] | 41% | `runs/bench/2026-10-20_19-05-48_lxbelshark_78be_cgm_v0s_seed44_946b` |
+| softshrink_gap_tile_lam1 | inter-scanner | 273 | 0.890 | 0.899 | -0.010 | [-0.014, -0.006] | 4% | `runs/bench/2026-10-28_09-10-20_lxbelshark_237c_softshrink_gap_tile_lam1` |
+| softshrink_gap_tile_lam1 | inter-staining | 546 | 0.312 | 0.321 | -0.010 | [-0.011, -0.008] | 2% | `runs/bench/2026-10-28_09-10-20_lxbelshark_237c_softshrink_gap_tile_lam1` |
+| softshrink_gap_tile_lam1 | scanner + staining | 3276 | 0.264 | 0.273 | -0.009 | [-0.011, -0.008] | 6% | `runs/bench/2026-10-28_09-10-20_lxbelshark_237c_softshrink_gap_tile_lam1` |
+| softshrink_gap_tile_lam1 | all | 4095 | 0.312 | 0.321 | -0.009 | [-0.011, -0.008] | 5% | `runs/bench/2026-10-28_09-10-20_lxbelshark_237c_softshrink_gap_tile_lam1` |
+| softshrink_gap_tile_lam1 | inter-scanner, HR | 21 | 0.718 | 0.732 | -0.014 | [-0.024, -0.005] | 0% | `runs/bench/2026-10-28_09-10-20_lxbelshark_237c_softshrink_gap_tile_lam1` |
+| softshrink_gap_tile_lam1 | all, HR | 609 | 0.036 | 0.038 | -0.002 | [-0.003, -0.001] | 7% | `runs/bench/2026-10-28_09-10-20_lxbelshark_237c_softshrink_gap_tile_lam1` |
 
 Reference: `cgm_v1s_7b71` (`runs/bench/2026-10-14_23-36-54_lxbelshark_22f4_cgm_v1s_7b71`). Per slide pair top-1 (plismbench `metrics.csv`, mean of both directions); Δ = method minus reference, mean over the pairs of the group; 95% CI = percentile interval of a slide-level bootstrap (2000 draws, seed 0; pairs share slides, so slides are resampled and a pair counts once per drawn copy of each of its slides); pairs better = share of pairs with Δ > 0. HR = either slide has the HR stain. One fit per method, so the interval covers the slide sample only, not seeds.
 
@@ -1209,6 +1401,7 @@ Reference: `mixture_G0_K1` (`runs/bench/2026-10-14_07-10-49_lxbelshark_0721_mixt
 | mixture_G0_K1_a8 | posthoc_gap | 0.263 (0.044) | 0.283 (0.023) | 0.062 (0.021) | 0.580 (0.077) | 0.533 (0.051) | 0.264 (0.037) | 0.510 (0.055) | 0.381 (0.018) | 0.174 (0.082) | 0.569 (0.047) | 0.362 | `runs/bench/2026-10-28_01-54-47_lxbelshark_0d33_mixture_G0_K1_a8` | – | c9f3cbe* |
 | softshrink_gap_slide_lam100 | posthoc_gap | 0.252 (0.049) | 0.269 (0.012) | 0.066 (0.009) | 0.573 (0.080) | 0.543 (0.043) | 0.264 (0.037) | 0.494 (0.043) | 0.367 (0.013) | 0.186 (0.073) | 0.592 (0.039) | 0.361 | `runs/bench/2026-10-28_06-45-38_lxbelshark_8ca2_softshrink_gap_slide_lam100` | – | c9f3cbe* |
 | softshrink_gap_tile_lam1 | posthoc_gap | 0.265 (0.043) | 0.281 (0.024) | 0.067 (0.022) | 0.581 (0.077) | 0.538 (0.049) | 0.267 (0.038) | 0.509 (0.051) | 0.385 (0.019) | 0.170 (0.086) | 0.573 (0.056) | 0.364 | `runs/bench/2026-10-28_09-10-22_lxbelshark_c687_softshrink_gap_tile_lam1` | – | c2cb13d* |
+| cgm_v2s_920f | posthoc_gap | 0.263 (0.044) | 0.280 (0.016) | 0.068 (0.024) | 0.584 (0.075) | 0.539 (0.040) | 0.260 (0.035) | 0.505 (0.043) | 0.380 (0.016) | 0.168 (0.091) | 0.578 (0.062) | 0.362 | `runs/bench/2026-10-28_11-30-27_lxbelshark_536f_cgm_v2s_920f` | – | 4c25097* |
 
 Pearson mean (std over folds), HEST `dataset_results.json`; average only when all tasks ran.
 
@@ -1422,6 +1615,7 @@ CGM fits (`map_cgm.pt`) on the shared SCORPION-proxy protocol (`sipe.eval.cgm_se
 | `runs/2026-10-20_18-01-55_lxbelshark_946b` | t42t8n81 | ConsensusGenModule | 6b069d9 | 5999/6000 | 0.981 | 0.887 | 0.294 | 0.802 | 0.099 | 0.541 | 0.000 |
 | `runs/2026-10-27_18-13-25_lxbelshark_c688` | yokp8prl | ConsensusGenModule | 51c60dc* | 5999/6000 | 0.985 | 0.887 | 0.350 | 0.801 | 0.031 | 0.774 | 0.086 |
 | `runs/2026-10-27_22-57-58_lxbelshark_7568` | i67uww4l | ConsensusGenModule | ab49016* | 5999/6000 | 0.985 | 0.887 | 0.319 | 0.801 | 0.095 | 0.302 | 0.057 |
+| `runs/2026-10-28_10-04-49_lxbelshark_bc3a` | zny5eyu6 | ConsensusGenModule | c2cb13d* | 11999/12000 | 0.979 | 0.887 | 0.290 | 0.801 | 0.158 | 0.377 | 0.000 |
 
 Mean of the last 10 validations of `val/<col>`, read from the local `.wandb` file; step = last logged `trainer/global_step` / `max_steps`.
 

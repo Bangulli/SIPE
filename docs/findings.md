@@ -1,4 +1,4 @@
-# Findings: what the acquisition-shrinkage phase taught us (as of 2026-10-27)
+# Findings: what the acquisition-shrinkage phase taught us (as of 2026-10-28)
 
 Lessons that outlive single runs: about the benchmarks, the protocols, the data and what
 did or did not work. Each one names its evidence (run dir, or the table in
@@ -64,8 +64,13 @@ CGM were not selected on the same footing. PLISM confirms that stronger closed-f
 shrinkage helps: the CGM init with the noise scaled by β=3.5 is +0.017 [+0.014, +0.020] over
 G0 (all pairs), −0.008 [−0.009, −0.006] below trained V0-S
 (`runs/bench/2026-10-27_20-10-51_lxbelshark_ec6a_aug_cgminit_clean_all_b3.5`), while val
-ranks it above V0-S (0.9836 vs 0.9807). Not yet known: PLISM of G0 at α > 1 or the eraser
-at λ > 0.5.
+ranks it above V0-S (0.9836 vs 0.9807). The val-argmax strengths confirm it on PLISM (all
+pairs, read 2026-10-28): G0 α=8 0.314 vs 0.294 at α=1
+(`runs/bench/2026-10-28_01-54-30_lxbelshark_d718_mixture_G0_K1_a8`), eraser slide λ=100 0.290
+vs 0.281 at λ=0.5 (`runs/bench/2026-10-28_06-45-26_lxbelshark_49a0_softshrink_gap_slide_lam100`),
+eraser tile λ=1 0.312 vs 0.304 at λ=0.4
+(`runs/bench/2026-10-28_09-10-20_lxbelshark_237c_softshrink_gap_tile_lam1`), HEST average kept
+(0.362 / 0.361 / 0.364). Select linear baselines by val argmax, not by the 95% rule.
 
 **2. PLISM's HR stain is a protocol outlier.** HR is Harris hematoxylin applied overnight
 (more than 24 h; checked on the images by the user, 2026-10-15). Its cross-stain pairs sit
