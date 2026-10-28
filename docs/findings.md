@@ -194,7 +194,7 @@ untrained init is −0.020 below trained V0-S (augmented, 5120 tiles), and −0.
 (`runs/bench/2026-10-16_14-07-40_lxbelshark_3c28_cgm_v1s_noaug_7e3c`), a seed-sized effect. Geo and zoom
 augmentation even lower the closed-form estimators on clean SCORPION val (G0 0.9765 vs
 0.9787); dihedral is neutral (H0-mini GAP close to dihedral-invariant). Evidence: ablation
-blocks and augmentation-attribution table in `docs/progress.md`. The exchangeable linear V0
+blocks in `docs/pair-tables.md`, augmentation-attribution table in `docs/experiment-log.md`. The exchangeable linear V0
 (no scanner offsets or per-scanner noise) is +0.022 [+0.018, +0.025] over G0 and only
 −0.003 [−0.003, −0.002] below V0-S (`runs/bench/2026-10-16_22-17-16_lxbelshark_d926_cgm_v0_5ee4`),
 and the exchangeable nonlinear V1 is −0.001 [−0.002, −0.000] below V1-S, about the seed

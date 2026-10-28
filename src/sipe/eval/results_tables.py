@@ -1,5 +1,5 @@
-"""Results tables for docs/progress.md and docs/experiment-log.md, read from run dirs
-(no metric typed by hand).
+"""Results tables for docs/progress.md, docs/pair-tables.md and docs/experiment-log.md,
+read from run dirs (no metric typed by hand).
 
 Sources, all under runs/ (gitignored, so every row names the dir it came from):
   - PLISM: runs/bench/*/metrics/<n>_tiles/<tag>/results.csv (top-1, mean part); with
@@ -34,8 +34,9 @@ Sources, all under runs/ (gitignored, so every row names the dir it came from):
     (blocks scanner_count_plism, scanner_count_plism_seen)
   - training: runs/<run>/wandb/*run-*/*.wandb (local W&B history; no API key needed)
 
-The docs (`DOCS`: progress.md for the ISBI paper, experiment-log.md for the rest) hold
-generated blocks; the same block may appear in both:
+The docs (`DOCS`: progress.md for the ISBI paper, pair-tables.md for its paired
+comparisons, experiment-log.md for the rest) hold generated blocks; the same block may
+appear in several:
 
   <!-- results:plism exclude=*smoke* -->
   ...table written by this tool...
@@ -88,7 +89,11 @@ import yaml
 SIPE_ROOT = Path(__file__).resolve().parents[3]
 RUNS = SIPE_ROOT / "runs"
 PROGRESS = SIPE_ROOT / "docs" / "progress.md"
-DOCS = (PROGRESS, SIPE_ROOT / "docs" / "experiment-log.md")
+DOCS = (
+    PROGRESS,
+    SIPE_ROOT / "docs" / "pair-tables.md",
+    SIPE_ROOT / "docs" / "experiment-log.md",
+)
 
 PLISM_ROWS = {
     "inter-scanner": "inter-scanner",

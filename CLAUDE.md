@@ -29,7 +29,11 @@ are small or unstable.
 PLISM/HEST bench runs), update them in the same turn:
 - `docs/progress.md` = the ISBI paper only: scope, claims with evidence, runs in flight and
   remaining tasks, the paper tables. Update a claim's evidence/status, the in-flight list and
-  the "as of" date.
+  the "as of" date. Keep section 3 to the current status and open items; dated run notes go
+  to the experiment log's "Paper run log".
+- `docs/pair-tables.md` = the paper's paired comparisons (generated `plism_pairs` /
+  `hest_pairs` blocks: PLISM per slide pair, HEST per task and fold). New per-pair blocks go
+  here, not into progress.md.
 - `docs/experiment-log.md` = everything else: the roadmap status table (one row per step,
   run dirs, verdict), each roadmap decision (D0–D6) with its evidence, per-experiment
   readings, open points outside the paper, the other tables. Mark runs still in progress.
@@ -40,7 +44,8 @@ Say in your reply which of them you updated.
 **Never type a metric by hand.** Every value must be read from a file under `runs/` (or from
 W&B), and each row must name the run dir it came from.
 - Results tables are generated: `uv run python -m sipe.eval.results_tables --write` refreshes
-  the `<!-- results:… -->` blocks in `docs/progress.md` and `docs/experiment-log.md`, and
+  the `<!-- results:… -->` blocks in `docs/progress.md`, `docs/pair-tables.md` and
+  `docs/experiment-log.md`, and
   `--check` exits 1 if one is stale. Never edit inside a block. Block options (`exclude=`, `extra=`, `cols=`, `min_steps=`,
   `module=`) are listed in the module docstring.
 - A new benchmark output, estimator output or metric goes into a parser in
