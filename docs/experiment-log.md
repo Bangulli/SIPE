@@ -530,9 +530,25 @@ In flight / to launch (user, 2026-10-27; details in `docs/experiment-log.md`, Ex
   --features-from runs/bench/2026-10-13_10-02-08_lxbelshark_053f_h0_mini_gap_ref --posthoc
   runs/bench/2026-10-28_08-21-40_claude-box_bc46_scorpion_aug_attribution_fp_beta/map_CGM-fp-per_scanner-k1-b1.5_clean_all.pt
   --tag cgm_fp_k1_b1.5_bc46`; k=2 β=1 (already on PLISM) is tied with it on val.
-- Fit done 2026-10-28 (11999/12000, maps every 2000 steps; PLISM not run yet): `runs/2026-10-28_10-04-49_lxbelshark_bc3a`
+- Fit done 2026-10-28 (11999/12000, maps every 2000 steps): `runs/2026-10-28_10-04-49_lxbelshark_bc3a`
   (W&B zny5eyu6), the 12k-step V0-S below; the paper's limitations say the budget
   sensitivity is not tested, update them if this lands before the deadline.
+  PLISM step 12000 read 2026-10-28 (`runs/bench/2026-10-28_13-23-27_lxbelshark_3079_v0s_s12k_bc3a_s12000`,
+  per-pair blocks vs tuned G0 / a602 / V1-S 7b71 in `docs/pair-tables.md`): all 0.321;
+  vs a602 +0.003 [+0.002, +0.004] (69% of pairs), inter-scanner −0.004 [−0.005, −0.002],
+  scanner + staining +0.004 [+0.003, +0.005]; vs tuned G0 +0.007 [+0.006, +0.008]; vs V1-S
+  7b71 −0.000 [−0.001, +0.001]. In-loop SCORPION val 0.979 vs a602 0.981. Per the pre-stated
+  reading: "12000 above" = the 6000-step recipe is conservative on PLISM all pairs, but the
+  extra steps shift gain from inter-scanner to staining.
+  Steps 6000 / 2000 read 2026-10-28 (`runs/bench/2026-10-28_13-46-58_lxbelshark_ee0c_v0s_s12k_bc3a_s6000`,
+  `runs/bench/2026-10-28_14-10-11_lxbelshark_4907_v0s_s12k_bc3a_s2000`): all pairs 0.298
+  (step 0 = `aug_cgminit_geo_5120`) → 0.314 (2000) → 0.321 (6000) → 0.321 (12000).
+  Step 6000 vs a602 +0.003 [+0.002, +0.003], vs tuned G0 +0.007 [+0.006, +0.008], vs V1-S
+  7b71 −0.000; step 2000 vs tuned G0 +0.001 [−0.001, +0.002], vs a602 −0.004 [−0.005,
+  −0.003]. Verdict: plateau by step 6000 within this schedule (recipe safe); a602 sits 0.003
+  below it (its step 6000 = end of cosine; this run's = half lr, more integrated lr), so the
+  paper's V0-S budget is conservative. Inter-scanner 0.896 → 0.895 → 0.893 (2000 / 6000 /
+  12000): slow drift down.
   Launched (user, 2026-10-28): V0-S recipe sensitivity (does training's +0.004 over the
   tuned G0 depend on the step budget? in-loop val is flat for V0-S, 0.9796–0.9809 over the
   whole a602 run, so a val stopping rule cannot answer it). New option

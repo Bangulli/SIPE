@@ -128,9 +128,25 @@ Remaining, in order:
    --features-from runs/bench/2026-10-13_10-02-08_lxbelshark_053f_h0_mini_gap_ref --posthoc
    runs/2026-10-28_10-04-49_lxbelshark_bc3a/map_cgm_step<12000|06000|02000>.pt --tag
    v0s_s12k_bc3a_s<step>`. Read vs a602 (6000-step endpoint, 0.318) and the tuned G0 (0.314);
-   update the limitation on budget sensitivity accordingly. In flight: step 12000
-   (`runs/bench/2026-10-28_13-23-27_lxbelshark_3079_v0s_s12k_bc3a_s12000`, no results yet on
-   2026-10-28).
+   update the limitation on budget sensitivity accordingly.
+   Step 12000 read 2026-10-28 (`runs/bench/2026-10-28_13-23-27_lxbelshark_3079_v0s_s12k_bc3a_s12000`,
+   per-pair blocks in `docs/pair-tables.md`): all pairs 0.321 vs a602 0.318, +0.003
+   [+0.002, +0.004] (69% of pairs; V0-S seed spread +0.000), vs tuned G0 +0.007 [+0.006,
+   +0.008] (91%), vs V1-S 7b71 −0.000 [−0.001, +0.001]. Gain comes from scanner + staining
+   (+0.004 vs a602); inter-scanner is *lower*, −0.004 [−0.005, −0.002] vs a602 (6% of pairs
+   better), HR inter-scanner −0.011. In-loop SCORPION val at the end: 0.979 vs a602 0.981
+   (training block).
+   Steps 6000 / 2000 read 2026-10-28 (`runs/bench/2026-10-28_13-46-58_lxbelshark_ee0c_v0s_s12k_bc3a_s6000`,
+   `runs/bench/2026-10-28_14-10-11_lxbelshark_4907_v0s_s12k_bc3a_s2000`). PLISM all pairs
+   along the 12k run: step 0 (`aug_cgminit_geo_5120`) 0.298, 2000 0.314, 6000 0.321, 12000
+   0.321; inter-scanner 0.891 / 0.896 / 0.895 / 0.893. Step 6000 vs a602 +0.003 [+0.002,
+   +0.003] (78%), vs tuned G0 +0.007 [+0.006, +0.008] (96%), vs V1-S 7b71 −0.000 [−0.001,
+   +0.000]; step 2000 vs tuned G0 +0.001 [−0.001, +0.002]. Reading: the run plateaus on
+   PLISM all pairs between 6000 and 12000 (recipe safe: not a hand-picked sweet spot); the
+   level is 0.003 above a602, whose step 6000 is the end of its cosine (the 12k run's step
+   6000 is at half lr), so the paper's V0-S row is, if anything, conservative. Inter-scanner
+   drifts down slowly with training (−0.004 vs a602 at 12000). One fit. Limitation text:
+   user decision.
 3. User on Overleaf: page count (Table 2 has 16 rows), affiliation 2 incomplete, the user's
    `% TODO: change the mean embedding notation`, ethics/acknowledgment sections commented out.
 
@@ -201,7 +217,8 @@ Open, not blocking the paper (details in the paper run log, `docs/experiment-log
 | cgm_fp_k2_6e3e | posthoc_gap | 0.890 | 0.312 | 0.266 | 0.314 | `runs/bench/2026-10-28_07-54-03_lxbelshark_4200_cgm_fp_k2_6e3e` | – | c2cb13d* |
 | softshrink_gap_tile_lam1 | posthoc_gap | 0.890 | 0.312 | 0.264 | 0.312 | `runs/bench/2026-10-28_09-10-20_lxbelshark_237c_softshrink_gap_tile_lam1` | – | c2cb13d* |
 | v0s_s12k_bc3a_s12000 | posthoc_gap | 0.893 | 0.319 | 0.274 | 0.321 | `runs/bench/2026-10-28_13-23-27_lxbelshark_3079_v0s_s12k_bc3a_s12000` | – | 4c25097* |
-| v0s_s12k_bc3a_s6000 | posthoc_gap | no results | – | – | – | `runs/bench/2026-10-28_13-46-58_lxbelshark_ee0c_v0s_s12k_bc3a_s6000` | – | bfadd00* |
+| v0s_s12k_bc3a_s6000 | posthoc_gap | 0.895 | 0.320 | 0.273 | 0.321 | `runs/bench/2026-10-28_13-46-58_lxbelshark_ee0c_v0s_s12k_bc3a_s6000` | – | bfadd00* |
+| v0s_s12k_bc3a_s2000 | posthoc_gap | 0.896 | 0.317 | 0.266 | 0.314 | `runs/bench/2026-10-28_14-10-11_lxbelshark_4907_v0s_s12k_bc3a_s2000` | – | 394889c* |
 | h0_mini | – | 0.600 | 0.120 | 0.055 | 0.100 | `../plism-benchmark/output/metrics/8139_tiles/h0_mini` | – | – |
 | sipe_h0_mini | – | 0.666 | 0.237 | 0.158 | 0.203 | `../plism-benchmark/output/metrics/8139_tiles/sipe_h0_mini` | – | – |
 
@@ -261,7 +278,8 @@ similarity over all pairs, median top-10 accuracy per shift group, and their mea
 | cgm_fp_k2_6e3e | posthoc_gap | 0.923 | 0.980 | 0.654 | 0.593 | 0.787 | `runs/bench/2026-10-28_07-54-03_lxbelshark_4200_cgm_fp_k2_6e3e` | – | c2cb13d* |
 | softshrink_gap_tile_lam1 | posthoc_gap | 0.924 | 0.981 | 0.658 | 0.593 | 0.789 | `runs/bench/2026-10-28_09-10-20_lxbelshark_237c_softshrink_gap_tile_lam1` | – | c2cb13d* |
 | v0s_s12k_bc3a_s12000 | posthoc_gap | 0.925 | 0.981 | 0.662 | 0.602 | 0.792 | `runs/bench/2026-10-28_13-23-27_lxbelshark_3079_v0s_s12k_bc3a_s12000` | – | 4c25097* |
-| v0s_s12k_bc3a_s6000 | posthoc_gap | no results | – | – | – | – | `runs/bench/2026-10-28_13-46-58_lxbelshark_ee0c_v0s_s12k_bc3a_s6000` | – | bfadd00* |
+| v0s_s12k_bc3a_s6000 | posthoc_gap | 0.920 | 0.982 | 0.663 | 0.603 | 0.792 | `runs/bench/2026-10-28_13-46-58_lxbelshark_ee0c_v0s_s12k_bc3a_s6000` | – | bfadd00* |
+| v0s_s12k_bc3a_s2000 | posthoc_gap | 0.906 | 0.982 | 0.662 | 0.593 | 0.786 | `runs/bench/2026-10-28_14-10-11_lxbelshark_4907_v0s_s12k_bc3a_s2000` | – | 394889c* |
 | h0_mini | – | 0.800 | 0.864 | 0.318 | 0.183 | 0.541 | `../plism-benchmark/output/metrics/8139_tiles/h0_mini` | – | – |
 | sipe_h0_mini | – | 0.961 | 0.888 | 0.501 | 0.345 | 0.674 | `../plism-benchmark/output/metrics/8139_tiles/sipe_h0_mini` | – | – |
 
@@ -341,7 +359,8 @@ this reason, never instead of them.
 | cgm_fp_k2_6e3e | posthoc_gap | 0.905 | 0.366 | 0.312 | 0.362 | `runs/bench/2026-10-28_07-54-03_lxbelshark_4200_cgm_fp_k2_6e3e` | – | c2cb13d* |
 | softshrink_gap_tile_lam1 | posthoc_gap | 0.904 | 0.366 | 0.310 | 0.360 | `runs/bench/2026-10-28_09-10-20_lxbelshark_237c_softshrink_gap_tile_lam1` | – | c2cb13d* |
 | v0s_s12k_bc3a_s12000 | posthoc_gap | 0.907 | 0.374 | 0.321 | 0.370 | `runs/bench/2026-10-28_13-23-27_lxbelshark_3079_v0s_s12k_bc3a_s12000` | – | 4c25097* |
-| v0s_s12k_bc3a_s6000 | posthoc_gap | no results | – | – | – | `runs/bench/2026-10-28_13-46-58_lxbelshark_ee0c_v0s_s12k_bc3a_s6000` | – | bfadd00* |
+| v0s_s12k_bc3a_s6000 | posthoc_gap | 0.909 | 0.376 | 0.320 | 0.370 | `runs/bench/2026-10-28_13-46-58_lxbelshark_ee0c_v0s_s12k_bc3a_s6000` | – | bfadd00* |
+| v0s_s12k_bc3a_s2000 | posthoc_gap | 0.909 | 0.372 | 0.312 | 0.363 | `runs/bench/2026-10-28_14-10-11_lxbelshark_4907_v0s_s12k_bc3a_s2000` | – | 394889c* |
 | h0_mini | – | 0.609 | 0.142 | 0.065 | 0.114 | `../plism-benchmark/output/metrics/8139_tiles/h0_mini` | – | – |
 | sipe_h0_mini | – | 0.678 | 0.280 | 0.187 | 0.235 | `../plism-benchmark/output/metrics/8139_tiles/sipe_h0_mini` | – | – |
 
@@ -398,7 +417,8 @@ Top-1 accuracy, mean over slide pairs without the stain(s) HR on either side (re
 | cgm_fp_k2_6e3e | posthoc_gap | 0.928 | 0.981 | 0.679 | 0.631 | 0.805 | `runs/bench/2026-10-28_07-54-03_lxbelshark_4200_cgm_fp_k2_6e3e` | – | c2cb13d* |
 | softshrink_gap_tile_lam1 | posthoc_gap | 0.930 | 0.982 | 0.681 | 0.631 | 0.806 | `runs/bench/2026-10-28_09-10-20_lxbelshark_237c_softshrink_gap_tile_lam1` | – | c2cb13d* |
 | v0s_s12k_bc3a_s12000 | posthoc_gap | 0.930 | 0.982 | 0.688 | 0.641 | 0.810 | `runs/bench/2026-10-28_13-23-27_lxbelshark_3079_v0s_s12k_bc3a_s12000` | – | 4c25097* |
-| v0s_s12k_bc3a_s6000 | posthoc_gap | no results | – | – | – | – | `runs/bench/2026-10-28_13-46-58_lxbelshark_ee0c_v0s_s12k_bc3a_s6000` | – | bfadd00* |
+| v0s_s12k_bc3a_s6000 | posthoc_gap | 0.925 | 0.983 | 0.689 | 0.642 | 0.810 | `runs/bench/2026-10-28_13-46-58_lxbelshark_ee0c_v0s_s12k_bc3a_s6000` | – | bfadd00* |
+| v0s_s12k_bc3a_s2000 | posthoc_gap | 0.912 | 0.983 | 0.688 | 0.636 | 0.805 | `runs/bench/2026-10-28_14-10-11_lxbelshark_4907_v0s_s12k_bc3a_s2000` | – | 394889c* |
 | h0_mini | – | 0.812 | 0.866 | 0.371 | 0.219 | 0.567 | `../plism-benchmark/output/metrics/8139_tiles/h0_mini` | – | – |
 | sipe_h0_mini | – | 0.964 | 0.891 | 0.549 | 0.394 | 0.699 | `../plism-benchmark/output/metrics/8139_tiles/sipe_h0_mini` | – | – |
 
