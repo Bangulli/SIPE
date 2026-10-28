@@ -31,6 +31,21 @@ top-1 differences of a few thousandths decided nothing that held on PLISM:
 - Use SCORPION val to select within one method family and as a sanity check; claim gains
   on PLISM per slide pair with the slide-bootstrap intervals. 5 val and 5 test WSIs.
 
+**19. The CGM objective's optimum is a constant map; trained CGM is early-stopped.** With a
+linear encoder the training loss (predict a random view of the tile from one view, plus
+the KL) depends on second moments only, and its block coordinate descent from the
+CGM-init (`sipe.estimators.cgm_fixed_point`) converges to posterior collapse: S_q = I,
+L M = 0, val top-1 0.0010 (`runs/bench/2026-10-27_23-00-13_claude-box_6e3e_scorpion_aug_attribution_fixed_point`). The collapsed Gaussian attains the target view's
+marginal likelihood with zero gap, so any informative q(z | other view) is worse under
+this objective. The early iterates are good maps (k=1 val 0.9843, k=2 0.9848, above trained
+V0-S 0.9807 in the same run), and trained V0-S sits between k=1 and k=2 in J (scratch
+check). So: (a) the trained CGM's extra shrinkage over its init is set by lr × steps, not
+by the model; (b) "the map is the ELBO solution" must not be claimed; (c) any objective
+of this form needs a stopping rule or a different target. Two numerical lessons: features
+with an exact null direction (H0-mini GAP: LayerNorm) make the moment objective
+unbounded below, so solve in the data subspace; and the converged fixed point is useless
+as an arm, so report the path.
+
 **18. "Smallest strength at 95% of the gain over raw" picks under-shrunk linear maps.** The
 gain over raw H0-mini is about 0.09 val top-1, so the 5% slack (about 0.005) is larger than
 every difference between good linear maps, and the rule stops at the weakest one inside the

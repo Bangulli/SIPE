@@ -1071,9 +1071,10 @@ def aug_attribution_table(root: Path, opts: dict[str, list[str]]) -> str:
         "rel. change", "test top-1", "test Δtop-1 vs G0",
         "bench run dir", "SIPE commit",
     ]  # fmt: skip
-    rows = []
+    rows, fp_rows = [], []
     for run in _bench_runs(root, "scorpion_aug_attribution", *_filters(opts)):
         source = [f"`{_rel(run.dir)}`", run.source_cells()[2]]
+        fp_rows += _fixed_point_rows(run.dir, source)
         if not (run.dir / "summary_val.csv").exists():
             rows.append(["no results", *["–"] * (len(header) - 3), *source])
             continue
@@ -1132,6 +1133,64 @@ def aug_attribution_table(root: Path, opts: dict[str, list[str]]) -> str:
         " saved `map_<estimator>_<data>_<units>.pt`. Other rows (raw, reference, V0-S,"
         " ...) are map files evaluated in the same run. Test (`--test`, read once,"
         " `summary_test.csv`, probes trained on val as in `cgm_select`): – = not read."
+        " CGM-fp(<noise>) = the stationary point of the CGM training objective with a"
+        " linear encoder (closed-form V0-S, `sipe.estimators.cgm_fixed_point`)."
+        + _fixed_point_table(fp_rows)
+    )
+
+
+def _fixed_point_rows(run_dir: Path, source: list[str]) -> list[list[str]]:
+    """CGM-fp arms of one aug_attribution run: convergence and the distance of every
+    CGM arm's linear part to the linear `--maps` (`linear_dist.csv`)."""
+    arms_path = run_dir / "arms.json"
+    if not arms_path.exists():
+        return []
+    arms = _read_json(arms_path)
+    dist_path = run_dir / "linear_dist.csv"
+    dist = pd.read_csv(dist_path) if dist_path.exists() else pd.DataFrame()
+    rows = []
+    for name, arm in arms.items():
+        is_fp = "iterations" in arm
+        d = dist[dist["name"] == name] if len(dist) else dist
+        if not is_fp and not len(d):
+            continue
+        rows.append(
+            [
+                arm.get("estimator", name),
+                arm.get("data", "–"),
+                str(arm.get("n_units", "–")),
+                str(arm["iterations"]) if is_fp else "–",
+                str(arm["converged"]) if is_fp else "–",
+                _fmt(arm.get("J_init"), 5) if is_fp else "–",
+                _fmt(arm.get("J_final"), 5) if is_fp else "–",
+                _fmt(arm.get("tr_noise_ratio"), 3) if is_fp else "–",
+                _fmt(arm.get("tr_posterior"), 1) if is_fp else "–",
+                ", ".join(f"{r['to']} {r['rel_dist_LM']:.3f}" for _, r in d.iterrows())
+                or "–",
+                *source,
+            ]
+        )
+    return rows
+
+
+def _fixed_point_table(rows: list[list[str]]) -> str:
+    if not rows:
+        return ""
+    header = [
+        "model", "data", "units", "iterations", "converged", "J init / D",
+        "J at k / D", "tr(W) / tr(W init)", "tr(S_q)", "rel. distance of L M to",
+        "bench run dir", "SIPE commit",
+    ]  # fmt: skip
+    return (
+        "\n\n"
+        + _table(header, rows)
+        + "\n\nV0-S objective by block coordinate descent from the CGM-init"
+        " (`arms.json`, `fp_history_*.csv`, `linear_dist.csv`): k = iterations"
+        " (conv = to convergence, the optimum: posterior collapse, tr(S_q) = D);"
+        " J = the training objective per source view and dimension, without"
+        " constants, at the init and at k; tr(W) / tr(W init) = noise trace over the"
+        " init's within-tile noise (mean over scanners). Distance ="
+        " ||L M − L' M'||_F / ||L' M'||_F to each linear map of `--maps`."
     )
 
 

@@ -1166,6 +1166,7 @@ CGM fits (`map_cgm.pt`) on the shared SCORPION-proxy protocol (`sipe.eval.cgm_se
 | `runs/2026-10-20_18-01-22_lxbelshark_f119` | cvd0qnuz | ConsensusGenModule | 6b069d9 | 5999/6000 | 0.980 | 0.887 | 0.292 | 0.800 | 0.091 | 0.537 | 0.000 |
 | `runs/2026-10-20_18-01-55_lxbelshark_946b` | t42t8n81 | ConsensusGenModule | 6b069d9 | 5999/6000 | 0.981 | 0.887 | 0.294 | 0.802 | 0.099 | 0.541 | 0.000 |
 | `runs/2026-10-27_18-13-25_lxbelshark_c688` | yokp8prl | ConsensusGenModule | 51c60dc* | 5999/6000 | 0.985 | 0.887 | 0.350 | 0.801 | 0.031 | 0.774 | 0.086 |
+| `runs/2026-10-27_22-57-58_lxbelshark_7568` | i67uww4l | ConsensusGenModule | ab49016* | 5999/6000 | 0.985 | 0.887 | 0.319 | 0.801 | 0.095 | 0.302 | 0.057 |
 
 Mean of the last 10 validations of `val/<col>`, read from the local `.wandb` file; step = last logged `trainer/global_step` / `max_steps`.
 
@@ -1222,8 +1223,49 @@ V0-S / V1-S without augmentation; later LOSO fits also land here.
 | G0 | clean | all | 93100 | 1.00 | 0.9787 | +0.0000 | 0.9942 | – / – | – | 0.193 | 0.9645 | +0.0000 | `runs/bench/2026-10-27_18-03-25_claude-box_3e81_scorpion_aug_attribution_noise_weight` | 51c60dc* |
 | CGM-init | clean | all | 93100 | – | 0.9808 | +0.0021 | 0.9951 | – / – | – | 0.218 | 0.9674 | +0.0029 | `runs/bench/2026-10-27_18-03-25_claude-box_3e81_scorpion_aug_attribution_noise_weight` | 51c60dc* |
 | CGM-init(b=3.5) | clean | all | 93100 | – | 0.9836 | +0.0049 | 0.9962 | – / – | – | 0.311 | 0.9709 | +0.0064 | `runs/bench/2026-10-27_18-03-25_claude-box_3e81_scorpion_aug_attribution_noise_weight` | 51c60dc* |
+| raw | – | – | – | – | 0.8870 | – | 0.9586 | – / – | – | 0.000 | 0.8020 | – | `runs/bench/2026-10-27_23-00-13_claude-box_6e3e_scorpion_aug_attribution_fixed_point` | c9f3cbe* |
+| reference | – | – | – | – | 0.9731 | – | 0.9918 | – / – | – | 0.173 | 0.9588 | – | `runs/bench/2026-10-27_23-00-13_claude-box_6e3e_scorpion_aug_attribution_fixed_point` | c9f3cbe* |
+| V0-S_a602 | – | – | – | – | 0.9807 | +0.0020 | 0.9950 | – / – | – | 0.321 | 0.9682 | +0.0037 | `runs/bench/2026-10-27_23-00-13_claude-box_6e3e_scorpion_aug_attribution_fixed_point` | c9f3cbe* |
+| G0 | clean | all | 93100 | 1.00 | 0.9787 | +0.0000 | 0.9942 | – / – | – | 0.193 | 0.9645 | +0.0000 | `runs/bench/2026-10-27_23-00-13_claude-box_6e3e_scorpion_aug_attribution_fixed_point` | c9f3cbe* |
+| CGM-init | clean | all | 93100 | – | 0.9808 | +0.0021 | 0.9951 | – / – | – | 0.218 | 0.9674 | +0.0029 | `runs/bench/2026-10-27_23-00-13_claude-box_6e3e_scorpion_aug_attribution_fixed_point` | c9f3cbe* |
+| CGM-init(b=3.5) | clean | all | 93100 | – | 0.9836 | +0.0049 | 0.9962 | – / – | – | 0.311 | 0.9709 | +0.0064 | `runs/bench/2026-10-27_23-00-13_claude-box_6e3e_scorpion_aug_attribution_fixed_point` | c9f3cbe* |
+| CGM-fp(shared,k=conv) | clean | all | 93100 | – | 0.0010 | -0.9777 | 0.0048 | – / – | – | 0.876 | 0.0010 | -0.9635 | `runs/bench/2026-10-27_23-00-13_claude-box_6e3e_scorpion_aug_attribution_fixed_point` | c9f3cbe* |
+| CGM-fp(shared,k=1) | clean | all | 93100 | – | 0.9843 | +0.0056 | 0.9965 | – / – | – | 0.300 | 0.9728 | +0.0083 | `runs/bench/2026-10-27_23-00-13_claude-box_6e3e_scorpion_aug_attribution_fixed_point` | c9f3cbe* |
+| CGM-fp(shared,k=2) | clean | all | 93100 | – | 0.9846 | +0.0059 | 0.9965 | – / – | – | 0.375 | 0.9720 | +0.0075 | `runs/bench/2026-10-27_23-00-13_claude-box_6e3e_scorpion_aug_attribution_fixed_point` | c9f3cbe* |
+| CGM-fp(shared,k=3) | clean | all | 93100 | – | 0.9838 | +0.0051 | 0.9963 | – / – | – | 0.422 | 0.9703 | +0.0058 | `runs/bench/2026-10-27_23-00-13_claude-box_6e3e_scorpion_aug_attribution_fixed_point` | c9f3cbe* |
+| CGM-fp(shared,k=4) | clean | all | 93100 | – | 0.9826 | +0.0039 | 0.9960 | – / – | – | 0.457 | 0.9687 | +0.0042 | `runs/bench/2026-10-27_23-00-13_claude-box_6e3e_scorpion_aug_attribution_fixed_point` | c9f3cbe* |
+| CGM-fp(shared,k=6) | clean | all | 93100 | – | 0.9797 | +0.0010 | 0.9949 | – / – | – | 0.505 | 0.9647 | +0.0002 | `runs/bench/2026-10-27_23-00-13_claude-box_6e3e_scorpion_aug_attribution_fixed_point` | c9f3cbe* |
+| CGM-fp(shared,k=10) | clean | all | 93100 | – | 0.9733 | -0.0054 | 0.9931 | – / – | – | 0.564 | 0.9547 | -0.0098 | `runs/bench/2026-10-27_23-00-13_claude-box_6e3e_scorpion_aug_attribution_fixed_point` | c9f3cbe* |
+| CGM-fp(per_scanner,k=conv) | clean | all | 93100 | – | 0.0010 | -0.9777 | 0.0051 | – / – | – | 0.876 | 0.0010 | -0.9635 | `runs/bench/2026-10-27_23-00-13_claude-box_6e3e_scorpion_aug_attribution_fixed_point` | c9f3cbe* |
+| CGM-fp(per_scanner,k=1) | clean | all | 93100 | – | 0.9843 | +0.0056 | 0.9965 | – / – | – | 0.300 | 0.9728 | +0.0083 | `runs/bench/2026-10-27_23-00-13_claude-box_6e3e_scorpion_aug_attribution_fixed_point` | c9f3cbe* |
+| CGM-fp(per_scanner,k=2) | clean | all | 93100 | – | 0.9848 | +0.0061 | 0.9966 | – / – | – | 0.381 | 0.9721 | +0.0076 | `runs/bench/2026-10-27_23-00-13_claude-box_6e3e_scorpion_aug_attribution_fixed_point` | c9f3cbe* |
+| CGM-fp(per_scanner,k=3) | clean | all | 93100 | – | 0.9841 | +0.0054 | 0.9963 | – / – | – | 0.434 | 0.9710 | +0.0065 | `runs/bench/2026-10-27_23-00-13_claude-box_6e3e_scorpion_aug_attribution_fixed_point` | c9f3cbe* |
+| CGM-fp(per_scanner,k=4) | clean | all | 93100 | – | 0.9830 | +0.0043 | 0.9958 | – / – | – | 0.474 | 0.9703 | +0.0058 | `runs/bench/2026-10-27_23-00-13_claude-box_6e3e_scorpion_aug_attribution_fixed_point` | c9f3cbe* |
+| CGM-fp(per_scanner,k=6) | clean | all | 93100 | – | 0.9803 | +0.0016 | 0.9949 | – / – | – | 0.537 | 0.9664 | +0.0019 | `runs/bench/2026-10-27_23-00-13_claude-box_6e3e_scorpion_aug_attribution_fixed_point` | c9f3cbe* |
+| CGM-fp(per_scanner,k=10) | clean | all | 93100 | – | 0.9714 | -0.0073 | 0.9920 | – / – | – | 0.637 | 0.9520 | -0.0125 | `runs/bench/2026-10-27_23-00-13_claude-box_6e3e_scorpion_aug_attribution_fixed_point` | c9f3cbe* |
 
-SCORPION val, clean features, probes trained on train (– = `--retrieval-only`; `summary_val.csv`, arms in `arms.json`). G0 = consensus shrinkage (K = 1, α by the 95% rule on val); CGM-init = the V0-S init map (closed form, no training). Data: clean = the GAP cache's train split, other labels = augmented train caches (`sipe.features.extract`; a unit = one tile copy, views share the transform). Units: n = n tiles with one random copy each (same tiles in every arm), tiles = every tile once, all = every copy. Δ vs G0|clean|all (= the G0 of the mixture sweep when α = 1). Explanatory ablation: nothing is selected across arms; the PLISM readout uses the saved `map_<estimator>_<data>_<units>.pt`. Other rows (raw, reference, V0-S, ...) are map files evaluated in the same run. Test (`--test`, read once, `summary_test.csv`, probes trained on val as in `cgm_select`): – = not read.
+SCORPION val, clean features, probes trained on train (– = `--retrieval-only`; `summary_val.csv`, arms in `arms.json`). G0 = consensus shrinkage (K = 1, α by the 95% rule on val); CGM-init = the V0-S init map (closed form, no training). Data: clean = the GAP cache's train split, other labels = augmented train caches (`sipe.features.extract`; a unit = one tile copy, views share the transform). Units: n = n tiles with one random copy each (same tiles in every arm), tiles = every tile once, all = every copy. Δ vs G0|clean|all (= the G0 of the mixture sweep when α = 1). Explanatory ablation: nothing is selected across arms; the PLISM readout uses the saved `map_<estimator>_<data>_<units>.pt`. Other rows (raw, reference, V0-S, ...) are map files evaluated in the same run. Test (`--test`, read once, `summary_test.csv`, probes trained on val as in `cgm_select`): – = not read. CGM-fp(<noise>) = the stationary point of the CGM training objective with a linear encoder (closed-form V0-S, `sipe.estimators.cgm_fixed_point`).
+
+| model | data | units | iterations | converged | J init / D | J at k / D | tr(W) / tr(W init) | tr(S_q) | rel. distance of L M to | bench run dir | SIPE commit |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| CGM-init | clean | all | – | – | – | – | – | – | V0-S_a602 0.547 | `runs/bench/2026-10-27_23-00-13_claude-box_6e3e_scorpion_aug_attribution_fixed_point` | c9f3cbe* |
+| CGM-init(b=3.5) | clean | all | – | – | – | – | – | – | V0-S_a602 0.300 | `runs/bench/2026-10-27_23-00-13_claude-box_6e3e_scorpion_aug_attribution_fixed_point` | c9f3cbe* |
+| CGM-fp(shared,k=conv) | clean | all | 2000 | False | 0.39955 | -0.13835 | 11.095 | 768.0 | V0-S_a602 1.000 | `runs/bench/2026-10-27_23-00-13_claude-box_6e3e_scorpion_aug_attribution_fixed_point` | c9f3cbe* |
+| CGM-fp(shared,k=1) | clean | all | 1 | False | 0.39955 | 0.11939 | 1.961 | 255.7 | V0-S_a602 0.417 | `runs/bench/2026-10-27_23-00-13_claude-box_6e3e_scorpion_aug_attribution_fixed_point` | c9f3cbe* |
+| CGM-fp(shared,k=2) | clean | all | 2 | False | 0.39955 | -0.05349 | 2.612 | 458.4 | V0-S_a602 0.513 | `runs/bench/2026-10-27_23-00-13_claude-box_6e3e_scorpion_aug_attribution_fixed_point` | c9f3cbe* |
+| CGM-fp(shared,k=3) | clean | all | 3 | False | 0.39955 | -0.09887 | 3.103 | 564.9 | V0-S_a602 0.618 | `runs/bench/2026-10-27_23-00-13_claude-box_6e3e_scorpion_aug_attribution_fixed_point` | c9f3cbe* |
+| CGM-fp(shared,k=4) | clean | all | 4 | False | 0.39955 | -0.11651 | 3.495 | 627.9 | V0-S_a602 0.689 | `runs/bench/2026-10-27_23-00-13_claude-box_6e3e_scorpion_aug_attribution_fixed_point` | c9f3cbe* |
+| CGM-fp(shared,k=6) | clean | all | 6 | False | 0.39955 | -0.12925 | 4.106 | 688.5 | V0-S_a602 0.774 | `runs/bench/2026-10-27_23-00-13_claude-box_6e3e_scorpion_aug_attribution_fixed_point` | c9f3cbe* |
+| CGM-fp(shared,k=10) | clean | all | 10 | False | 0.39955 | -0.13538 | 4.965 | 728.2 | V0-S_a602 0.853 | `runs/bench/2026-10-27_23-00-13_claude-box_6e3e_scorpion_aug_attribution_fixed_point` | c9f3cbe* |
+| CGM-fp(per_scanner,k=conv) | clean | all | 1813 | True | 0.39955 | -0.17349 | 11.095 | 768.0 | V0-S_a602 1.000 | `runs/bench/2026-10-27_23-00-13_claude-box_6e3e_scorpion_aug_attribution_fixed_point` | c9f3cbe* |
+| CGM-fp(per_scanner,k=1) | clean | all | 1 | False | 0.39955 | 0.10155 | 1.961 | 255.7 | V0-S_a602 0.417 | `runs/bench/2026-10-27_23-00-13_claude-box_6e3e_scorpion_aug_attribution_fixed_point` | c9f3cbe* |
+| CGM-fp(per_scanner,k=2) | clean | all | 2 | False | 0.39955 | -0.07068 | 2.610 | 451.5 | V0-S_a602 0.496 | `runs/bench/2026-10-27_23-00-13_claude-box_6e3e_scorpion_aug_attribution_fixed_point` | c9f3cbe* |
+| CGM-fp(per_scanner,k=3) | clean | all | 3 | False | 0.39955 | -0.11936 | 3.135 | 562.0 | V0-S_a602 0.605 | `runs/bench/2026-10-27_23-00-13_claude-box_6e3e_scorpion_aug_attribution_fixed_point` | c9f3cbe* |
+| CGM-fp(per_scanner,k=4) | clean | all | 4 | False | 0.39955 | -0.13909 | 3.586 | 627.3 | V0-S_a602 0.685 | `runs/bench/2026-10-27_23-00-13_claude-box_6e3e_scorpion_aug_attribution_fixed_point` | c9f3cbe* |
+| CGM-fp(per_scanner,k=6) | clean | all | 6 | False | 0.39955 | -0.15474 | 4.391 | 691.1 | V0-S_a602 0.792 | `runs/bench/2026-10-27_23-00-13_claude-box_6e3e_scorpion_aug_attribution_fixed_point` | c9f3cbe* |
+| CGM-fp(per_scanner,k=10) | clean | all | 10 | False | 0.39955 | -0.16487 | 5.987 | 735.8 | V0-S_a602 0.914 | `runs/bench/2026-10-27_23-00-13_claude-box_6e3e_scorpion_aug_attribution_fixed_point` | c9f3cbe* |
+
+V0-S objective by block coordinate descent from the CGM-init (`arms.json`, `fp_history_*.csv`, `linear_dist.csv`): k = iterations (conv = to convergence, the optimum: posterior collapse, tr(S_q) = D); J = the training objective per source view and dimension, without constants, at the init and at k; tr(W) / tr(W init) = noise trace over the init's within-tile noise (mean over scanners). Distance = ||L M − L' M'||_F / ||L' M'||_F to each linear map of `--maps`.
 
 <!-- /results:augattr -->
 

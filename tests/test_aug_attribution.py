@@ -309,3 +309,49 @@ def test_cgm_select_main(tmp_path, monkeypatch):
 
     table = cgm_select_table(runs, {})
     assert "| V0-S_aaaa |" in table and "| G0 |" in table
+
+
+def test_aug_attribution_fixed_point_arms(tmp_path, monkeypatch):
+    import sipe.eval.aug_attribution as aa
+    from sipe.model.consensus_gen import CGMMap
+
+    _write_cache(tmp_path)
+    runs = _fake_runs(monkeypatch, aa, tmp_path)
+    ref = CGMMap(10, encoder_hidden_dim=0)
+    torch.save(
+        {"class_path": "sipe.model.consensus_gen.CGMMap",
+         "init_args": {"dim": 10, "encoder_hidden_dim": 0, "generator_hidden_dim": 0},
+         "state_dict": ref.state_dict()},
+        tmp_path / "v0s.pt",
+    )  # fmt: skip
+    run_dir = aa.main(
+        ["--tag", "t", "--features-from", str(tmp_path), "--n-units", "all",
+         "--estimators", "CGM-init", "--fixed-point", "shared", "per_scanner",
+         "--fp-iters", "1", "2", "0", "--fp-max-iter", "20",
+         "--maps", f"V0-S={tmp_path / 'v0s.pt'}",
+         "--reference-map", "none", "--retrieval-only", "--device", "-1"]
+    )  # fmt: skip
+    arms = json.loads((run_dir / "arms.json").read_text())
+    assert set(arms) == {"CGM-init|clean|all"} | {
+        f"CGM-fp({noise},k={k})|clean|all"
+        for noise in ("shared", "per_scanner") for k in ("1", "2", "conv")
+    }  # fmt: skip
+    fp_arm = arms["CGM-fp(per_scanner,k=2)|clean|all"]
+    assert fp_arm["map"] == "map_CGM-fp-per_scanner-k2_clean_all.pt"
+    assert fp_arm["iterations"] == 2
+    assert fp_arm["J_final"] <= arms["CGM-fp(per_scanner,k=1)|clean|all"]["J_final"]
+    assert fp_arm["J_final"] <= fp_arm["J_init"]
+    assert arms["CGM-fp(shared,k=conv)|clean|all"]["iterations"] <= 20
+    one = load_posthoc_map(run_dir / arms["CGM-fp(shared,k=1)|clean|all"]["map"]).map
+    two = load_posthoc_map(run_dir / arms["CGM-fp(shared,k=2)|clean|all"]["map"]).map
+    assert not torch.equal(one.M, two.M)
+    assert (run_dir / "fp_history_shared_clean_all.csv").exists()
+    dist = pd.read_csv(run_dir / "linear_dist.csv")
+    assert set(dist["name"]) == set(arms) and set(dist["to"]) == {"V0-S"}
+    loaded = load_posthoc_map(run_dir / fp_arm["map"])
+    assert loaded.map(torch.zeros(2, 10)).shape == (2, 10)
+    from sipe.eval.results_tables import aug_attribution_table
+
+    table = aug_attribution_table(runs, {})
+    assert "| CGM-fp(shared,k=1) | clean | all |" in table
+    assert "rel. distance of L M to" in table and "V0-S " in table

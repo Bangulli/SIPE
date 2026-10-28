@@ -14,6 +14,12 @@ without training (docs/experiment-log.md, Exp 7 history, 2026-10-15):
   within-tile noise scaled by b (`init_from_moments(noise_weight=b)`; stronger
   shrinkage). b = 1 is `CGM-init`. An analysis knob, chosen outside this driver
   (e.g. matched to a trained map), never selected here;
+  `--fixed-point shared per_scanner` adds `CGM-fp(<noise>,k=<k>)` arms: k block
+  coordinate descent steps on the CGM training objective with a linear encoder
+  (`sipe.estimators.cgm_fixed_point`), from the CGM-init, for every k of
+  `--fp-iters` (`--fp-iters 0` = run to convergence: the optimum is posterior
+  collapse, a constant map; the useful maps are early iterates). k is an analysis
+  axis here, never selected;
 - data: `clean` (train split of `--features-from`) and every `--aug-caches
   label=dir` (`sipe.features.extract`); a unit = one tile (clean) or one tile copy
   (augmented, all scanner views share the transform);
@@ -31,7 +37,9 @@ unless `--test`.
 Outputs (run dir): `sweep_val.csv` (G0 alpha grid, retrieval only), `arms.json`,
 `summary_val.csv` (raw, reference, `--maps`, every arm; `--retrieval-only` skips the
 CPU-heavy probes), `map_<est>_<data>_<n>.pt` (posthoc module files),
-`summary_test.csv` with `--test`.
+`summary_test.csv` with `--test`; `fp_history_<noise>_<data>_<n>.csv` (objective per
+iteration) and `linear_dist.csv` (relative distance of the linear parts L M of every
+CGM arm to every linear CGM map of `--maps`, e.g. trained V0-S).
 
     uv run python -m sipe.eval.aug_attribution --tag aug_attribution \\
         --features-from <GAP cache> --aug-caches geo=<cache> dihedral=<cache> \\
@@ -51,6 +59,7 @@ import torch
 
 from sipe.bench.posthoc import load_posthoc_map
 from sipe.bench.provenance import new_bench_run_dir, write_run_info
+from sipe.estimators import cgm_fixed_point
 from sipe.estimators.mixture import Gate, Mixture, MixtureShrinkageMap, Moments
 from sipe.eval.content_dependence import paired_views
 from sipe.eval.mixture_sweep import DEFAULT_ALPHAS, DEFAULT_REFERENCE, SETTING
@@ -189,6 +198,15 @@ def main(argv: list[str] | None = None) -> Path:
     parser.add_argument("--init-ridge", type=float, default=CGM_INIT_RIDGE)
     parser.add_argument("--init-noise-weights", nargs="+", type=float, default=[1.0],
                         help="CGM-init noise weights b (1 = CGM-init).")  # fmt: skip
+    parser.add_argument("--fixed-point", nargs="*", default=[],
+                        choices=cgm_fixed_point.NOISE,
+                        help="Closed-form V0-S arms (noise model).")  # fmt: skip
+    parser.add_argument("--fp-iters", nargs="+", type=int, default=[1, 2, 3],
+                        help="Iterates kept as arms (0 = converged).")  # fmt: skip
+    parser.add_argument("--fp-max-iter", type=int, default=2000,
+                        help="Cap for --fp-iters 0.")  # fmt: skip
+    parser.add_argument("--fp-tol", type=float, default=1e-7,
+                        help="Stop at this relative change of L M.")  # fmt: skip
     parser.add_argument("--select-gain-frac", type=float, default=0.95)
     parser.add_argument("--maps", nargs="*", default=[],
                         help="label=<map file> evaluated alongside.")  # fmt: skip
@@ -267,9 +285,11 @@ def main(argv: list[str] | None = None) -> Path:
                 for est in args.estimators
                 if est == "CGM-init"
                 for b in args.init_noise_weights
-            ]
+            ] + [("CGM-fp", noise) for noise in args.fixed_point]
             for est, beta in variants:
-                if beta is not None and beta != 1.0:
+                if est == "CGM-fp":
+                    est = f"CGM-fp({beta})"
+                elif beta is not None and beta != 1.0:
                     est = f"CGM-init(b={beta:g})"
                 name = f"{est}|{data_label}|{size}"
                 info = {
@@ -279,7 +299,10 @@ def main(argv: list[str] | None = None) -> Path:
                     "units": len(views),
                     "views": len(views) * views.shape[1],
                 }
-                file_est = est if beta in (None, 1.0) else f"CGM-init-b{beta:g}"
+                if est.startswith("CGM-fp"):
+                    file_est = None  # one map per iterate, below
+                else:
+                    file_est = est if beta in (None, 1.0) else f"CGM-init-b{beta:g}"
                 stem = f"map_{file_est}_{data_label}_{size}.pt"
                 if est == "G0":
                     model = g0_model(views, args.ridge)
@@ -305,6 +328,49 @@ def main(argv: list[str] | None = None) -> Path:
                              {"k": 1, "dim": model.mu.shape[1], "gate_dim": 1},
                              variant="G0", K=1, alpha=alpha, data=data_label,
                              n_units=size, encoder=encoder)  # fmt: skip
+                elif est.startswith("CGM-fp"):
+                    converge = 0 in args.fp_iters
+                    keep = tuple(k for k in args.fp_iters if k > 0)
+                    result = cgm_fixed_point.fit(
+                        views, device, noise=beta, ridge=args.init_ridge,
+                        max_iter=args.fp_max_iter if converge else max(keep),
+                        tol=args.fp_tol if converge else 0.0, log_every=1,
+                        snapshots=keep,
+                    )  # fmt: skip
+                    history = pd.DataFrame(result.history)
+                    history.to_csv(
+                        run_dir / f"fp_history_{beta}_{data_label}_{size}.csv",
+                        index=False, float_format="%.8g",
+                    )  # fmt: skip
+                    iterates = dict(result.snapshots)
+                    if converge:
+                        iterates[0] = result.map
+                    for k, fmap in sorted(iterates.items()):
+                        at = history.iloc[-1] if k == 0 else (
+                            history.loc[history["iter"] == k].iloc[0])  # fmt: skip
+                        label = "conv" if k == 0 else f"{k}"
+                        name_k = f"CGM-fp({beta},k={label})|{data_label}|{size}"
+                        stem_k = f"map_CGM-fp-{beta}-k{label}_{data_label}_{size}.pt"
+                        arm = {
+                            **info, "estimator": f"CGM-fp({beta},k={label})",
+                            "noise": beta, "iterations": int(at["iter"]),
+                            "converged": bool(result.converged) if k == 0 else False,
+                            "J_init": float(history["J"].iloc[0]),
+                            "J_final": float(at["J"]),
+                            "tr_noise_ratio": float(at["tr_noise_ratio"]),
+                            "tr_posterior": float(at["tr_posterior"]),
+                        }  # fmt: skip
+                        save_map(run_dir / stem_k, fmap,
+                                 {"dim": fmap.dim, "encoder_hidden_dim": 0,
+                                  "generator_hidden_dim": 0},
+                                 arm="V0-S objective, block coordinate descent",
+                                 noise=beta, iterations=arm["iterations"],
+                                 init_ridge=args.init_ridge, data=data_label,
+                                 n_units=size, encoder=encoder)  # fmt: skip
+                        maps[name_k] = fmap
+                        arms[name_k] = {**arm, "map": stem_k}
+                        log.info("arm %s: %s", name_k, arms[name_k])
+                    continue
                 else:
                     fmap = cgm_init_map(views, device, args.init_ridge, beta)
                     info["noise_weight"] = beta
@@ -321,6 +387,20 @@ def main(argv: list[str] | None = None) -> Path:
     if sweep:
         pd.concat(sweep).rename(columns={"lambda": "alpha"}).to_csv(
             run_dir / "sweep_val.csv", index=False, float_format="%.6g"
+        )
+
+    linear = {
+        name: m for name, m in maps.items()
+        if isinstance(m, CGMMap) and m.r is None and m.h is None
+    }  # fmt: skip
+    dist = [
+        {"name": a, "to": b, "rel_dist_LM": cgm_fixed_point.linear_distance(
+            linear[a], linear[b])}
+        for a in linear if a in arms for b in extra_maps if b in linear
+    ]  # fmt: skip
+    if dist:
+        pd.DataFrame(dist).to_csv(
+            run_dir / "linear_dist.csv", index=False, float_format="%.6f"
         )
 
     def logger(name: str, metrics: dict) -> None:
