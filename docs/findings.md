@@ -44,7 +44,11 @@ by the model; (b) "the map is the ELBO solution" must not be claimed; (c) any ob
 of this form needs a stopping rule or a different target. Two numerical lessons: features
 with an exact null direction (H0-mini GAP: LayerNorm) make the moment objective
 unbounded below, so solve in the data subspace; and the converged fixed point is useless
-as an arm, so report the path.
+as an arm, so report the path. On PLISM the iterates do not beat trained V0-S: k=1 −0.009
+[−0.011, −0.008], k=2 −0.005 [−0.006, −0.004] all pairs vs V0-S a602
+(`runs/bench/2026-10-28_06-49-01_lxbelshark_8acb_cgm_fp_k1_6e3e`,
+`runs/bench/2026-10-28_07-54-03_lxbelshark_4200_cgm_fp_k2_6e3e`), k=2 about equal to the
+tuned G0 α=8 (both 0.314): another case of finding 1.
 
 **18. "Smallest strength at 95% of the gain over raw" picks under-shrunk linear maps.** The
 gain over raw H0-mini is about 0.09 val top-1, so the 5% slack (about 0.005) is larger than

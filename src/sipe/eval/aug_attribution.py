@@ -18,8 +18,10 @@ without training (docs/experiment-log.md, Exp 7 history, 2026-10-15):
   coordinate descent steps on the CGM training objective with a linear encoder
   (`sipe.estimators.cgm_fixed_point`), from the CGM-init, for every k of
   `--fp-iters` (`--fp-iters 0` = run to convergence: the optimum is posterior
-  collapse, a constant map; the useful maps are early iterates). k is an analysis
-  axis here, never selected;
+  collapse, a constant map; the useful maps are early iterates); with
+  `--fp-init-noise-weights b ...` the descent starts from CGM-init(b=<b>) (arms
+  `CGM-fp(<noise>,k=<k>,b=<b>)`, b = 1 unlabeled). k and b are analysis axes here,
+  never selected;
 - data: `clean` (train split of `--features-from`) and every `--aug-caches
   label=dir` (`sipe.features.extract`); a unit = one tile (clean) or one tile copy
   (augmented, all scanner views share the transform);
@@ -203,6 +205,9 @@ def main(argv: list[str] | None = None) -> Path:
                         help="Closed-form V0-S arms (noise model).")  # fmt: skip
     parser.add_argument("--fp-iters", nargs="+", type=int, default=[1, 2, 3],
                         help="Iterates kept as arms (0 = converged).")  # fmt: skip
+    parser.add_argument("--fp-init-noise-weights", nargs="+", type=float,
+                        default=[1.0],
+                        help="Start the descent from CGM-init(b).")  # fmt: skip
     parser.add_argument("--fp-max-iter", type=int, default=2000,
                         help="Cap for --fp-iters 0.")  # fmt: skip
     parser.add_argument("--fp-tol", type=float, default=1e-7,
@@ -285,10 +290,14 @@ def main(argv: list[str] | None = None) -> Path:
                 for est in args.estimators
                 if est == "CGM-init"
                 for b in args.init_noise_weights
-            ] + [("CGM-fp", noise) for noise in args.fixed_point]
+            ] + [
+                ("CGM-fp", (noise, b))
+                for noise in args.fixed_point
+                for b in args.fp_init_noise_weights
+            ]
             for est, beta in variants:
                 if est == "CGM-fp":
-                    est = f"CGM-fp({beta})"
+                    est = f"CGM-fp({beta[0]})"
                 elif beta is not None and beta != 1.0:
                     est = f"CGM-init(b={beta:g})"
                 name = f"{est}|{data_label}|{size}"
@@ -329,17 +338,21 @@ def main(argv: list[str] | None = None) -> Path:
                              variant="G0", K=1, alpha=alpha, data=data_label,
                              n_units=size, encoder=encoder)  # fmt: skip
                 elif est.startswith("CGM-fp"):
+                    noise, start = beta
+                    tag = "" if start == 1.0 else f",b={start:g}"
+                    ftag = "" if start == 1.0 else f"-b{start:g}"
                     converge = 0 in args.fp_iters
                     keep = tuple(k for k in args.fp_iters if k > 0)
                     result = cgm_fixed_point.fit(
-                        views, device, noise=beta, ridge=args.init_ridge,
+                        views, device, noise=noise, ridge=args.init_ridge,
+                        noise_weight=start,
                         max_iter=args.fp_max_iter if converge else max(keep),
                         tol=args.fp_tol if converge else 0.0, log_every=1,
                         snapshots=keep,
                     )  # fmt: skip
                     history = pd.DataFrame(result.history)
                     history.to_csv(
-                        run_dir / f"fp_history_{beta}_{data_label}_{size}.csv",
+                        run_dir / f"fp_history_{noise}{ftag}_{data_label}_{size}.csv",
                         index=False, float_format="%.8g",
                     )  # fmt: skip
                     iterates = dict(result.snapshots)
@@ -349,11 +362,14 @@ def main(argv: list[str] | None = None) -> Path:
                         at = history.iloc[-1] if k == 0 else (
                             history.loc[history["iter"] == k].iloc[0])  # fmt: skip
                         label = "conv" if k == 0 else f"{k}"
-                        name_k = f"CGM-fp({beta},k={label})|{data_label}|{size}"
-                        stem_k = f"map_CGM-fp-{beta}-k{label}_{data_label}_{size}.pt"
+                        est_k = f"CGM-fp({noise},k={label}{tag})"
+                        name_k = f"{est_k}|{data_label}|{size}"
+                        stem_k = (f"map_CGM-fp-{noise}-k{label}{ftag}"
+                                  f"_{data_label}_{size}.pt")  # fmt: skip
                         arm = {
-                            **info, "estimator": f"CGM-fp({beta},k={label})",
-                            "noise": beta, "iterations": int(at["iter"]),
+                            **info, "estimator": est_k,
+                            "noise": noise, "init_noise_weight": start,
+                            "iterations": int(at["iter"]),
                             "converged": bool(result.converged) if k == 0 else False,
                             "J_init": float(history["J"].iloc[0]),
                             "J_final": float(at["J"]),
@@ -364,7 +380,8 @@ def main(argv: list[str] | None = None) -> Path:
                                  {"dim": fmap.dim, "encoder_hidden_dim": 0,
                                   "generator_hidden_dim": 0},
                                  arm="V0-S objective, block coordinate descent",
-                                 noise=beta, iterations=arm["iterations"],
+                                 noise=noise, init_noise_weight=start,
+                                 iterations=arm["iterations"],
                                  init_ridge=args.init_ridge, data=data_label,
                                  n_units=size, encoder=encoder)  # fmt: skip
                         maps[name_k] = fmap

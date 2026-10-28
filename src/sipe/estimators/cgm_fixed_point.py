@@ -120,13 +120,16 @@ def fit(
     log_every: int = 0,
     log=None,
     null_tol: float = 1e-10,
+    noise_weight: float = 1.0,
     snapshots: tuple[int, ...] = (),
 ) -> FixedPoint:
     """Fixed point from the moment init (`init_from_moments`, `ridge` as the init).
 
     views [n, V, D], view j = scanner j, every tile complete. Stops when the
     relative change of L M (the map's linear part) falls below `tol`. `snapshots`:
-    iterations at which a copy of the map is kept (the path from the init, 0)."""
+    iterations at which a copy of the map is kept (the path from the init, 0).
+    `noise_weight`: start from the init with the noise scaled by beta
+    (`init_from_moments(noise_weight=)`); the objective is unchanged."""
     if noise not in NOISE:
         raise ValueError(f"noise must be one of {NOISE}, got {noise!r}.")
     n, v, d = views.shape
@@ -138,6 +141,7 @@ def fit(
         torch.arange(v, device=device).repeat(n),
         torch.arange(n, device=device).repeat_interleave(v),
         ridge=ridge,
+        noise_weight=noise_weight,
     )
     fmap = head.map
     center = fmap.center.double()

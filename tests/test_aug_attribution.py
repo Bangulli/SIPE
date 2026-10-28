@@ -328,14 +328,21 @@ def test_aug_attribution_fixed_point_arms(tmp_path, monkeypatch):
         ["--tag", "t", "--features-from", str(tmp_path), "--n-units", "all",
          "--estimators", "CGM-init", "--fixed-point", "shared", "per_scanner",
          "--fp-iters", "1", "2", "0", "--fp-max-iter", "20",
+         "--fp-init-noise-weights", "1", "3",
          "--maps", f"V0-S={tmp_path / 'v0s.pt'}",
          "--reference-map", "none", "--retrieval-only", "--device", "-1"]
     )  # fmt: skip
     arms = json.loads((run_dir / "arms.json").read_text())
     assert set(arms) == {"CGM-init|clean|all"} | {
-        f"CGM-fp({noise},k={k})|clean|all"
+        f"CGM-fp({noise},k={k}{b})|clean|all"
         for noise in ("shared", "per_scanner") for k in ("1", "2", "conv")
+        for b in ("", ",b=3")
     }  # fmt: skip
+    b3 = arms["CGM-fp(per_scanner,k=1,b=3)|clean|all"]
+    assert b3["map"] == "map_CGM-fp-per_scanner-k1-b3_clean_all.pt"
+    assert b3["init_noise_weight"] == 3.0
+    m1 = load_posthoc_map(run_dir / arms["CGM-fp(per_scanner,k=1)|clean|all"]["map"])
+    assert not torch.equal(load_posthoc_map(run_dir / b3["map"]).map.M, m1.map.M)
     fp_arm = arms["CGM-fp(per_scanner,k=2)|clean|all"]
     assert fp_arm["map"] == "map_CGM-fp-per_scanner-k2_clean_all.pt"
     assert fp_arm["iterations"] == 2

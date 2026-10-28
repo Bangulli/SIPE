@@ -312,7 +312,22 @@ The ISBI-facing summary of these items is in `docs/progress.md` (section 2, clai
   above the collapsed optimum: trained V0-S is an early-stopped point on the way to
   collapse, and its extra shrinkage over the init is set by the recipe (lr, steps), not
   by the objective. Per-scanner vs shared W: at most +0.0007 on val (k ≤ 4), no effect.
-  k is an analysis axis, not selected. PLISM of k=1 and k=2 (per-scanner): to launch (user).
+  k is an analysis axis, not selected. PLISM read 2026-10-28 (all pairs, per-pair blocks in `docs/progress.md`):
+  k=1 (`runs/bench/2026-10-28_06-49-01_lxbelshark_8acb_cgm_fp_k1_6e3e`) 0.309, +0.015 [+0.013, +0.018] over G0, −0.009 [−0.011, −0.008] vs V0-S a602,
+  −0.013 [−0.015, −0.011] vs V1-S 7b71; k=2 (`runs/bench/2026-10-28_07-54-03_lxbelshark_4200_cgm_fp_k2_6e3e`) 0.314, +0.020 [+0.016, +0.024] over G0,
+  −0.005 [−0.006, −0.004] vs V0-S, −0.008 [−0.009, −0.007] vs V1-S. The tuned G0 (α=8, val
+  argmax, `runs/bench/2026-10-28_01-54-30_lxbelshark_d718_mixture_G0_K1_a8`) is also 0.314, +0.020 [+0.017, +0.024] over G0, −0.004 [−0.005, −0.003] vs
+  V0-S. So the SCORPION ranking (k=1, k=2 above V0-S) does not hold on PLISM (finding 1):
+  strongly shrunk closed forms (k=2, tuned G0, β=3.5 0.311) all land at 0.311–0.314, trained
+  V0-S stays about 0.004–0.005 above them and V1-S about 0.008 above k=2.
+  β grid, 2026-10-28 (`runs/bench/2026-10-28_08-21-40_claude-box_bc46_scorpion_aug_attribution_fp_beta`, clean, all tiles, per-scanner W, start β ∈ {1, 1.5, 2,
+  2.5, 3, 3.5, 4, 5, 6, 8} × k ∈ {1, 2, 3} and CGM-init at the same β, val + test read once,
+  augmentation-attribution table): val argmax of CGM-init over β is β=3.5 (0.9836, test
+  0.9709), so the β=3.5 row matched to V0-S is also its val-best (no longer only "matched").
+  Fixed point: val argmax k=1, β=1.5 (0.9849, test 0.9727, relative change 0.327); the
+  surface is flat: k=1 β=2 and k=2 β=1 0.9848, k=1 β=2.5 0.9848, so val does not pin the
+  shrinkage between relative change 0.30 and 0.41. Trained V0-S 0.9807 / 0.9682 in the same
+  run. PLISM so far: k=2 β=1 0.314 (tied on val with the argmax), β=3.5 init 0.311.
   Step 2 done 2026-10-15 (`runs/bench/2026-10-15_19-36-05_lxbelshark_eda5_scorpion_aug_attribution`,
   augmentation-attribution table, val retrieval only): CGM-init|clean|all 0.9808 = V0-S_a602
   0.9807, i.e. the V0-S estimator on clean data, without training and without augmentation,
@@ -971,8 +986,10 @@ Held-out test split; probes trained on val (`summary.csv`).
 | softshrink_gap_tile | gap | tile | 0.4 | 0.963 | 0.993 | 0.905 | 0.777 | 0.986 | smallest lambda with val top-1 gain >= 0.95 x best gain | `runs/bench/2026-10-14_09-21-09_lxbelshark_c54b_scorpion_softshrink_gap_tile` | 4b6e266 |
 | softshrink_gap_region | gap | region | 0 | 0.802 | 0.919 | 0.956 | 0.939 | 0.974 | raw | `runs/bench/2026-10-14_19-02-29_lxbelshark_71bb_scorpion_softshrink_gap_region` | 67e83ee |
 | softshrink_gap_region | gap | region | 0.7 | 0.971 | 0.994 | 0.720 | 0.393 | 0.987 | smallest lambda with val top-1 gain >= 0.95 x best gain | `runs/bench/2026-10-14_19-02-29_lxbelshark_71bb_scorpion_softshrink_gap_region` | 67e83ee |
-| softshrink_gap_tile_valbest | – | tile | – | – | – | – | – | – | no test yet (5 val λ rows) | `runs/bench/2026-10-27_21-31-38_lxbelshark_50cd_scorpion_softshrink_gap_tile_valbest` | f2f0b90 |
-| softshrink_gap_slide_valbest | – | slide | – | – | – | – | – | – | no test yet (5 val λ rows) | `runs/bench/2026-10-27_21-31-39_lxbelshark_e14c_scorpion_softshrink_gap_slide_valbest` | f2f0b90 |
+| softshrink_gap_tile_valbest | gap | tile | 0 | 0.802 | 0.919 | 0.956 | 0.939 | 0.974 | raw | `runs/bench/2026-10-27_21-31-38_lxbelshark_50cd_scorpion_softshrink_gap_tile_valbest` | f2f0b90 |
+| softshrink_gap_tile_valbest | gap | tile | 1 | 0.968 | 0.994 | 0.880 | 0.657 | 0.985 | smallest lambda with val top-1 gain >= 1 x best gain | `runs/bench/2026-10-27_21-31-38_lxbelshark_50cd_scorpion_softshrink_gap_tile_valbest` | f2f0b90 |
+| softshrink_gap_slide_valbest | gap | slide | 0 | 0.802 | 0.919 | 0.956 | 0.939 | 0.974 | raw | `runs/bench/2026-10-27_21-31-39_lxbelshark_e14c_scorpion_softshrink_gap_slide_valbest` | f2f0b90 |
+| softshrink_gap_slide_valbest | gap | slide | 100 | 0.966 | 0.993 | 0.265 | 0.363 | 0.984 | smallest lambda with val top-1 gain >= 1 x best gain | `runs/bench/2026-10-27_21-31-39_lxbelshark_e14c_scorpion_softshrink_gap_slide_valbest` | f2f0b90 |
 
 Test split, proxy protocol (`summary_test.csv`); λ selected on val, rule in the note (`selected.json`).
 
@@ -1078,9 +1095,9 @@ least-squares predictor of the tile consensus).
 | G1 K=8 | 0.50 | 0.50 | – | 0.973 (0.975) | 0.985 | 1.087 | 0.252 | 0.879 / 0.820 | 0.957 | 0.990 | 0.648 / 0.489 | 0.985 | – | `runs/bench/2026-10-13_21-47-56_claude-box_6fdf_scorpion_mixture_gap` | 9ee82ff* |
 | G2-scale K=8 | 0.50 | 0.50 | – | 0.973 (0.975) | 0.985 | 1.111 | 0.260 | 0.879 / 0.819 | 0.958 | 0.991 | 0.649 / 0.496 | 0.986 | – | `runs/bench/2026-10-13_21-47-56_claude-box_6fdf_scorpion_mixture_gap` | 9ee82ff* |
 | G2 K=8 | 0.50 | 0.50 | 0.25 | 0.981 (0.983) | 0.987 | 1.193 | 0.280 | 0.879 / 0.822 | 0.968 | 0.994 | 0.558 / 0.418 | 0.989 | – | `runs/bench/2026-10-13_21-47-56_claude-box_6fdf_scorpion_mixture_gap` | 9ee82ff* |
-| raw | – | – | – | 0.887 | 0.978 | – | – | – | – | – | – / – | – | – | `runs/bench/2026-10-27_21-31-39_lxbelshark_ac86_scorpion_mixture_G0_valbest` | f2f0b90 |
-| reference (eraser) | – | – | – | 0.973 | 0.985 | – | – | – | – | – | – / – | – | – | `runs/bench/2026-10-27_21-31-39_lxbelshark_ac86_scorpion_mixture_G0_valbest` | f2f0b90 |
-| G0 K=1 | 8.00 | – | – | 0.983 (0.979) | 0.982 | 1.087 | 0.131 | – | – | – | – / – | – | – | `runs/bench/2026-10-27_21-31-39_lxbelshark_ac86_scorpion_mixture_G0_valbest` | f2f0b90 |
+| raw | – | – | – | 0.887 | 0.978 | – | – | – | 0.802 | 0.919 | 0.956 / 0.939 | 0.975 | – | `runs/bench/2026-10-27_21-31-39_lxbelshark_ac86_scorpion_mixture_G0_valbest` | f2f0b90 |
+| reference (eraser) | – | – | – | 0.973 | 0.985 | – | – | – | 0.959 | 0.991 | 0.685 / 0.463 | 0.986 | – | `runs/bench/2026-10-27_21-31-39_lxbelshark_ac86_scorpion_mixture_G0_valbest` | f2f0b90 |
+| G0 K=1 | 8.00 | – | – | 0.983 (0.979) | 0.982 | 1.087 | 0.131 | – | 0.971 | 0.994 | 0.375 / 0.324 | 0.986 | – | `runs/bench/2026-10-27_21-31-39_lxbelshark_ac86_scorpion_mixture_G0_valbest` | f2f0b90 |
 
 Val: selection split, scanner/region probes trained on train (`summary_val.csv`); α chosen by the 95%-of-best-val-top-1-gain rule, β by the val consensus likelihood, γ by the val residual likelihood (`selected.json`, `likelihood.csv`). ll = mean held-out log-likelihood, nats/dim: resid = residuals under N_k of their consensus cluster, x = single views under the mixture marginal. Gate = single-view argmax p(k|x) vs the consensus cluster, and share of tiles whose 5 views gate to one cluster (α=1 map, `gating.csv`). Test: proxy protocol, probes trained on val (`summary_test.csv`). Reference = soft-shrinkage eraser map evaluated in the same run.
 

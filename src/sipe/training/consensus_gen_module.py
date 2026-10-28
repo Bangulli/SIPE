@@ -19,7 +19,9 @@ on_fit_start sets the linear-Gaussian solution from `init_batches` train batches
 (skipped on resume); `init_noise_weight` (beta, default 1 = the moment solution)
 scales the within-tile noise of that init, as `init_from_moments(noise_weight=)`.
 Every checkpoint save also writes `map_cgm.pt` in the run dir,
-a `--posthoc` module map file for sipe.bench.plism / sipe.bench.hest.
+a `--posthoc` module map file for sipe.bench.plism / sipe.bench.hest;
+`map_every_n_steps` > 0 also keeps `map_cgm_step<step>.pt` every n optimizer steps
+(the training trajectory; no effect on training).
 
 Validation: PLISM-style cross-scanner retrieval top-1 (SCORPION proxy) on f(x) and
 backbone GAP over the whole val split, fresh WSI-split scanner probes on both, and
@@ -64,6 +66,7 @@ class ConsensusGenModule(FrozenBackboneModule):
         init_batches: int = 40,
         init_ridge: float = 1e-3,
         init_noise_weight: float = 1.0,
+        map_every_n_steps: int = 0,
         freeze_backbone: bool = True,
         image_key: str = "image",
         domain_key: str = "domain",
@@ -170,6 +173,12 @@ class ConsensusGenModule(FrozenBackboneModule):
             top1 = cross_scanner_top1(x, domains, locations, slide_index)
             self.log(f"val/retrieval_top1_{name}", top1)
         self.log_wsi_probes(features, domains, slides)
+
+    def on_train_batch_end(self, outputs: Any, batch: Any, batch_idx: int) -> None:
+        n, step = self.hparams.map_every_n_steps, int(self.global_step)
+        if n > 0 and step > 0 and step % n == 0 and self.trainer.is_global_zero:
+            root = Path(self.trainer.default_root_dir)
+            self.save_map(root / f"map_cgm_step{step:05d}.pt")
 
     def on_save_checkpoint(self, checkpoint: dict[str, Any]) -> None:
         super().on_save_checkpoint(checkpoint)
