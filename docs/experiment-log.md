@@ -463,6 +463,18 @@ The rows as they stood in the claims table; progress.md keeps a short version. "
 References to "section 4" / "above" below mean `docs/progress.md` at that time; the per-pair
 blocks are now in `docs/pair-tables.md`.
 
+- 2026-10-28, tuned G0 on UNI2-h GAP (`scripts/g0_tuned_run.sh`, manifest
+  `runs/uni2h_gap_manifest.env`): α=8, val argmax, not at grid edge
+  (`runs/bench/2026-10-28_14-44-07_lxbelshark_3aa7_scorpion_uni2h_gap_g0_valbest`, val 0.9868
+  vs α=1 0.9850; test 0.9765 vs α=1 0.9750). PLISM all 0.390 vs α=1 0.378
+  (`runs/bench/2026-10-28_15-48-12_lxbelshark_c763_uni2h_gap_g0_a8`); CGM V1-S b116 vs tuned
+  G0 +0.002 [+0.001, +0.002] (64% of pairs; was +0.014 vs α=1), inter-scanner +0.000, without
+  HR +0.001 [+0.000, +0.002]. HEST 0.380 (`runs/bench/2026-10-28_15-48-29_lxbelshark_af68_uni2h_gap_g0_a8`):
+  tuned G0 vs raw −0.007 [−0.014, −0.001], V1-S vs tuned G0 +0.001 [−0.003, +0.004]. Verdict:
+  on UNI2-h GAP the stronger attenuation explains nearly all of CGM's gain, and the HEST cost
+  comes with the attenuation, not with CGM. Paper Table 3 and text updated. CONCH tuned G0 fit
+  (`…4848_scorpion_conch15_gap_g0_valbest`) still running.
+
 In flight / to launch (user, 2026-10-27; details in `docs/experiment-log.md`, Exp 7 history):
 - HEST of the clean CGM init (`map_CGM-init_clean_all.pt` of
   `runs/bench/2026-10-15_19-36-05_lxbelshark_eda5_scorpion_aug_attribution`, tag
