@@ -32,6 +32,8 @@ Sources, all under runs/ (gitignored, so every row names the dir it came from):
   - scanner-count study: runs/bench/*/summary_{val,test}.csv + contrasts_*.csv
     (sipe.eval.scanner_count); PLISM runs tagged sc_<model>_<subset>
     (blocks scanner_count_plism, scanner_count_plism_seen)
+  - saved map files on one split, no probes: runs/bench/*/summary_<split>.csv
+    (sipe.eval.map_retrieval)
   - map spectrum in G0's eigenbasis: runs/bench/*/summary.csv + spectrum_bins.csv
     (sipe.eval.map_spectrum)
   - training: runs/<run>/wandb/*run-*/*.wandb (local W&B history; no API key needed)
@@ -1679,6 +1681,38 @@ def training_table(root: Path, opts: dict[str, list[str]]) -> str:
 # --- map spectrum ----------------------------------------------------------------
 
 
+def map_retrieval_table(root: Path, opts: dict[str, list[str]]) -> str:
+    header = [
+        "map", "split", "top-1", "top-5", "cosine", "map file", "bench run dir",
+        "SIPE commit",
+    ]  # fmt: skip
+    rows = []
+    for run in _bench_runs(root, "scorpion_map_retrieval", *_filters(opts)):
+        split = str(run.config.get("split", "test"))
+        source = [f"`{_rel(run.dir)}`", run.source_cells()[2]]
+        summary = run.dir / f"summary_{split}.csv"
+        if not summary.exists():
+            rows.append(["no results", split, *["–"] * (len(header) - 4), *source])
+            continue
+        for _, r in pd.read_csv(summary, keep_default_na=False).iterrows():
+            rows.append([
+                str(r["name"]),
+                split,
+                f"{r['top_1_accuracy']:.4f}",
+                f"{r['top_5_accuracy']:.4f}",
+                f"{r['cosine_similarity']:.4f}",
+                f"`{_rel(r['path'])}`" if r["path"] else "–",
+                *source,
+            ])  # fmt: skip
+    return (
+        _table(header, rows)
+        + "\n\nSaved map files applied to the cached features of one split"
+        " (`sipe.eval.map_retrieval`): retrieval columns of `sipe.eval.proxy`, the"
+        " same top-1 as the `cgm_select` summaries, without probes. Analysis rows,"
+        " nothing selected."
+    )
+
+
 def map_spectrum_table(root: Path, opts: dict[str, list[str]]) -> str:
     header = [
         "map", "α fit", "fit RMSE", "off-diagonal", "kept content", "kept scanner",
@@ -1742,6 +1776,7 @@ TABLES = {
     "scanner_count_plism_seen": scanner_count_plism_seen_table,
     "training": training_table,
     "map_spectrum": map_spectrum_table,
+    "map_retrieval": map_retrieval_table,
 }
 
 

@@ -95,6 +95,11 @@ need before running or changing one of these tools.
   target x_k − x_j, content from the other views (no shared noise); train/val only, writes
   `summary.csv`, `per_scanner.csv`, `per_cluster.csv`, `ridge.csv` (table block
   `content_offsets`).
+- SCORPION retrieval of saved map files (no probes, e.g. intermediate
+  `map_cgm_step<step>.pt`): `uv run python -m sipe.eval.map_retrieval --tag <tag> --split
+  test --features-from <feature cache> --maps <name>=<map file> ...`; same top-1 as
+  `cgm_select` (checked on raw and a602); writes `summary_<split>.csv` (block
+  `map_retrieval`). Seconds on GPU.
 - Map spectrum (any fitted map files, no PLISM): `uv run python -m sipe.eval.map_spectrum
   --tag <tag> --features-from <feature cache> --maps <name>=<map file> ...`; each map's
   (mean) Jacobian in G0's eigenbasis (generalized eigenvectors of C, N from train,
