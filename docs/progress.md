@@ -218,6 +218,14 @@ Open, not blocking the paper (details in the paper run log, `docs/experiment-log
   is flat on PLISM all pairs from step 6000 to 12000 and at the 6000-step fit's level (V0-S
   gained +0.003 over a602); inter-scanner drifts down for both encoders. Appendix table
   `tab:budget-v1s` added to `paper-overleaf/appendix.tex`.
+  Within-run, step 12000 vs step 6000 (block "12k-step runs: later steps vs step 6000",
+  `docs/pair-tables.md`): V1-S inter-scanner −0.003 [−0.005, −0.002] (12% of pairs), all
+  +0.000 [−0.000, +0.001]; V0-S inter-scanner −0.002 [−0.003, −0.002] (2%), all +0.000. The
+  SCORPION val/test decline after step 6000 (V1-S 0.9848 → 0.9830 / 0.9732 → 0.9707) shows up
+  in PLISM inter-scanner for both encoders, not in all pairs. V0-S step 2000 vs 6000: SCORPION
+  higher (0.9809 vs 0.9801) yet PLISM all −0.007 [−0.008, −0.005] (staining gain comes later),
+  inter-scanner +0.001 [−0.001, +0.002]. So SCORPION tracks PLISM inter-scanner, not the
+  staining-dominated all pairs. Whether 6000 is a V1-S peak: PLISM of steps 2000/4000 not run.
 
 ## 4. Paper tables (generated)
 
