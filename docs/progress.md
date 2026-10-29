@@ -226,6 +226,14 @@ Open, not blocking the paper (details in the paper run log, `docs/experiment-log
   higher (0.9809 vs 0.9801) yet PLISM all −0.007 [−0.008, −0.005] (staining gain comes later),
   inter-scanner +0.001 [−0.001, +0.002]. So SCORPION tracks PLISM inter-scanner, not the
   staining-dominated all pairs. Whether 6000 is a V1-S peak: PLISM of steps 2000/4000 not run.
+  Selecting the step on SCORPION val (2026-10-29): over all V1-S maps (12k steps + 7b71) the
+  argmax is 7b71 (0.9852) = the paper's row. Within the 12k run, steps 4000 and 6000 tie
+  (0.9848; equal to ~1e-9 at full precision, scratch recomputation with
+  `sipe.eval.map_retrieval` functions, not saved); the 95% rule (threshold 0.9799) picks step
+  2000. V0-S: val argmax over the 12k steps + a602 is step 2000 (0.9809), whose PLISM all pairs
+  is 0.314, −0.007 vs step 6000 of the same run; inter-scanner unchanged. So val selection of
+  the step is safe for inter-scanner but can miss the staining gain. PLISM of V1-S steps
+  2000/4000 (user) would show what the val choice gives for V1-S.
 
 ## 4. Paper tables (generated)
 
