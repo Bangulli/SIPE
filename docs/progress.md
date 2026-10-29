@@ -188,6 +188,13 @@ Open, not blocking the paper (details in the paper run log, `docs/experiment-log
   directions (off-diagonal 3–6%). Possible discussion sentence (user decision): training
   is not only a stronger attenuation. Optional causal test (not built): PLISM of a602's
   diagonal-only projection (same per-direction gains, no mixing).
+- In flight (user, 2026-10-29): G0 strength robustness on PLISM (not a selection; answers
+  "is the val-tuned G0 handicapped?"): `STEPS="0 1 3" ALPHAS="<a>" LABEL=a<a>
+  scripts/g0_tuned_run.sh` for α = 4, 16, 32 (the one-α grid forces that α; manifest
+  `runs/tuned_baselines_manifest.env`, tags `mixture_G0_K1_a4/_a16/_a32`). Read: add the tags
+  to the per-pair block vs `cgm_v1s_7b71` and to the appendix; with α=1 (0.294) and α=8
+  (0.314) a five-point PLISM curve vs CGM 0.321. CGM above G0 at every α = claim
+  independent of how G0 is tuned; otherwise state that CGM matches the hindsight-best G0.
 - In flight (user, 2026-10-29): 12k-step CGM (V1-S recipe, `max_steps=12000`,
   `map_every_n_steps=2000`), `runs/2026-10-29_13-18-57_lxbelshark_0dbe` (W&B xkoashrr). Then
   `plism_apply` on `map_cgm_step12000.pt` and `map_cgm_step06000.pt` (tags
