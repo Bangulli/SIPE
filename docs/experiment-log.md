@@ -463,6 +463,21 @@ The rows as they stood in the claims table; progress.md keeps a short version. "
 References to "section 4" / "above" below mean `docs/progress.md` at that time; the per-pair
 blocks are now in `docs/pair-tables.md`.
 
+- 2026-10-29, tuned G0 on CONCH v1.5 GAP (manifest `runs/conch15_gap_manifest.env`): α=8,
+  val argmax, not at grid edge (`runs/bench/2026-10-28_17-17-10_lxbelshark_4848_scorpion_conch15_gap_g0_valbest`,
+  val 0.9794 vs α=1 0.9558; test 0.9551 vs α=1 0.9172, V1-S 0.9567). PLISM all 0.216 vs α=1
+  0.164 (`runs/bench/2026-10-28_19-06-35_lxbelshark_00ed_conch15_gap_g0_a8`); V1-S 1ee1 vs
+  tuned G0 −0.011 [−0.012, −0.009] (3% of pairs; was +0.041 vs α=1), inter-scanner −0.012,
+  without HR −0.012. HEST 0.358 (`…2561_conch15_gap_g0_a8`): tuned G0 vs raw −0.007
+  [−0.013, −0.001], V1-S vs tuned G0 +0.000 [−0.003, +0.003]. Verdict: on CONCH GAP the
+  tuned linear map beats CGM (H0-mini recipe unchanged); SCORPION test still ranks CGM first,
+  another case of SCORPION not ranking PLISM. Paper Table 3 and text updated.
+- 2026-10-29, residual-only `cgm_select` relaunch
+  (`runs/bench/2026-10-28_17-44-54_lxbelshark_e863_scorpion_cgm_resonly_c688_r2`): val 0.9848,
+  test 0.9760, i.e. equal to V1-S 7b71 on SCORPION, −0.016 on PLISM. Fixed-point k=1 β=1.5
+  PLISM (`runs/bench/2026-10-29_00-17-44_lxbelshark_c283_cgm_fp_k1_b1.5_bc46`): 0.309, below
+  k=2 β=1 (0.314). Residual-only on the β=3.5 init: fit `runs/2026-10-29_00-16-58_lxbelshark_4f55`
+  in progress.
 - 2026-10-28, tuned G0 on UNI2-h GAP (`scripts/g0_tuned_run.sh`, manifest
   `runs/uni2h_gap_manifest.env`): α=8, val argmax, not at grid edge
   (`runs/bench/2026-10-28_14-44-07_lxbelshark_3aa7_scorpion_uni2h_gap_g0_valbest`, val 0.9868
