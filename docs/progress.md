@@ -121,6 +121,10 @@ Content as of now (user decisions 2026-10-28):
 - 2026-10-29 (user decision): HR only in the oracle paragraph (defined there); "No HR" column of
   Table 1, the Metrics sentence on HR and "without HR" in the main comparison removed. The
   without-HR per-pair blocks stay in `docs/pair-tables.md`.
+- 2026-10-29: Method states G0 = closed-form linear-Gaussian β-VAE (β = α; checked numerically:
+  identity to 1e-12 on the train moments, saved tuned G0 map to 2.5e-8); "β distinct from α"
+  sentence removed; CGM introduced as G0's latent model with per-scanner offsets/covariances
+  and a trained nonlinear encoder. Net +7 source lines; page count to check (user).
 - Citations added: Srinidhi et al. 2021 (CPath DA survey; volume/pages from memory, unverified),
   Lu et al. 2024 (CONCH).
 
