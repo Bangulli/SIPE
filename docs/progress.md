@@ -125,6 +125,8 @@ Content as of now (user decisions 2026-10-28):
   identity to 1e-12 on the train moments, saved tuned G0 map to 2.5e-8); "β distinct from α"
   sentence removed; CGM introduced as G0's latent model with per-scanner offsets/covariances
   and a trained nonlinear encoder. Net +7 source lines; page count to check (user).
+- 2026-10-29: closed-form iterates out of the paper (user); Method keeps one sentence (optimum =
+  posterior collapse, CGM = budgeted trajectory; finding 19), dangling "(Sec. Results)" removed.
 - Citations added: Srinidhi et al. 2021 (CPath DA survey; volume/pages from memory, unverified),
   Lu et al. 2024 (CONCH).
 
