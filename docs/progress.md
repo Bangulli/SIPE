@@ -524,9 +524,9 @@ Pearson mean (std over folds), HEST `dataset_results.json`; average only when al
 | G0 | – | – | – | 0.9787 | +0.0000 | 0.986 | 0.9645 | 0.9932 | 0.619 / 0.430 | 0.986 | – | `runs/bench/2026-10-28_17-44-54_lxbelshark_e863_scorpion_cgm_resonly_c688_r2` | b37b6e6* |
 | V1-S_c688 | V1-S | 42 | c0 | 0.9848 | +0.0061 | 0.987 | 0.9760 | 0.9955 | 0.541 / 0.446 | 0.989 | selected | `runs/bench/2026-10-28_17-44-54_lxbelshark_e863_scorpion_cgm_resonly_c688_r2` | b37b6e6* |
 | no results | – | – | – | – | – | – | – | – | – | – | – | `runs/bench/2026-10-29_14-09-10_lxbelshark_b539_scorpion_cgm_resonly_b3.5_4f55` | d06d312* |
-| raw | – | – | – | 0.8870 | – | 0.978 | – | – | – / – | – | – | `runs/bench/2026-10-29_14-09-45_lxbelshark_9b4a_scorpion_cgm_resonly_b3.5_4f55` | d06d312* |
-| G0 | – | – | – | 0.9787 | +0.0000 | 0.986 | – | – | – / – | – | – | `runs/bench/2026-10-29_14-09-45_lxbelshark_9b4a_scorpion_cgm_resonly_b3.5_4f55` | d06d312* |
-| V1-S_4f55 | V1-S | 42 | c0 | 0.9850 | +0.0063 | 0.985 | – | – | – / – | – | selected | `runs/bench/2026-10-29_14-09-45_lxbelshark_9b4a_scorpion_cgm_resonly_b3.5_4f55` | d06d312* |
+| raw | – | – | – | 0.8870 | – | 0.978 | 0.8020 | 0.9195 | 0.956 / 0.939 | 0.975 | – | `runs/bench/2026-10-29_14-09-45_lxbelshark_9b4a_scorpion_cgm_resonly_b3.5_4f55` | d06d312* |
+| G0 | – | – | – | 0.9787 | +0.0000 | 0.986 | 0.9645 | 0.9932 | 0.619 / 0.430 | 0.986 | – | `runs/bench/2026-10-29_14-09-45_lxbelshark_9b4a_scorpion_cgm_resonly_b3.5_4f55` | d06d312* |
+| V1-S_4f55 | V1-S | 42 | c0 | 0.9850 | +0.0063 | 0.985 | 0.9754 | 0.9952 | 0.521 / 0.401 | 0.987 | selected | `runs/bench/2026-10-29_14-09-45_lxbelshark_9b4a_scorpion_cgm_resonly_b3.5_4f55` | d06d312* |
 
 CGM fits (`map_cgm.pt`) on the shared SCORPION-proxy protocol (`sipe.eval.cgm_select`), clean features. Val: probes trained on train (`summary_val.csv`); selection = the simplest configuration (arm, then larger ρ) whose mean val top-1 gain over G0 (fitted in the run, α = 1) reaches 95% of the best gain (`selected.json`, `candidates.csv`). Test: read once after the selection, probes trained on val (`summary_test.csv`). Config = fits that differ only by seed share an id.
 
@@ -566,7 +566,7 @@ CGM fits (`map_cgm.pt`) on the shared SCORPION-proxy protocol (`sipe.eval.cgm_se
 | `runs/2026-10-27_22-57-58_lxbelshark_7568` | i67uww4l | ConsensusGenModule | ab49016* | 5999/6000 | 0.985 | 0.887 | 0.319 | 0.801 | 0.095 | 0.302 | 0.057 |
 | `runs/2026-10-28_10-04-49_lxbelshark_bc3a` | zny5eyu6 | ConsensusGenModule | c2cb13d* | 11999/12000 | 0.979 | 0.887 | 0.290 | 0.801 | 0.158 | 0.377 | 0.000 |
 | `runs/2026-10-29_00-16-58_lxbelshark_4f55` | vrw8h4ul | ConsensusGenModule | b37b6e6* | 5999/6000 | 0.985 | 0.887 | 0.319 | 0.801 | 0.095 | 0.302 | 0.057 |
-| `runs/2026-10-29_13-18-57_lxbelshark_0dbe` | xkoashrr | ConsensusGenModule | d06d312* | 9224/12000 | 0.983 | 0.887 | 0.273 | 0.802 | 0.194 | 0.329 | 0.093 |
+| `runs/2026-10-29_13-18-57_lxbelshark_0dbe` | xkoashrr | ConsensusGenModule | d06d312* | 11024/12000 | 0.983 | 0.887 | 0.271 | 0.801 | 0.204 | 0.313 | 0.087 |
 
 Mean of the last 10 validations of `val/<col>`, read from the local `.wandb` file; step = last logged `trainer/global_step` / `max_steps`.
 
