@@ -195,11 +195,17 @@ Open, not blocking the paper (details in the paper run log, `docs/experiment-log
   to the per-pair block vs `cgm_v1s_7b71` and to the appendix; with α=1 (0.294) and α=8
   (0.314) a five-point PLISM curve vs CGM 0.321. CGM above G0 at every α = claim
   independent of how G0 is tuned; otherwise state that CGM matches the hindsight-best G0.
-- In flight (user, 2026-10-29): 12k-step CGM (V1-S recipe, `max_steps=12000`,
-  `map_every_n_steps=2000`), `runs/2026-10-29_13-18-57_lxbelshark_0dbe` (W&B xkoashrr). Then
-  `plism_apply` on `map_cgm_step12000.pt` and `map_cgm_step06000.pt` (tags
-  `v1s_s12k_0dbe_s<step>`), read vs CGM 7b71 (0.321) as for the V0-S run; its row in the
-  training table changes until it ends (so `--check` fails meanwhile).
+- 12k-step CGM (V1-S recipe, `max_steps=12000`, `map_every_n_steps=2000`),
+  `runs/2026-10-29_13-18-57_lxbelshark_0dbe` (W&B xkoashrr): fit done 2026-10-29 (11999/12000;
+  config = 7b71's except `max_steps`; `map_cgm.pt` = step-12000 map, same tensors). In-loop
+  SCORPION val top-1 at the end 0.983 vs 7b71 0.985 (training block). SCORPION of the step
+  maps (`sipe.eval.map_retrieval`, block in `docs/experiment-log.md`): val top-1 0.9840 /
+  0.9848 / 0.9848 / 0.9836 / 0.9833 / 0.9830 at steps 2000–12000 vs 7b71 0.9852
+  (`…9c0e_scorpion_map_retrieval_v1s_s12k_val`); test 0.9732 / 0.9736 / 0.9732 / 0.9718 /
+  0.9707 / 0.9707 vs 7b71 0.9756 (`…50a1_scorpion_map_retrieval_v1s_s12k`). Same pattern as
+  the V0-S 12k run: SCORPION flat to slightly down after step 4000–6000.
+  **Next (user):** `plism_apply` on `map_cgm_step12000.pt` and `map_cgm_step06000.pt` (tags
+  `v1s_s12k_0dbe_s<step>`), read vs CGM 7b71 (0.321) as for the V0-S run.
 
 ## 4. Paper tables (generated)
 
@@ -573,7 +579,7 @@ CGM fits (`map_cgm.pt`) on the shared SCORPION-proxy protocol (`sipe.eval.cgm_se
 | `runs/2026-10-27_22-57-58_lxbelshark_7568` | i67uww4l | ConsensusGenModule | ab49016* | 5999/6000 | 0.985 | 0.887 | 0.319 | 0.801 | 0.095 | 0.302 | 0.057 |
 | `runs/2026-10-28_10-04-49_lxbelshark_bc3a` | zny5eyu6 | ConsensusGenModule | c2cb13d* | 11999/12000 | 0.979 | 0.887 | 0.290 | 0.801 | 0.158 | 0.377 | 0.000 |
 | `runs/2026-10-29_00-16-58_lxbelshark_4f55` | vrw8h4ul | ConsensusGenModule | b37b6e6* | 5999/6000 | 0.985 | 0.887 | 0.319 | 0.801 | 0.095 | 0.302 | 0.057 |
-| `runs/2026-10-29_13-18-57_lxbelshark_0dbe` | xkoashrr | ConsensusGenModule | d06d312* | 11024/12000 | 0.983 | 0.887 | 0.271 | 0.801 | 0.204 | 0.313 | 0.087 |
+| `runs/2026-10-29_13-18-57_lxbelshark_0dbe` | xkoashrr | ConsensusGenModule | d06d312* | 11999/12000 | 0.983 | 0.887 | 0.274 | 0.802 | 0.205 | 0.311 | 0.086 |
 
 Mean of the last 10 validations of `val/<col>`, read from the local `.wandb` file; step = last logged `trainer/global_step` / `max_steps`.
 
