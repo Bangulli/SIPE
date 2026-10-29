@@ -192,6 +192,7 @@ cython_debug/
 .ruff_cache/
 /runs/
 /paper/
+/paper-overleaf/
 /models/
 .claude-box.mounts
 
