@@ -118,6 +118,9 @@ Content as of now (user decisions 2026-10-28):
   by the user, so the Results text no longer cites them. HEST: per-task names dropped (tasks
   not defined), one sentence kept (shifts up to 0.035, same direction for the tuned tile
   eraser λ=1 on every task moving > 0.01; HEST vs raw block in `docs/pair-tables.md`).
+- 2026-10-29 (user decision): HR only in the oracle paragraph (defined there); "No HR" column of
+  Table 1, the Metrics sentence on HR and "without HR" in the main comparison removed. The
+  without-HR per-pair blocks stay in `docs/pair-tables.md`.
 - Citations added: Srinidhi et al. 2021 (CPath DA survey; volume/pages from memory, unverified),
   Lu et al. 2024 (CONCH).
 
