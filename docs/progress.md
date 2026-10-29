@@ -111,7 +111,7 @@ Content as of now (user decisions 2026-10-28):
 - Removed: scanner-count paragraph (claim 13) and LOSO (claim 8): both compare with G0 α=1
   only; kept here as claims, not in the paper.
 - Method states finding 19 ("Training budget": optimum = constant map, map = fixed 6,000-step
-  budget from the closed-form init). Limitations: one split, budget varied only for the linear encoder (12k run: plateau from step 6000, +0.003 over a602; paper text 2026-10-29),
+  budget from the closed-form init). Limitations: one split, 12k budget checked for both encoders (PLISM all pairs 0.321 at steps 6000/12000; −0.001 vs 7b71, +0.003 vs a602; paper text updated 2026-10-29),
   one fit for ablation arms / other backbones, no claim on unseen scanner models.
 - Citations added: Srinidhi et al. 2021 (CPath DA survey; volume/pages from memory, unverified),
   Lu et al. 2024 (CONCH).
