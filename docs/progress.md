@@ -111,7 +111,7 @@ Content as of now (user decisions 2026-10-28):
 - Removed: scanner-count paragraph (claim 13) and LOSO (claim 8): both compare with G0 α=1
   only; kept here as claims, not in the paper.
 - Method states finding 19 ("Training budget": optimum = constant map, map = fixed 6,000-step
-  budget from the closed-form init). Limitations: one split, budget sensitivity untested,
+  budget from the closed-form init). Limitations: one split, budget varied only for the linear encoder (12k run: plateau from step 6000, +0.003 over a602; paper text 2026-10-29),
   one fit for ablation arms / other backbones, no claim on unseen scanner models.
 - Citations added: Srinidhi et al. 2021 (CPath DA survey; volume/pages from memory, unverified),
   Lu et al. 2024 (CONCH).
@@ -165,18 +165,34 @@ Open, not blocking the paper (details in the paper run log, `docs/experiment-log
   filled. The dead first try `…01f7_scorpion_cgm_resonly_c688` can be deleted (user).
   (HEST of the clean CGM init: done, `runs/bench/2026-10-27_17-47-57_lxbelshark_2f44_aug_cgminit_clean_all`,
   average 0.363, HEST table; the paper's Table 2 no longer has a HEST column.)
-- Residual-only on the β=3.5 init (user, analysis row): fit in flight,
-  `runs/2026-10-29_00-16-58_lxbelshark_4f55` (`linear_lr=0`, `init_noise_weight=3.5`; W&B
-  vrw8h4ul): fit done 2026-10-29 (5999/6000, in-loop val 0.985 = V1-S 7b71 and c688, CGM
-  training table). Next (user): `plism_apply` (tag `cgm_v1s_resonly_b3.5_4f55`) and
-  `cgm_select` (tag `cgm_resonly_b3.5_4f55`); then per-pair blocks vs tuned G0, V1-S 7b71 and
-  `aug_cgminit_clean_all_b3.5`.
-  Read r's effect against its own init (Init. α=3.5, 0.311).
+- Residual-only on the β=3.5 init (analysis row): fit `runs/2026-10-29_00-16-58_lxbelshark_4f55`;
+  PLISM read 2026-10-29 (`runs/bench/2026-10-29_13-28-32_lxbelshark_802d_cgm_v1s_resonly_b3.5_4f55`):
+  0.311, +0.000 [−0.001, +0.001] vs its own init (49% of pairs), while the α=1 residual-only
+  c688 is +0.006 [+0.005, +0.007] vs its init (block "Residual MLP with frozen linear
+  parameters vs its own initialization", `docs/pair-tables.md`); vs V1-S 7b71 −0.010
+  [−0.012, −0.009]. So with a frozen linear part, r compensates for missing attenuation and
+  adds nothing on a well-attenuated map. `cgm_select` in flight, launched twice
+  (`…b539_…` and `…9b4a_scorpion_cgm_resonly_b3.5_4f55`, no outputs on 2026-10-29): keep one.
 - Done 2026-10-29: PLISM of the fixed-point val argmax k=1 β=1.5
   (`runs/bench/2026-10-29_00-17-44_lxbelshark_c283_cgm_fp_k1_b1.5_bc46`): 0.309, −0.005
   [−0.006, −0.004] vs tuned G0, −0.013 [−0.015, −0.011] vs V1-S 7b71; below k=2 β=1 (0.314),
   so the val argmax among closed-form iterates does not pick the PLISM-best one. Not in the
   paper (Table 2 keeps the β=1 descent rows).
+- Internal appendix (not submitted): `paper-overleaf/appendix.tex`, standalone, rows
+  generated from run files (spectrum, 12k budget, backbones vs tuned G0 per group); not
+  compiled here (no LaTeX in claude-box).
+- Done 2026-10-29: map spectrum in G0's eigenbasis
+  (`runs/bench/2026-10-29_12-24-59_claude-box_26e5_map_spectrum_h0mini`, finding 20, table in
+  `docs/experiment-log.md`). At matched kept-scanner variance, trained V0-S beats both the
+  β=3.5 init (+0.008) and the tuned G0 (+0.007 at steps 6000/12000); training mixes G0's
+  directions (off-diagonal 3–6%). Possible discussion sentence (user decision): training
+  is not only a stronger attenuation. Optional causal test (not built): PLISM of a602's
+  diagonal-only projection (same per-direction gains, no mixing).
+- In flight (user, 2026-10-29): 12k-step CGM (V1-S recipe, `max_steps=12000`,
+  `map_every_n_steps=2000`), `runs/2026-10-29_13-18-57_lxbelshark_0dbe` (W&B xkoashrr). Then
+  `plism_apply` on `map_cgm_step12000.pt` and `map_cgm_step06000.pt` (tags
+  `v1s_s12k_0dbe_s<step>`), read vs CGM 7b71 (0.321) as for the V0-S run; its row in the
+  training table changes until it ends (so `--check` fails meanwhile).
 
 ## 4. Paper tables (generated)
 
@@ -232,6 +248,7 @@ Open, not blocking the paper (details in the paper run log, `docs/experiment-log
 | v0s_s12k_bc3a_s6000 | posthoc_gap | 0.895 | 0.320 | 0.273 | 0.321 | `runs/bench/2026-10-28_13-46-58_lxbelshark_ee0c_v0s_s12k_bc3a_s6000` | – | bfadd00* |
 | v0s_s12k_bc3a_s2000 | posthoc_gap | 0.896 | 0.317 | 0.266 | 0.314 | `runs/bench/2026-10-28_14-10-11_lxbelshark_4907_v0s_s12k_bc3a_s2000` | – | 394889c* |
 | cgm_fp_k1_b1.5_bc46 | posthoc_gap | 0.893 | 0.309 | 0.260 | 0.309 | `runs/bench/2026-10-29_00-17-44_lxbelshark_c283_cgm_fp_k1_b1.5_bc46` | – | b37b6e6* |
+| cgm_v1s_resonly_b3.5_4f55 | posthoc_gap | 0.896 | 0.312 | 0.262 | 0.311 | `runs/bench/2026-10-29_13-28-32_lxbelshark_802d_cgm_v1s_resonly_b3.5_4f55` | – | d06d312* |
 | h0_mini | – | 0.600 | 0.120 | 0.055 | 0.100 | `../plism-benchmark/output/metrics/8139_tiles/h0_mini` | – | – |
 | sipe_h0_mini | – | 0.666 | 0.237 | 0.158 | 0.203 | `../plism-benchmark/output/metrics/8139_tiles/sipe_h0_mini` | – | – |
 
@@ -294,6 +311,7 @@ similarity over all pairs, median top-10 accuracy per shift group, and their mea
 | v0s_s12k_bc3a_s6000 | posthoc_gap | 0.920 | 0.982 | 0.663 | 0.603 | 0.792 | `runs/bench/2026-10-28_13-46-58_lxbelshark_ee0c_v0s_s12k_bc3a_s6000` | – | bfadd00* |
 | v0s_s12k_bc3a_s2000 | posthoc_gap | 0.906 | 0.982 | 0.662 | 0.593 | 0.786 | `runs/bench/2026-10-28_14-10-11_lxbelshark_4907_v0s_s12k_bc3a_s2000` | – | 394889c* |
 | cgm_fp_k1_b1.5_bc46 | posthoc_gap | 0.911 | 0.981 | 0.652 | 0.586 | 0.782 | `runs/bench/2026-10-29_00-17-44_lxbelshark_c283_cgm_fp_k1_b1.5_bc46` | – | b37b6e6* |
+| cgm_v1s_resonly_b3.5_4f55 | posthoc_gap | 0.911 | 0.982 | 0.654 | 0.590 | 0.784 | `runs/bench/2026-10-29_13-28-32_lxbelshark_802d_cgm_v1s_resonly_b3.5_4f55` | – | d06d312* |
 | h0_mini | – | 0.800 | 0.864 | 0.318 | 0.183 | 0.541 | `../plism-benchmark/output/metrics/8139_tiles/h0_mini` | – | – |
 | sipe_h0_mini | – | 0.961 | 0.888 | 0.501 | 0.345 | 0.674 | `../plism-benchmark/output/metrics/8139_tiles/sipe_h0_mini` | – | – |
 
@@ -376,6 +394,7 @@ this reason, never instead of them.
 | v0s_s12k_bc3a_s6000 | posthoc_gap | 0.909 | 0.376 | 0.320 | 0.370 | `runs/bench/2026-10-28_13-46-58_lxbelshark_ee0c_v0s_s12k_bc3a_s6000` | – | bfadd00* |
 | v0s_s12k_bc3a_s2000 | posthoc_gap | 0.909 | 0.372 | 0.312 | 0.363 | `runs/bench/2026-10-28_14-10-11_lxbelshark_4907_v0s_s12k_bc3a_s2000` | – | 394889c* |
 | cgm_fp_k1_b1.5_bc46 | posthoc_gap | 0.907 | 0.363 | 0.306 | 0.357 | `runs/bench/2026-10-29_00-17-44_lxbelshark_c283_cgm_fp_k1_b1.5_bc46` | – | b37b6e6* |
+| cgm_v1s_resonly_b3.5_4f55 | posthoc_gap | 0.910 | 0.366 | 0.308 | 0.360 | `runs/bench/2026-10-29_13-28-32_lxbelshark_802d_cgm_v1s_resonly_b3.5_4f55` | – | d06d312* |
 | h0_mini | – | 0.609 | 0.142 | 0.065 | 0.114 | `../plism-benchmark/output/metrics/8139_tiles/h0_mini` | – | – |
 | sipe_h0_mini | – | 0.678 | 0.280 | 0.187 | 0.235 | `../plism-benchmark/output/metrics/8139_tiles/sipe_h0_mini` | – | – |
 
@@ -435,6 +454,7 @@ Top-1 accuracy, mean over slide pairs without the stain(s) HR on either side (re
 | v0s_s12k_bc3a_s6000 | posthoc_gap | 0.925 | 0.983 | 0.689 | 0.642 | 0.810 | `runs/bench/2026-10-28_13-46-58_lxbelshark_ee0c_v0s_s12k_bc3a_s6000` | – | bfadd00* |
 | v0s_s12k_bc3a_s2000 | posthoc_gap | 0.912 | 0.983 | 0.688 | 0.636 | 0.805 | `runs/bench/2026-10-28_14-10-11_lxbelshark_4907_v0s_s12k_bc3a_s2000` | – | 394889c* |
 | cgm_fp_k1_b1.5_bc46 | posthoc_gap | 0.917 | 0.982 | 0.679 | 0.628 | 0.802 | `runs/bench/2026-10-29_00-17-44_lxbelshark_c283_cgm_fp_k1_b1.5_bc46` | – | b37b6e6* |
+| cgm_v1s_resonly_b3.5_4f55 | posthoc_gap | 0.917 | 0.983 | 0.682 | 0.632 | 0.803 | `runs/bench/2026-10-29_13-28-32_lxbelshark_802d_cgm_v1s_resonly_b3.5_4f55` | – | d06d312* |
 | h0_mini | – | 0.812 | 0.866 | 0.371 | 0.219 | 0.567 | `../plism-benchmark/output/metrics/8139_tiles/h0_mini` | – | – |
 | sipe_h0_mini | – | 0.964 | 0.891 | 0.549 | 0.394 | 0.699 | `../plism-benchmark/output/metrics/8139_tiles/sipe_h0_mini` | – | – |
 
@@ -503,6 +523,8 @@ Pearson mean (std over folds), HEST `dataset_results.json`; average only when al
 | raw | – | – | – | 0.8870 | – | 0.978 | 0.8020 | 0.9195 | 0.956 / 0.939 | 0.975 | – | `runs/bench/2026-10-28_17-44-54_lxbelshark_e863_scorpion_cgm_resonly_c688_r2` | b37b6e6* |
 | G0 | – | – | – | 0.9787 | +0.0000 | 0.986 | 0.9645 | 0.9932 | 0.619 / 0.430 | 0.986 | – | `runs/bench/2026-10-28_17-44-54_lxbelshark_e863_scorpion_cgm_resonly_c688_r2` | b37b6e6* |
 | V1-S_c688 | V1-S | 42 | c0 | 0.9848 | +0.0061 | 0.987 | 0.9760 | 0.9955 | 0.541 / 0.446 | 0.989 | selected | `runs/bench/2026-10-28_17-44-54_lxbelshark_e863_scorpion_cgm_resonly_c688_r2` | b37b6e6* |
+| no results | – | – | – | – | – | – | – | – | – | – | – | `runs/bench/2026-10-29_14-09-10_lxbelshark_b539_scorpion_cgm_resonly_b3.5_4f55` | d06d312* |
+| no results | – | – | – | – | – | – | – | – | – | – | – | `runs/bench/2026-10-29_14-09-45_lxbelshark_9b4a_scorpion_cgm_resonly_b3.5_4f55` | d06d312* |
 
 CGM fits (`map_cgm.pt`) on the shared SCORPION-proxy protocol (`sipe.eval.cgm_select`), clean features. Val: probes trained on train (`summary_val.csv`); selection = the simplest configuration (arm, then larger ρ) whose mean val top-1 gain over G0 (fitted in the run, α = 1) reaches 95% of the best gain (`selected.json`, `candidates.csv`). Test: read once after the selection, probes trained on val (`summary_test.csv`). Config = fits that differ only by seed share an id.
 
@@ -542,6 +564,7 @@ CGM fits (`map_cgm.pt`) on the shared SCORPION-proxy protocol (`sipe.eval.cgm_se
 | `runs/2026-10-27_22-57-58_lxbelshark_7568` | i67uww4l | ConsensusGenModule | ab49016* | 5999/6000 | 0.985 | 0.887 | 0.319 | 0.801 | 0.095 | 0.302 | 0.057 |
 | `runs/2026-10-28_10-04-49_lxbelshark_bc3a` | zny5eyu6 | ConsensusGenModule | c2cb13d* | 11999/12000 | 0.979 | 0.887 | 0.290 | 0.801 | 0.158 | 0.377 | 0.000 |
 | `runs/2026-10-29_00-16-58_lxbelshark_4f55` | vrw8h4ul | ConsensusGenModule | b37b6e6* | 5999/6000 | 0.985 | 0.887 | 0.319 | 0.801 | 0.095 | 0.302 | 0.057 |
+| `runs/2026-10-29_13-18-57_lxbelshark_0dbe` | xkoashrr | ConsensusGenModule | d06d312* | 6234/12000 | 0.985 | 0.887 | 0.291 | 0.801 | 0.144 | 0.414 | 0.086 |
 
 Mean of the last 10 validations of `val/<col>`, read from the local `.wandb` file; step = last logged `trainer/global_step` / `max_steps`.
 

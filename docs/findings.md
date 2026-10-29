@@ -1,4 +1,4 @@
-# Findings: what the acquisition-shrinkage phase taught us (as of 2026-10-28)
+# Findings: what the acquisition-shrinkage phase taught us (as of 2026-10-29)
 
 Lessons that outlive single runs: about the benchmarks, the protocols, the data and what
 did or did not work. Each one names its evidence (run dir, or the table in
@@ -49,6 +49,17 @@ as an arm, so report the path. On PLISM the iterates do not beat trained V0-S: k
 (`runs/bench/2026-10-28_06-49-01_lxbelshark_8acb_cgm_fp_k1_6e3e`,
 `runs/bench/2026-10-28_07-54-03_lxbelshark_4200_cgm_fp_k2_6e3e`), k=2 about equal to the
 tuned G0 α=8 (both 0.314): another case of finding 1.
+
+**20. Trained CGM is not just a stronger G0.** In G0's eigenbasis (`sipe.eval.map_spectrum`,
+`runs/bench/2026-10-29_12-24-59_claude-box_26e5_map_spectrum_h0mini`, table in
+`docs/experiment-log.md`), maps that remove the same share of scanner variance differ on
+PLISM: the β=3.5 init and trained V0-S a602 both keep 0.17 of it and are 0.311 vs 0.318;
+V0-S at 6000 / 12000 steps and the tuned G0 keep 0.12–0.14 and are 0.321 vs 0.314. Training
+increases the attenuation with steps (finding 19) and also mixes G0's directions
+(off-diagonal 3–6% of the operator vs 0). So: (a) compare maps at matched kept-scanner
+variance, not by their α; (b) "the gain is attenuation" (Table 2) holds against the init,
+not against the tuned G0; (c) whether the mixing causes the gain is untested (diagonal-only
+projection on PLISM).
 
 **18. "Smallest strength at 95% of the gain over raw" picks under-shrunk linear maps.** The
 gain over raw H0-mini is about 0.09 val top-1, so the 5% slack (about 0.005) is larger than

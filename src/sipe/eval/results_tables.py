@@ -32,6 +32,8 @@ Sources, all under runs/ (gitignored, so every row names the dir it came from):
   - scanner-count study: runs/bench/*/summary_{val,test}.csv + contrasts_*.csv
     (sipe.eval.scanner_count); PLISM runs tagged sc_<model>_<subset>
     (blocks scanner_count_plism, scanner_count_plism_seen)
+  - map spectrum in G0's eigenbasis: runs/bench/*/summary.csv + spectrum_bins.csv
+    (sipe.eval.map_spectrum)
   - training: runs/<run>/wandb/*run-*/*.wandb (local W&B history; no API key needed)
 
 The docs (`DOCS`: progress.md for the ISBI paper, pair-tables.md for its paired
@@ -1674,6 +1676,51 @@ def training_table(root: Path, opts: dict[str, list[str]]) -> str:
     )
 
 
+# --- map spectrum ----------------------------------------------------------------
+
+
+def map_spectrum_table(root: Path, opts: dict[str, list[str]]) -> str:
+    header = [
+        "map", "α fit", "fit RMSE", "off-diagonal", "kept content", "kept scanner",
+        "gain by λ decile (high → low)", "Jacobian spread", "bench run dir",
+        "SIPE commit",
+    ]  # fmt: skip
+    rows = []
+    for run in _bench_runs(root, "map_spectrum", *_filters(opts)):
+        source = [f"`{_rel(run.dir)}`", run.source_cells()[2]]
+        summary = run.dir / "summary.csv"
+        if not summary.exists():
+            rows.append(["no results", *["–"] * (len(header) - 3), *source])
+            continue
+        bins = pd.read_csv(run.dir / "spectrum_bins.csv")
+        for _, r in pd.read_csv(summary).iterrows():
+            gains = bins.loc[bins["map"] == r["map"]].sort_values("decile")
+            rows.append([
+                str(r["map"]),
+                f"{r['alpha_fit']:.2f}",
+                f"{r['fit_rmse']:.3f}",
+                f"{r['offdiag_frac']:.4f}",
+                _fmt(r["kept_content"]),
+                _fmt(r["kept_scanner"]),
+                " / ".join(f"{g:.2f}" for g in gains["gain_mean"]),
+                _fmt(r["jac_spread"]),
+                *source,
+            ])  # fmt: skip
+    return (
+        _table(header, rows)
+        + "\n\nEach map's (mean) Jacobian J in G0's eigenbasis (generalized"
+        " eigenvectors of C v = λ N v, train moments, tile-level pairs, G0 ridge;"
+        " `sipe.eval.map_spectrum`), A = V^T J N V. G0 with attenuation α is diagonal"
+        " there with gain λ/(λ+α). α fit = the single α whose G0 gains best fit"
+        " diag A (least squares over directions), fit RMSE = the residual;"
+        " off-diagonal = ||A − diag A||²/||A||² (mixing between G0's directions);"
+        " kept content / scanner = tr(J C Jᵀ)/tr(C), tr(J N Jᵀ)/tr(N); gain by"
+        " decile = mean diag A over the directions in each λ decile, highest"
+        " content-to-scanner ratio first. Jacobian spread (nonlinear maps): mean"
+        " ||J(x) − J̄||/||J̄|| over val embeddings. No PLISM data is read."
+    )
+
+
 TABLES = {
     "plism": plism_table,
     "plism_leaderboard": plism_leaderboard_table,
@@ -1694,6 +1741,7 @@ TABLES = {
     "scanner_count_plism": scanner_count_plism_table,
     "scanner_count_plism_seen": scanner_count_plism_seen_table,
     "training": training_table,
+    "map_spectrum": map_spectrum_table,
 }
 
 

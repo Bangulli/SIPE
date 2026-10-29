@@ -95,6 +95,13 @@ need before running or changing one of these tools.
   target x_k − x_j, content from the other views (no shared noise); train/val only, writes
   `summary.csv`, `per_scanner.csv`, `per_cluster.csv`, `ridge.csv` (table block
   `content_offsets`).
+- Map spectrum (any fitted map files, no PLISM): `uv run python -m sipe.eval.map_spectrum
+  --tag <tag> --features-from <feature cache> --maps <name>=<map file> ...`; each map's
+  (mean) Jacobian in G0's eigenbasis (generalized eigenvectors of C, N from train,
+  tile-level pairs, G0 ridge), G0 is exactly diagonal there (checked: off-diagonal 1e-14,
+  α fit 1.00 / 7.99 for the α=1 / α=8 files). Writes `summary.csv`, `spectrum.csv`,
+  `spectrum_bins.csv`, `spectrum.png` (table block `map_spectrum`). CPU, about 1 min for 11
+  maps.
 
 ## Experiments 3 and 4 (mixture, quadratic)
 
