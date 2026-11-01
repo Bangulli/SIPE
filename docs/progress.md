@@ -171,6 +171,10 @@ Remaining, in order:
    user decision.
 3. User on Overleaf: page count (Table 2 has 16 rows), affiliation 2 incomplete, the user's
    `% TODO: change the mean embedding notation`, ethics/acknowledgment sections commented out.
+   Overleaf repo has local unpushed commits (b1c4076, e1528b4 HR, 92b4e4c G0 as β-VAE,
+   fcf6f68 budget sentence, 2026-10-29): user runs `git pull && git push` on the host, then
+   checks compilation and page count (β-VAE passage added ~7 lines; candidate cuts: G0 "At
+   α=1 … within-tile variation", CGM "Since the scanner-averaged conditional mean…").
 
 Open, not blocking the paper (details in the paper run log, `docs/experiment-log.md`):
 - Done 2026-10-29: SCORPION `cgm_select` of the residual-only arm
