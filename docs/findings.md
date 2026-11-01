@@ -50,6 +50,18 @@ as an arm, so report the path. On PLISM the iterates do not beat trained V0-S: k
 `runs/bench/2026-10-28_07-54-03_lxbelshark_4200_cgm_fp_k2_6e3e`), k=2 about equal to the
 tuned G0 α=8 (both 0.314): another case of finding 1.
 
+**21. SCORPION val tracks PLISM inter-scanner, not PLISM all pairs; early steps miss the
+staining gain.** Over the 12k-step fits, steps 2000 vs 6000 on PLISM all pairs: V0-S −0.007
+[−0.008, −0.005] (`runs/bench/2026-10-28_14-10-11_lxbelshark_4907_v0s_s12k_bc3a_s2000`),
+V1-S −0.003 [−0.004, −0.002]
+(`runs/bench/2026-10-29_17-30-51_lxbelshark_f222_v1s_s12k_0dbe_s02000`), with
+inter-scanner unchanged or higher, while SCORPION val top-1 is equal or higher at step 2000
+(block "12k-step runs: later steps vs step 6000", `docs/pair-tables.md`). V1-S step 4000
+already matches step 6000 (+0.000 [−0.001, +0.001],
+`runs/bench/2026-10-29_17-30-16_lxbelshark_3a9e_v1s_s12k_0dbe_s04000`). So: a val-selected
+step or a 95%-of-gain rule is safe for inter-scanner but can pick a map that is worse on
+staining shifts; report the step count and do not select it on PLISM.
+
 **20. Trained CGM is not just a stronger G0.** In G0's eigenbasis (`sipe.eval.map_spectrum`,
 `runs/bench/2026-10-29_12-24-59_claude-box_26e5_map_spectrum_h0mini`, table in
 `docs/experiment-log.md`), maps that remove the same share of scanner variance differ on

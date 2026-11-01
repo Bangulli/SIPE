@@ -1,4 +1,4 @@
-# ISBI paper progress (as of 2026-10-29)
+# ISBI paper progress (as of 2026-11-01)
 
 Working state of the 4-page ISBI submission (deadline 2026-11-02, 23:59 US Eastern; moved from 2026-10-26, checked on biomedicalimaging.org/2027 on 2026-10-25; plan: `docs/roadmap.md`,
 CGM as built: `docs/experiment7.md`). This file only holds what the paper needs: scope,
@@ -189,8 +189,10 @@ Open, not blocking the paper (details in the paper run log, `docs/experiment-log
   c688 is +0.006 [+0.005, +0.007] vs its init (block "Residual MLP with frozen linear
   parameters vs its own initialization", `docs/pair-tables.md`); vs V1-S 7b71 −0.010
   [−0.012, −0.009]. So with a frozen linear part, r compensates for missing attenuation and
-  adds nothing on a well-attenuated map. `cgm_select` in flight, launched twice
-  (`…b539_…` and `…9b4a_scorpion_cgm_resonly_b3.5_4f55`, no outputs on 2026-10-29): keep one.
+  adds nothing on a well-attenuated map. `cgm_select` read 2026-11-01
+  (`runs/bench/2026-10-29_14-09-45_lxbelshark_9b4a_scorpion_cgm_resonly_b3.5_4f55`, one
+  candidate, selected): val top-1 0.9850 vs G0 0.9787, test 0.9754 vs G0 0.9645. The
+  duplicate `…b539_…` has no outputs and can be deleted (user).
 - Done 2026-10-29: PLISM of the fixed-point val argmax k=1 β=1.5
   (`runs/bench/2026-10-29_00-17-44_lxbelshark_c283_cgm_fp_k1_b1.5_bc46`): 0.309, −0.005
   [−0.006, −0.004] vs tuned G0, −0.013 [−0.015, −0.011] vs V1-S 7b71; below k=2 β=1 (0.314),
@@ -209,7 +211,10 @@ Open, not blocking the paper (details in the paper run log, `docs/experiment-log
 - In flight (user, 2026-10-29): G0 strength robustness on PLISM (not a selection; answers
   "is the val-tuned G0 handicapped?"): `STEPS="0 1 3" ALPHAS="<a>" LABEL=a<a>
   scripts/g0_tuned_run.sh` for α = 4, 16, 32 (the one-α grid forces that α; manifest
-  `runs/tuned_baselines_manifest.env`, tags `mixture_G0_K1_a4/_a16/_a32`). Read: add the tags
+  `runs/tuned_baselines_manifest.env`, tags `mixture_G0_K1_a4/_a16/_a32`). α=4 read
+  2026-11-01 (`runs/bench/2026-10-29_15-45-29_lxbelshark_e40c_mixture_G0_K1_a4`, tag added to
+  the block vs `cgm_v1s_7b71`): all pairs 0.312, vs V1-S 7b71 −0.009 [−0.011, −0.008] (5% of
+  pairs); inter-scanner 0.894, −0.005 [−0.009, −0.002]. α=16/32: no run dirs yet. Read: add the tags
   to the per-pair block vs `cgm_v1s_7b71` and to the appendix; with α=1 (0.294) and α=8
   (0.314) a five-point PLISM curve vs CGM 0.321. CGM above G0 at every α = claim
   independent of how G0 is tuned; otherwise state that CGM matches the hindsight-best G0.
@@ -243,15 +248,24 @@ Open, not blocking the paper (details in the paper run log, `docs/experiment-log
   in PLISM inter-scanner for both encoders, not in all pairs. V0-S step 2000 vs 6000: SCORPION
   higher (0.9809 vs 0.9801) yet PLISM all −0.007 [−0.008, −0.005] (staining gain comes later),
   inter-scanner +0.001 [−0.001, +0.002]. So SCORPION tracks PLISM inter-scanner, not the
-  staining-dominated all pairs. Whether 6000 is a V1-S peak: PLISM of steps 2000/4000 not run.
+  staining-dominated all pairs. V1-S steps 2000/4000 read 2026-11-01
+  (`runs/bench/2026-10-29_17-30-51_lxbelshark_f222_v1s_s12k_0dbe_s02000`,
+  `runs/bench/2026-10-29_17-30-16_lxbelshark_3a9e_v1s_s12k_0dbe_s04000`; tags added to the
+  blocks vs 7b71 and "12k-step runs: later steps vs step 6000"): all pairs 0.317 / 0.321,
+  vs step 6000 −0.003 [−0.004, −0.002] / +0.000 [−0.001, +0.001]; vs 7b71 −0.004
+  [−0.005, −0.003] / −0.001 [−0.001, −0.001]; inter-scanner 0.898 at both, vs step 6000
+  +0.002 [+0.000, +0.003] / +0.002 [+0.001, +0.003]. So V1-S peaks on PLISM all pairs from
+  step 4000 on (flat to 12000), and step 2000 misses the staining gain as for V0-S.
+  Appendix `tab:budget-v1s` filled for steps 2000/4000.
   Selecting the step on SCORPION val (2026-10-29): over all V1-S maps (12k steps + 7b71) the
   argmax is 7b71 (0.9852) = the paper's row. Within the 12k run, steps 4000 and 6000 tie
   (0.9848; equal to ~1e-9 at full precision, scratch recomputation with
   `sipe.eval.map_retrieval` functions, not saved); the 95% rule (threshold 0.9799) picks step
   2000. V0-S: val argmax over the 12k steps + a602 is step 2000 (0.9809), whose PLISM all pairs
   is 0.314, −0.007 vs step 6000 of the same run; inter-scanner unchanged. So val selection of
-  the step is safe for inter-scanner but can miss the staining gain. PLISM of V1-S steps
-  2000/4000 (user) would show what the val choice gives for V1-S.
+  the step is safe for inter-scanner but can miss the staining gain. For V1-S the val argmax
+  (steps 4000/6000 tied) gives 0.321, the 95% rule (step 2000) 0.317 (−0.003 vs step 6000):
+  same reading as V0-S.
 
 ## 4. Paper tables (generated)
 
@@ -312,8 +326,8 @@ Open, not blocking the paper (details in the paper run log, `docs/experiment-log
 | mixture_G0_K1_a4 | posthoc_gap | 0.894 | 0.315 | 0.264 | 0.312 | `runs/bench/2026-10-29_15-45-29_lxbelshark_e40c_mixture_G0_K1_a4` | – | 4b126fe* |
 | v1s_s12k_0dbe_s06000 | posthoc_gap | 0.896 | 0.319 | 0.273 | 0.321 | `runs/bench/2026-10-29_16-19-18_lxbelshark_4dc5_v1s_s12k_0dbe_s06000` | – | 4b126fe* |
 | v1s_s12k_0dbe_s06000 | posthoc_gap | 0.896 | 0.319 | 0.273 | 0.321 | `runs/bench/2026-10-29_16-19-58_lxbelshark_cc86_v1s_s12k_0dbe_s06000` | – | 2a42be2* |
-| v1s_s12k_0dbe_s04000 | posthoc_gap | no results | – | – | – | `runs/bench/2026-10-29_17-30-16_lxbelshark_3a9e_v1s_s12k_0dbe_s04000` | – | b984892 |
-| v1s_s12k_0dbe_s02000 | posthoc_gap | no results | – | – | – | `runs/bench/2026-10-29_17-30-51_lxbelshark_f222_v1s_s12k_0dbe_s02000` | – | b984892 |
+| v1s_s12k_0dbe_s04000 | posthoc_gap | 0.898 | 0.321 | 0.272 | 0.321 | `runs/bench/2026-10-29_17-30-16_lxbelshark_3a9e_v1s_s12k_0dbe_s04000` | – | b984892 |
+| v1s_s12k_0dbe_s02000 | posthoc_gap | 0.898 | 0.319 | 0.269 | 0.317 | `runs/bench/2026-10-29_17-30-51_lxbelshark_f222_v1s_s12k_0dbe_s02000` | – | b984892 |
 | h0_mini | – | 0.600 | 0.120 | 0.055 | 0.100 | `../plism-benchmark/output/metrics/8139_tiles/h0_mini` | – | – |
 | sipe_h0_mini | – | 0.666 | 0.237 | 0.158 | 0.203 | `../plism-benchmark/output/metrics/8139_tiles/sipe_h0_mini` | – | – |
 
@@ -381,8 +395,8 @@ similarity over all pairs, median top-10 accuracy per shift group, and their mea
 | mixture_G0_K1_a4 | posthoc_gap | 0.909 | 0.982 | 0.659 | 0.592 | 0.785 | `runs/bench/2026-10-29_15-45-29_lxbelshark_e40c_mixture_G0_K1_a4` | – | 4b126fe* |
 | v1s_s12k_0dbe_s06000 | posthoc_gap | 0.920 | 0.982 | 0.664 | 0.601 | 0.792 | `runs/bench/2026-10-29_16-19-18_lxbelshark_4dc5_v1s_s12k_0dbe_s06000` | – | 4b126fe* |
 | v1s_s12k_0dbe_s06000 | posthoc_gap | 0.920 | 0.982 | 0.664 | 0.601 | 0.792 | `runs/bench/2026-10-29_16-19-58_lxbelshark_cc86_v1s_s12k_0dbe_s06000` | – | 2a42be2* |
-| v1s_s12k_0dbe_s04000 | posthoc_gap | no results | – | – | – | – | `runs/bench/2026-10-29_17-30-16_lxbelshark_3a9e_v1s_s12k_0dbe_s04000` | – | b984892 |
-| v1s_s12k_0dbe_s02000 | posthoc_gap | no results | – | – | – | – | `runs/bench/2026-10-29_17-30-51_lxbelshark_f222_v1s_s12k_0dbe_s02000` | – | b984892 |
+| v1s_s12k_0dbe_s04000 | posthoc_gap | 0.915 | 0.982 | 0.665 | 0.600 | 0.790 | `runs/bench/2026-10-29_17-30-16_lxbelshark_3a9e_v1s_s12k_0dbe_s04000` | – | b984892 |
+| v1s_s12k_0dbe_s02000 | posthoc_gap | 0.907 | 0.982 | 0.664 | 0.598 | 0.788 | `runs/bench/2026-10-29_17-30-51_lxbelshark_f222_v1s_s12k_0dbe_s02000` | – | b984892 |
 | h0_mini | – | 0.800 | 0.864 | 0.318 | 0.183 | 0.541 | `../plism-benchmark/output/metrics/8139_tiles/h0_mini` | – | – |
 | sipe_h0_mini | – | 0.961 | 0.888 | 0.501 | 0.345 | 0.674 | `../plism-benchmark/output/metrics/8139_tiles/sipe_h0_mini` | – | – |
 
@@ -470,8 +484,8 @@ this reason, never instead of them.
 | mixture_G0_K1_a4 | posthoc_gap | 0.908 | 0.370 | 0.309 | 0.361 | `runs/bench/2026-10-29_15-45-29_lxbelshark_e40c_mixture_G0_K1_a4` | – | 4b126fe* |
 | v1s_s12k_0dbe_s06000 | posthoc_gap | 0.910 | 0.374 | 0.320 | 0.370 | `runs/bench/2026-10-29_16-19-18_lxbelshark_4dc5_v1s_s12k_0dbe_s06000` | – | 4b126fe* |
 | v1s_s12k_0dbe_s06000 | posthoc_gap | 0.910 | 0.374 | 0.320 | 0.370 | `runs/bench/2026-10-29_16-19-58_lxbelshark_cc86_v1s_s12k_0dbe_s06000` | – | 2a42be2* |
-| v1s_s12k_0dbe_s04000 | posthoc_gap | no results | – | – | – | `runs/bench/2026-10-29_17-30-16_lxbelshark_3a9e_v1s_s12k_0dbe_s04000` | – | b984892 |
-| v1s_s12k_0dbe_s02000 | posthoc_gap | no results | – | – | – | `runs/bench/2026-10-29_17-30-51_lxbelshark_f222_v1s_s12k_0dbe_s02000` | – | b984892 |
+| v1s_s12k_0dbe_s04000 | posthoc_gap | 0.912 | 0.376 | 0.320 | 0.370 | `runs/bench/2026-10-29_17-30-16_lxbelshark_3a9e_v1s_s12k_0dbe_s04000` | – | b984892 |
+| v1s_s12k_0dbe_s02000 | posthoc_gap | 0.912 | 0.375 | 0.315 | 0.366 | `runs/bench/2026-10-29_17-30-51_lxbelshark_f222_v1s_s12k_0dbe_s02000` | – | b984892 |
 | h0_mini | – | 0.609 | 0.142 | 0.065 | 0.114 | `../plism-benchmark/output/metrics/8139_tiles/h0_mini` | – | – |
 | sipe_h0_mini | – | 0.678 | 0.280 | 0.187 | 0.235 | `../plism-benchmark/output/metrics/8139_tiles/sipe_h0_mini` | – | – |
 
@@ -536,8 +550,8 @@ Top-1 accuracy, mean over slide pairs without the stain(s) HR on either side (re
 | mixture_G0_K1_a4 | posthoc_gap | 0.915 | 0.982 | 0.686 | 0.634 | 0.804 | `runs/bench/2026-10-29_15-45-29_lxbelshark_e40c_mixture_G0_K1_a4` | – | 4b126fe* |
 | v1s_s12k_0dbe_s06000 | posthoc_gap | 0.926 | 0.983 | 0.687 | 0.641 | 0.809 | `runs/bench/2026-10-29_16-19-18_lxbelshark_4dc5_v1s_s12k_0dbe_s06000` | – | 4b126fe* |
 | v1s_s12k_0dbe_s06000 | posthoc_gap | 0.926 | 0.983 | 0.687 | 0.641 | 0.809 | `runs/bench/2026-10-29_16-19-58_lxbelshark_cc86_v1s_s12k_0dbe_s06000` | – | 2a42be2* |
-| v1s_s12k_0dbe_s04000 | posthoc_gap | no results | – | – | – | – | `runs/bench/2026-10-29_17-30-16_lxbelshark_3a9e_v1s_s12k_0dbe_s04000` | – | b984892 |
-| v1s_s12k_0dbe_s02000 | posthoc_gap | no results | – | – | – | – | `runs/bench/2026-10-29_17-30-51_lxbelshark_f222_v1s_s12k_0dbe_s02000` | – | b984892 |
+| v1s_s12k_0dbe_s04000 | posthoc_gap | 0.920 | 0.983 | 0.689 | 0.642 | 0.809 | `runs/bench/2026-10-29_17-30-16_lxbelshark_3a9e_v1s_s12k_0dbe_s04000` | – | b984892 |
+| v1s_s12k_0dbe_s02000 | posthoc_gap | 0.913 | 0.983 | 0.689 | 0.640 | 0.806 | `runs/bench/2026-10-29_17-30-51_lxbelshark_f222_v1s_s12k_0dbe_s02000` | – | b984892 |
 | h0_mini | – | 0.812 | 0.866 | 0.371 | 0.219 | 0.567 | `../plism-benchmark/output/metrics/8139_tiles/h0_mini` | – | – |
 | sipe_h0_mini | – | 0.964 | 0.891 | 0.549 | 0.394 | 0.699 | `../plism-benchmark/output/metrics/8139_tiles/sipe_h0_mini` | – | – |
 
