@@ -1,4 +1,4 @@
-# ISBI paper progress (as of 2026-11-01)
+# ISBI paper progress (as of 2026-11-02)
 
 Working state of the 4-page ISBI submission (deadline 2026-11-02, 23:59 US Eastern; moved from 2026-10-26, checked on biomedicalimaging.org/2027 on 2026-10-25; plan: `docs/roadmap.md`,
 CGM as built: `docs/experiment7.md`). This file only holds what the paper needs: scope,
@@ -92,6 +92,22 @@ and pushes there; never commit in it (co-authors edit on Overleaf, which adds it
 Not compilable in claude-box (no LaTeX; TinyTeX install was denied): page count is checked
 by the user on Overleaf. Every number has a `%` comment naming its run dir.
 
+Paper state 2026-11-02 (submission day; Overleaf HEAD `84ecdf6`, pushed by the user):
+- Renamed G0 -> **ACE** (affine consensus estimator) in the visible text; `%` comments and
+  run tags keep G0. `appendix.tex` still says G0.
+- Selection paragraph = val argmax for linear baselines and among CGM architectures, recipe
+  (incl. augmentation) fixed a priori (see the 2026-11-02 note below on the 95% rule).
+- Results shortened (Retrieval, Condition oracle with HR numbers, HEST, Ablations, Other
+  backbones); seed robustness sentence in Retrieval; "applied unchanged" (no "H0-mini
+  recipe") for other backbones; CONCH "reversed" in the abstract.
+- Method: fixed budget stated as a fact, posterior collapse "for a linear encoder" (no
+  causal "to prevent"); definitions added (RMS, λ, WSI, b, θ; ρ term on φ_{r,out}).
+- ISBI 2027 sections: "Compliance with Ethical Standards" and "Acknowledgments" (funding,
+  no competing interests, AI-use statement); `\thanks` removed. Citation added:
+  `carloni2025pathology` (ScanGen: contrastive loss during task-specific fine-tuning).
+- Open: confirm "HR = Harris hematoxylin applied overnight" against Ochi et al. 2024;
+  co-authors to confirm the competing-interests statement.
+
 Content as of now (user decisions 2026-10-28):
 - Only tuned baselines (SCORPION val argmax). Table 1 (main): raw, eraser tile λ=1, G0 α=8,
   V0-S, V1-S (bold = best among selected methods), V2-S with † "not selected: below V1-S on
@@ -176,6 +192,18 @@ Remaining, in order:
    checks compilation and page count (β-VAE passage added ~7 lines; candidate cuts: G0 "At
    α=1 … within-tile variation", CGM "Since the scanner-averaged conditional mean…").
 
+- 2026-11-02, paper Selection paragraph (user rewrite of Method/Setup): the paper's CGM
+  selection (`runs/bench/2026-10-15_18-22-36_lxbelshark_aae8_scorpion_cgm_select`) had two
+  candidates only (V0-S, V1-S). Over the augmented fits of
+  `runs/bench/2026-10-18_10-46-17_lxbelshark_0256_scorpion_cgm_select_all` (V0, V0-S, V1,
+  V1-S × 3 seeds, V2-S), the coded 95% rule (simplest arm first) picks V1 (pooled
+  acquisition), not V1-S: full-precision val top-1 (scratch recomputation with
+  `sipe.eval.proxy.retrieval_metrics`, not saved) V1 73af 0.984980 vs threshold 0.984952
+  (G0 α=1 0.978735, V1-S seed mean 0.985279; margin about one query of 49,000). The val
+  argmax among augmented architectures is V1-S (0.985184 seed 42). So the paper can state
+  "argmax among architectures, recipe (incl. augmentation) fixed a priori", not "simplest
+  within 95%". Proposed to the user; paper text is the user's call.
+
 Open, not blocking the paper (details in the paper run log, `docs/experiment-log.md`):
 - Done 2026-10-29: SCORPION `cgm_select` of the residual-only arm
   (`runs/bench/2026-10-28_17-44-54_lxbelshark_e863_scorpion_cgm_resonly_c688_r2`): val 0.9848
@@ -208,7 +236,15 @@ Open, not blocking the paper (details in the paper run log, `docs/experiment-log
   directions (off-diagonal 3–6%). Possible discussion sentence (user decision): training
   is not only a stronger attenuation. Optional causal test (not built): PLISM of a602's
   diagonal-only projection (same per-direction gains, no mixing).
-- In flight (user, 2026-10-29): G0 strength robustness on PLISM (not a selection; answers
+- α=16 / α=32 runs DONE 2026-11-01, NOT READ yet: fits
+  `runs/bench/2026-11-01_19-27-14_lxbelshark_b725_scorpion_mixture_G0_a16` (α=16, val 0.9823),
+  `runs/bench/2026-11-01_19-31-36_lxbelshark_9d89_scorpion_mixture_G0_a32` (α=32, val 0.9790);
+  PLISM `runs/bench/2026-11-01_21-25-56_lxbelshark_ca19_mixture_G0_K1_a16`,
+  `runs/bench/2026-11-01_21-36-18_lxbelshark_802b_mixture_G0_K1_a32` (results.csv present;
+  manifest updated). Next: add tags `mixture_G0_K1_a16,mixture_G0_K1_a32` to the block
+  `ref=cgm_v1s_7b71` in `docs/pair-tables.md`, `results_tables --write`, read the five-point
+  curve (α = 1, 4, 8, 16, 32) vs CGM 0.321, add to the appendix.
+- (was in flight, user, 2026-10-29): G0 strength robustness on PLISM (not a selection; answers
   "is the val-tuned G0 handicapped?"): `STEPS="0 1 3" ALPHAS="<a>" LABEL=a<a>
   scripts/g0_tuned_run.sh` for α = 4, 16, 32 (the one-α grid forces that α; manifest
   `runs/tuned_baselines_manifest.env`, tags `mixture_G0_K1_a4/_a16/_a32`). α=4 read
