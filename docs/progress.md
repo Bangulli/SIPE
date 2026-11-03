@@ -1,4 +1,10 @@
-# ISBI paper progress (as of 2026-11-02)
+# ISBI paper progress (as of 2026-11-03)
+
+**SUBMITTED 2026-11-02 (user).** Overleaf repo HEAD at submission: `a9c41fa` ("change ref");
+the four "top-1 retrieval accuracy" wording edits (abstract, Metrics, Table 1 caption,
+Results) are uncommitted in `paper-overleaf/` and may not be in the submitted PDF (user to
+check). Next: wait for reviews; post-submission plans (follow-up paper, disk cleanup of
+PLISM features) are not decided yet.
 
 Working state of the 4-page ISBI submission (deadline 2026-11-02, 23:59 US Eastern; moved from 2026-10-26, checked on biomedicalimaging.org/2027 on 2026-10-25; plan: `docs/roadmap.md`,
 CGM as built: `docs/experiment7.md`). This file only holds what the paper needs: scope,
@@ -94,7 +100,7 @@ by the user on Overleaf. Every number has a `%` comment naming its run dir.
 
 Paper state 2026-11-02 (submission day; Overleaf HEAD `84ecdf6`, pushed by the user):
 - Renamed G0 -> **ACE** (affine consensus estimator) in the visible text; `%` comments and
-  run tags keep G0. `appendix.tex` still says G0.
+  run tags keep G0. `appendix.tex` says ACE too in visible text (2026-11-02).
 - Selection paragraph = val argmax for linear baselines and among CGM architectures, recipe
   (incl. augmentation) fixed a priori (see the 2026-11-02 note below on the 95% rule).
 - Results shortened (Retrieval, Condition oracle with HR numbers, HEST, Ablations, Other
@@ -105,6 +111,26 @@ Paper state 2026-11-02 (submission day; Overleaf HEAD `84ecdf6`, pushed by the u
 - ISBI 2027 sections: "Compliance with Ethical Standards" and "Acknowledgments" (funding,
   no competing interests, AI-use statement); `\thanks` removed. Citation added:
   `carloni2025pathology` (ScanGen: contrastive loss during task-specific fine-tuning).
+- Consistency review 2026-11-02 (all numbers rechecked against `docs/pair-tables.md` /
+  `docs/progress.md` blocks; changes committed by the user, Overleaf HEAD `815b6c2`):
+  - Nonlinear increment not separable from budget: V0-S 12k step 12000 vs V1-S 7b71 −0.000
+    [−0.001, +0.001] (block ref=cgm_v1s_7b71). Table 2 gained rows "Linear enc., 12k steps"
+    (.321 / .274 / 50% / val .9794) and "CGM, 12k steps" (.321 / .273 / −.001 / 49% / val
+    .9830; val from the map_retrieval runs `..._3bd4_..._v0s_s12k_val`, `..._9c0e_..._v1s_s12k_val`).
+    Abstract now says only "a smaller benefit from training"; Results Ablations rewritten by
+    the user ("Much of the improvement…", 12k linear "would not be selected on validation");
+    Limitations: "recipe and budget fixed a priori, the linear encoder's gap to CGM depends
+    on the budget (Table 2)".
+  - No-augmentation row dropped from Table 2 (user): augmentation is part of the recipe;
+    ACE on augmented moments −0.001 vs ACE (`aug_g0_geo_all`), so CGM's lead is not a data
+    amount effect.
+  - Table 2 caption: initialization rows = closed form computed on all train tiles
+    (`aug_cgminit_clean_all`, not the 5,120-tile augmented init CGM starts from,
+    `aug_cgminit_geo_5120`, PLISM 0.298); linear-encoder seeds footnote clarified.
+  - Minor: HEST task range "−0.035 to +0.029"; Table 3 UNI2-h ACE SCORPION test 0.976
+    (file 0.9765); ACE "moments estimated from the paired views" (was "moment-matched");
+    "β is the KL weight (α in ACE)"; ethics sentence without the license claim.
+  - Open: abstract/Discussion say "most" vs Results "Much of" (user to choose).
 - Open: confirm "HR = Harris hematoxylin applied overnight" against Ochi et al. 2024;
   co-authors to confirm the competing-interests statement.
 
