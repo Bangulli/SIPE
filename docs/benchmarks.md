@@ -24,6 +24,21 @@ Branch `sipe` holds two small opt-in patches:
 
 Model code stays in SIPE (`src/sipe/bench/`).
 
+**Parity with the published results.**
+- PLISM: the raw UNI2-h CLS run reproduces the official plismbench output exactly
+  (`runs/bench/2026-10-21_02-32-59_lxbelshark_2f49_uni2h_cls_ref` vs
+  `../plism-benchmark/output/metrics/8139_tiles/uni2h`, `docs/findings.md` #15). The
+  `plism_leaderboard` blocks also reproduce the README rows for H0-Mini and UNI2-h.
+- HEST (checked 2026-11-04 against the README table of 03.04.26, nine tasks, no HCC): raw
+  UNI2-h CLS gives a nine-task average of 0.4138 vs 0.4141 in the README, every task within
+  0.0013 (`runs/bench/2026-10-21_07-17-58_lxbelshark_f6ee_uni2h_cls_ref`). CONCH v1.5 head
+  gives 0.3792 vs 0.3792, every task within 0.0007
+  (`runs/bench/2026-10-22_22-13-02_lxbelshark_56da_conch15_head_ref`). H0-mini isn't a
+  like-for-like check: our row is GAP, not the official embedding. Its average is 0.3963 vs
+  0.3958, but individual tasks differ by up to 0.016
+  (`runs/bench/2026-10-13_11-03-53_lxbelshark_8f0f_h0_mini_gap_ref`). Our HEST "average"
+  column covers ten tasks (HCC included), so it is not the README's Average.
+
 ## Benchmark a post-hoc estimator
 
 A map fitted on cached SCORPION features (soft-shrinkage eraser, roadmap estimators) is
