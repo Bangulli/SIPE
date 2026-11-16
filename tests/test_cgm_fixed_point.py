@@ -80,10 +80,12 @@ def test_objective_is_the_training_loss_in_expectation(noise):
     torch.testing.assert_close(loss, expected, rtol=1e-9, atol=1e-9)
 
 
+@pytest.mark.parametrize("kl_weight", [1.0, 1 / 3])
 @pytest.mark.parametrize("noise", fp.NOISE)
-def test_fixed_point_is_stationary_and_monotone(noise):
+def test_fixed_point_is_stationary_and_monotone(noise, kl_weight):
     views = _views()
-    out = fp.fit(views, CPU, noise=noise, max_iter=3000, tol=1e-12, log_every=1)
+    out = fp.fit(views, CPU, noise=noise, max_iter=3000, tol=1e-12, log_every=1,
+                 kl_weight=kl_weight)  # fmt: skip
     J = [h["J"] for h in out.history]
     assert all(b <= a + 1e-12 for a, b in zip(J, J[1:]))
     assert J[-1] < J[0]
@@ -98,10 +100,13 @@ def test_fixed_point_is_stationary_and_monotone(noise):
         W0 = out.noise[0].clone().requires_grad_()
         W = W0.expand(u.shape[1], -1, -1)
         params = [L, M, S_q, W0]
-    else:
+    elif noise == "per_scanner":
         W = out.noise.clone().requires_grad_()
         params = [L, M, S_q, W]
-    grads = torch.autograd.grad(fp.objective(L, M, S_q, W, mom), params)
+    else:  # fixed: W is not a parameter
+        W = out.noise.clone()
+        params = [L, M, S_q]
+    grads = torch.autograd.grad(fp.objective(L, M, S_q, W, mom, kl_weight), params)
     for p, gr in zip(params, grads):
         assert gr.norm() < 1e-6 * max(1.0, p.norm()), gr.norm()
 
@@ -125,3 +130,32 @@ def test_null_direction_is_projected_out():
     a = torch.ones(6, dtype=torch.float64) / 6**0.5
     T = out.map.L.detach().double() @ out.map.M.detach().double()
     assert (T @ a).norm() < 1e-8 and (a @ T).norm() < 1e-8
+
+
+def _toy_collapse_views(n=2000, v=3, d=6, seed=1):
+    """Signal shared by the views, independent noise per view, no offsets."""
+    rng = np.random.default_rng(seed)
+    content = rng.normal(size=(n, 1, d)) @ rng.normal(size=(d, d))
+    return content + 0.5 * rng.normal(size=(n, v, d))
+
+
+def test_training_objective_collapses_joint_elbo_does_not():
+    """Finding 19 on a toy: kl_weight = 1 (the training loss, a single-view marginal
+    bound) converges to posterior collapse; kl_weight = 1/V (the joint ELBO) keeps an
+    informative posterior and a non-zero map."""
+    views = _toy_collapse_views()
+    d, v = views.shape[2], views.shape[1]
+    single = fp.fit(views, CPU, noise="shared", max_iter=20000, tol=1e-10)
+    joint = fp.fit(views, CPU, noise="shared", max_iter=20000, tol=1e-10,
+                   kl_weight=1 / v)  # fmt: skip
+    norm = lambda o: float((o.map.L.detach() @ o.map.M.detach()).norm())  # noqa: E731
+    assert single.history[-1]["tr_posterior"] > 0.99 * d  # S_q -> I
+    assert norm(single) < 1e-2
+    assert joint.history[-1]["tr_posterior"] < 0.5 * d
+    assert norm(joint) > 0.5
+
+
+def test_fixed_noise_keeps_the_init_noise():
+    views = _views()
+    out = fp.fit(views, CPU, noise="fixed", max_iter=50)
+    assert out.history[-1]["tr_noise_ratio"] == pytest.approx(1.0)

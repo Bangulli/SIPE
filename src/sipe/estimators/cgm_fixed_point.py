@@ -27,7 +27,17 @@ over every source of the tile, so the source moments given the target scanner ar
 same P_uu for every k (exact for complete tiles). delta_k = the scanner mean of u and
 b = 0 are already stationary (u is centered over all views). Block coordinate descent
 from the moment init: J never increases. `noise` = "shared" (one W, the init's
-assumption) or "per_scanner" (W_k, as trained V0-S: per_scanner=True).
+assumption), "per_scanner" (W_k, as trained V0-S: per_scanner=True) or "fixed" (W kept
+at the init's within-tile noise, never updated).
+
+KL weight (`kl_weight` = beta_KL, 2026-11-16): J_beta = mean_t E_q[NLL_t] + beta_KL KL.
+Training uses beta_KL = 1, a bound on the single-view marginal log p(u_t) only, which
+the collapsed model attains with zero gap (docs/findings.md, 19). beta_KL = 1/V gives
+J_beta = (1/V) x the negative ELBO of the joint log p(u_1..u_V) with the single-view
+encoder q(z | u_s), i.e. the per-view NLLs summed and the KL paid once. Only the S_q
+and M blocks change:
+    S_q = (I + L^T Wbar^-1 L / beta_KL)^-1
+    M   = (L^T Wbar^-1 L + beta_KL I)^-1 sum_k w_k L^T W_k^-1 P_yu^k P_uu^-1
 
 Null space: features can satisfy an exact linear constraint (H0-mini GAP: one
 direction with P_uu eigenvalue ~1e-17, the final LayerNorm). There every E_k is
@@ -53,7 +63,7 @@ import torch
 
 from sipe.model.consensus_gen import CGMMap, ConsensusGenerativeHead
 
-NOISE = ("shared", "per_scanner")
+NOISE = ("shared", "per_scanner", "fixed")
 
 
 @dataclass
@@ -90,9 +100,10 @@ def objective(
     S_q: torch.Tensor,
     W: torch.Tensor,
     mom: dict[str, torch.Tensor],
+    kl_weight: float = 1.0,
 ) -> torch.Tensor:
     """J per source view (no constants): sum_k w_k [tr(W_k^-1 E_k) + log|W_k|] / 2
-    + (tr S_q + tr(M P_uu M^T) - log|S_q|) / 2. Differentiable (tests)."""
+    + kl_weight (tr S_q + tr(M P_uu M^T) - log|S_q|) / 2. Differentiable (tests)."""
     k = W.shape[0]
     R = M @ mom["P_uu"] @ M.T + S_q
     nll = 0.0
@@ -107,7 +118,7 @@ def objective(
         + torch.trace(M @ mom["P_uu"] @ M.T)
         - torch.linalg.slogdet(S_q)[1]
     )
-    return nll + kl
+    return nll + kl_weight * kl
 
 
 def fit(
@@ -122,6 +133,7 @@ def fit(
     null_tol: float = 1e-10,
     noise_weight: float = 1.0,
     snapshots: tuple[int, ...] = (),
+    kl_weight: float = 1.0,
 ) -> FixedPoint:
     """Fixed point from the moment init (`init_from_moments`, `ridge` as the init).
 
@@ -129,9 +141,12 @@ def fit(
     relative change of L M (the map's linear part) falls below `tol`. `snapshots`:
     iterations at which a copy of the map is kept (the path from the init, 0).
     `noise_weight`: start from the init with the noise scaled by beta
-    (`init_from_moments(noise_weight=)`); the objective is unchanged."""
+    (`init_from_moments(noise_weight=)`); the objective is unchanged. `kl_weight`:
+    beta_KL of the objective (1 = the training loss, 1/V = the joint ELBO)."""
     if noise not in NOISE:
         raise ValueError(f"noise must be one of {NOISE}, got {noise!r}.")
+    if kl_weight <= 0:
+        raise ValueError(f"kl_weight must be > 0, got {kl_weight}.")
     n, v, d = views.shape
     head = ConsensusGenerativeHead(d, num_scanners=v, per_scanner=True,
                                    encoder_hidden_dim=0).to(device)  # fmt: skip
@@ -167,7 +182,7 @@ def fit(
     def record(it: int, change: float) -> None:
         row = {
             "iter": it,
-            "J": float(objective(L, M, S_q, W, mom)) / d,
+            "J": float(objective(L, M, S_q, W, mom, kl_weight)) / d,
             "tr_noise_ratio": float(torch.diagonal(W, dim1=-2, dim2=-1).sum(-1).mean())
             / tr_w0,
             "tr_posterior": float(torch.trace(S_q)),
@@ -196,14 +211,14 @@ def fit(
         W_inv = torch.linalg.inv(W)
         Wbar_inv = _sym(W_inv.mean(0))
         # S_q | L, W
-        S_q = _sym(torch.linalg.inv(eye + L.T @ Wbar_inv @ L))
+        S_q = _sym(torch.linalg.inv(eye + L.T @ Wbar_inv @ L / kl_weight))
         # L | M, S_q, W
         R = _sym(M @ mom["P_uu"] @ M.T + S_q)
         G = (W_inv @ mom["P_yu"]).sum(0) * w  # sum_k w_k W_k^-1 P_yu^k
         L = torch.linalg.solve(Wbar_inv, G @ M.T) @ torch.linalg.inv(R)
         # M | L, S_q, W
         M = torch.linalg.solve(
-            L.T @ Wbar_inv @ L + eye, L.T @ G
+            L.T @ Wbar_inv @ L + kl_weight * eye, L.T @ G
         ) @ torch.linalg.inv(mom["P_uu"])
         # W | L, M, S_q
         R = _sym(M @ mom["P_uu"] @ M.T + S_q)
@@ -214,7 +229,10 @@ def fit(
                 for j in range(v)
             ]
         )  # fmt: skip
-        W = E if noise == "per_scanner" else E.mean(0).expand_as(E).clone()
+        if noise == "per_scanner":
+            W = E
+        elif noise == "shared":
+            W = E.mean(0).expand_as(E).clone()
         T_new = L @ M
         change = float((T_new - T).norm() / T.norm())
         T = T_new

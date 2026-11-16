@@ -54,7 +54,7 @@ model:
     lr: 3.0e-4 # r/h MLPs; cosine decay over trainer.max_steps
     linear_lr: 1.0e-4 # M, L, b, Cholesky factors, delta (no weight decay)
     weight_decay: 0.01 # MLP weights only
-    kl_weight: 1.0 # beta = 1: the ELBO
+    kl_weight: 1.0 # 1: bound on the single-view marginal (collapses, finding 19); 0.2 = 1/V: joint ELBO of the 5 views
     kl_warmup_steps: 0 # init is already the linear-Gaussian solution
     residual_penalty: 1.0e-3 # rho on the r/h output layers
     init_batches: 40 # x 128 locations x 5 views = 25,600 train views

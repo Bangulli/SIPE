@@ -20,8 +20,11 @@ without training (docs/experiment-log.md, Exp 7 history, 2026-10-15):
   `--fp-iters` (`--fp-iters 0` = run to convergence: the optimum is posterior
   collapse, a constant map; the useful maps are early iterates); with
   `--fp-init-noise-weights b ...` the descent starts from CGM-init(b=<b>) (arms
-  `CGM-fp(<noise>,k=<k>,b=<b>)`, b = 1 unlabeled). k and b are analysis axes here,
-  never selected;
+  `CGM-fp(<noise>,k=<k>,b=<b>)`, b = 1 unlabeled); with `--fp-kl-weights w ...` the
+  objective's KL weight is w (1 = the training loss; 1/V = 0.2 = the joint ELBO of the
+  tile's views, whose optimum is not the collapse; arms `CGM-fp(<noise>,k=<k>,kl=<w>)`,
+  w = 1 unlabeled); `--fixed-point fixed` keeps the noise at the init. k, b and w are
+  analysis axes here, never selected;
 - data: `clean` (train split of `--features-from`) and every `--aug-caches
   label=dir` (`sipe.features.extract`); a unit = one tile (clean) or one tile copy
   (augmented, all scanner views share the transform);
@@ -208,6 +211,9 @@ def main(argv: list[str] | None = None) -> Path:
     parser.add_argument("--fp-init-noise-weights", nargs="+", type=float,
                         default=[1.0],
                         help="Start the descent from CGM-init(b).")  # fmt: skip
+    parser.add_argument("--fp-kl-weights", nargs="+", type=float, default=[1.0],
+                        help="KL weight of the objective (1 = training, 0.2 = joint "
+                        "ELBO).")  # fmt: skip
     parser.add_argument("--fp-max-iter", type=int, default=2000,
                         help="Cap for --fp-iters 0.")  # fmt: skip
     parser.add_argument("--fp-tol", type=float, default=1e-7,
@@ -291,9 +297,10 @@ def main(argv: list[str] | None = None) -> Path:
                 if est == "CGM-init"
                 for b in args.init_noise_weights
             ] + [
-                ("CGM-fp", (noise, b))
+                ("CGM-fp", (noise, b, w))
                 for noise in args.fixed_point
                 for b in args.fp_init_noise_weights
+                for w in args.fp_kl_weights
             ]
             for est, beta in variants:
                 if est == "CGM-fp":
@@ -338,14 +345,17 @@ def main(argv: list[str] | None = None) -> Path:
                              variant="G0", K=1, alpha=alpha, data=data_label,
                              n_units=size, encoder=encoder)  # fmt: skip
                 elif est.startswith("CGM-fp"):
-                    noise, start = beta
+                    noise, start, kl_weight = beta
                     tag = "" if start == 1.0 else f",b={start:g}"
                     ftag = "" if start == 1.0 else f"-b{start:g}"
+                    if kl_weight != 1.0:
+                        tag += f",kl={kl_weight:g}"
+                        ftag += f"-kl{kl_weight:g}"
                     converge = 0 in args.fp_iters
                     keep = tuple(k for k in args.fp_iters if k > 0)
                     result = cgm_fixed_point.fit(
                         views, device, noise=noise, ridge=args.init_ridge,
-                        noise_weight=start,
+                        noise_weight=start, kl_weight=kl_weight,
                         max_iter=args.fp_max_iter if converge else max(keep),
                         tol=args.fp_tol if converge else 0.0, log_every=1,
                         snapshots=keep,
@@ -369,6 +379,7 @@ def main(argv: list[str] | None = None) -> Path:
                         arm = {
                             **info, "estimator": est_k,
                             "noise": noise, "init_noise_weight": start,
+                            "kl_weight": kl_weight,
                             "iterations": int(at["iter"]),
                             "converged": bool(result.converged) if k == 0 else False,
                             "J_init": float(history["J"].iloc[0]),
@@ -381,7 +392,7 @@ def main(argv: list[str] | None = None) -> Path:
                                   "generator_hidden_dim": 0},
                                  arm="V0-S objective, block coordinate descent",
                                  noise=noise, init_noise_weight=start,
-                                 iterations=arm["iterations"],
+                                 kl_weight=kl_weight, iterations=arm["iterations"],
                                  init_ridge=args.init_ridge, data=data_label,
                                  n_units=size, encoder=encoder)  # fmt: skip
                         maps[name_k] = fmap
