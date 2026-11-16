@@ -7,8 +7,9 @@ last Limitations sentence ("Future work will examine pairing scale, content-depe
 shifts and stopping criteria.", `paper-overleaf/paper.tex`). Next: resubmission to MIDL
 (user, 2026-11-16). Stopping criteria: closed-form fix for the collapse (joint ELBO /
 frozen noise) in `docs/experiment-log.md`, section 3; PLISM read 2026-11-16: the converged
-joint-ELBO linear map = trained V0-S (0.317 vs 0.318 all pairs); next = training with
-`kl_weight=0.2`.
+joint-ELBO linear map = trained V0-S (0.317 vs 0.318 all pairs). Fits with `kl_weight=0.2`
+(V0-S / V1-S, 6k and 12k steps) done 2026-11-16, SCORPION val read (V1-S no longer
+declines with steps); PLISM of their maps in flight (user; experiment-log section 3).
 
 **SUBMITTED 2026-11-02 (user).** Overleaf repo HEAD at submission: `a9c41fa` ("change ref");
 the four "top-1 retrieval accuracy" wording edits (abstract, Metrics, Table 1 caption,

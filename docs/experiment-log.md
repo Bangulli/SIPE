@@ -794,6 +794,20 @@ selection unchanged (no-aug 7e3c). It replaces e198 in the `cgm` block.
     linear map, all from scanner + staining pairs.
   - Next: train V0-S and V1-S with `kl_weight=0.2` (6k and 12k steps: the map should not
     depend on the budget; trained V0-S should approach the closed-form optimum).
+  - Fits done 2026-11-16 (`configs/consensus_gen.yaml` + `kl_weight=0.2`,
+    `map_every_n_steps=2000`; commit 38ded26): V0-S 6k `runs/2026-11-16_20-11-56_lxbelshark_2143`,
+    V0-S 12k `runs/2026-11-16_21-03-41_lxbelshark_6917`, V1-S 6k
+    `runs/2026-11-16_20-11-56_lxbelshark_5e8a`, V1-S 12k `runs/2026-11-16_21-00-57_lxbelshark_89fc`.
+    SCORPION val top-1 of every step map
+    (`runs/bench/2026-11-16_22-48-24_claude-box_4900_scorpion_kl0.2_budget_val`): V0-S flat,
+    0.9800–0.9804 at every step of both runs, below the closed-form joint optimum 0.9840 (same
+    run): budget-independent, but training barely moves the linear map from the init (cause
+    not checked: linear lr 1e-4, or augmented vs clean data). V1-S rises and flattens: 6k run
+    0.9852 at the end; 12k run 0.9861 / 0.9863 / 0.9867 / 0.9868 at steps 6000–12000 (with
+    KL 1 the 12k V1-S fell from 0.9848 to 0.9830 after step 6000); 7b71 0.9852 in the same run.
+    PLISM pending (user): 6k maps and 12k steps 2000 / 6000 / 12000, tags
+    `cgm_v0s_kl0.2_2143`, `cgm_v1s_kl0.2_5e8a`, `v0s_kl0.2_s12k_6917_s<step>`,
+    `v1s_kl0.2_s12k_89fc_s<step>`.
 
 - Content-dependent scanner offsets (2026-10-16, `sipe.eval.content_offsets`; motivation:
   the CGM's shift δ_k is constant per scanner). Design: per scanner pair (k, j), target
