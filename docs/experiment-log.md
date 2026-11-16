@@ -755,6 +755,46 @@ selection unchanged (no-aug 7e3c). It replaces e198 in the `cgm` block.
 
 ## 3. Open points outside the ISBI scope
 
+- Non-degenerate CGM objective (2026-11-16, after the ISBI desk reject on "stopping
+  criteria"; MIDL resubmission planned). Diagnosis (finding 19): the training loss
+  `mean_t NLL_t + KL` bounds the single-view marginal log p(u_t), which the collapsed model
+  attains with zero gap. Two closed-form fixes in `sipe.estimators.cgm_fixed_point`:
+  `kl_weight` = 1/V = 0.2 (the joint ELBO of the tile's 5 views, NLLs summed, KL once) and
+  `noise="fixed"` (noise kept at the init's within-tile covariance). Run
+  `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` (clean, all
+  train tiles, val only, retrieval only; `summary_val.csv`, `arms.json`, `sweep_val.csv`):
+  - Sanity: per-scanner noise, KL weight 1 reproduces 6e3e (converged val top-1 0.0010,
+    k=1 0.9843, k=2 0.9848).
+  - Both fixes converge to an informative map (no collapse): per-scanner, KL 0.2: 510
+    iterations, val top-1 0.9840, tr S_q 207.31 (collapse = 768); fixed noise, KL 1: 559
+    iterations, 0.9851, tr S_q 447.02, relative change 0.3291 (V0-S a602: 0.9807, 0.3205);
+    fixed noise, KL 0.2: 195 iterations, 0.9824. References in the same run: G0 α=1 0.9787,
+    α=8 0.9833 (`sweep_val.csv`), CGM-init 0.9808.
+  - Reading: in closed form, the stopping-rule problem is gone with either fix; the
+    converged maps sit at or above tuned G0 on SCORPION val. Not verified on PLISM
+    (findings 1, 21: val does not rank PLISM all pairs). Not verified with training (the
+    fit would set `kl_weight=0.2` or freeze the noise factors; not implemented in the
+    training module yet).
+  - PLISM read 2026-11-16 (`plism_apply` on 053f; per-pair blocks vs tuned G0 α=8, V0-S
+    a602 and V1-S 7b71 in `docs/pair-tables.md`, tags `cgm_fp_*_f0f2`), all pairs / inter-
+    scanner:
+    - joint ELBO, per-scanner noise
+      (`runs/bench/2026-11-16_16-29-17_lxbelshark_bfd1_cgm_fp_per_scanner-kconv-kl0.2_f0f2`):
+      0.317 / 0.899; vs tuned G0 +0.003 [+0.002, +0.005] / +0.008 [+0.005, +0.012]; vs V0-S
+      a602 −0.001 [−0.002, +0.000] / +0.003 [+0.001, +0.005]; vs V1-S 7b71 −0.004
+      [−0.006, −0.003] / +0.000 [−0.002, +0.003].
+    - frozen noise, KL 1 (`…_9c12_cgm_fp_fixed-kconv_f0f2`): 0.309 / 0.894; vs tuned G0
+      −0.005 [−0.006, −0.004]. Frozen noise, KL 0.2 (`…_84eb_cgm_fp_fixed-kconv-kl0.2_f0f2`):
+      0.302; vs tuned G0 −0.012 [−0.014, −0.010].
+  - Reading: the converged joint-ELBO map (closed form, no step budget, no learning rate)
+    matches trained V0-S on PLISM all pairs and is above it inter-scanner; the stopping-rule
+    dependence of the linear arm is removed without losing its PLISM level. The frozen-noise
+    map, best on SCORPION val (0.9851), is below the tuned G0 on PLISM: val misranks again
+    (findings 1, 21); dropped. V1-S 7b71 keeps +0.004 on all pairs over the joint-ELBO
+    linear map, all from scanner + staining pairs.
+  - Next: train V0-S and V1-S with `kl_weight=0.2` (6k and 12k steps: the map should not
+    depend on the budget; trained V0-S should approach the closed-form optimum).
+
 - Content-dependent scanner offsets (2026-10-16, `sipe.eval.content_offsets`; motivation:
   the CGM's shift δ_k is constant per scanner). Design: per scanner pair (k, j), target
   x_k − x_j, content = mean of the other three views, so target and predictor share no
@@ -1131,6 +1171,27 @@ iterates) in claim 7 and in the paper's ablation table.
 | CGM-fp(per_scanner,k=1,b=8) | clean | all | 93100 | – | 0.9810 | +0.0023 | 0.9953 | – / – | – | 0.484 | 0.9667 | +0.0022 | `runs/bench/2026-10-28_08-21-40_claude-box_bc46_scorpion_aug_attribution_fp_beta` | c2cb13d* |
 | CGM-fp(per_scanner,k=2,b=8) | clean | all | 93100 | – | 0.9803 | +0.0016 | 0.9950 | – / – | – | 0.521 | 0.9659 | +0.0014 | `runs/bench/2026-10-28_08-21-40_claude-box_bc46_scorpion_aug_attribution_fp_beta` | c2cb13d* |
 | CGM-fp(per_scanner,k=3,b=8) | clean | all | 93100 | – | 0.9792 | +0.0005 | 0.9947 | – / – | – | 0.547 | 0.9642 | -0.0003 | `runs/bench/2026-10-28_08-21-40_claude-box_bc46_scorpion_aug_attribution_fp_beta` | c2cb13d* |
+| raw | – | – | – | – | 0.8870 | – | 0.9586 | – / – | – | 0.000 | – | – | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` | 01fb68a* |
+| reference | – | – | – | – | 0.9731 | – | 0.9918 | – / – | – | 0.173 | – | – | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` | 01fb68a* |
+| V0-S_a602 | – | – | – | – | 0.9807 | +0.0020 | 0.9950 | – / – | – | 0.321 | – | – | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` | 01fb68a* |
+| G0 | clean | all | 93100 | 1.00 | 0.9787 | +0.0000 | 0.9942 | – / – | – | 0.193 | – | – | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` | 01fb68a* |
+| CGM-init | clean | all | 93100 | – | 0.9808 | +0.0021 | 0.9951 | – / – | – | 0.218 | – | – | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` | 01fb68a* |
+| CGM-fp(per_scanner,k=conv) | clean | all | 93100 | – | 0.0010 | -0.9777 | 0.0051 | – / – | – | 0.876 | – | – | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` | 01fb68a* |
+| CGM-fp(per_scanner,k=1) | clean | all | 93100 | – | 0.9843 | +0.0056 | 0.9965 | – / – | – | 0.300 | – | – | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` | 01fb68a* |
+| CGM-fp(per_scanner,k=2) | clean | all | 93100 | – | 0.9848 | +0.0061 | 0.9966 | – / – | – | 0.381 | – | – | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` | 01fb68a* |
+| CGM-fp(per_scanner,k=3) | clean | all | 93100 | – | 0.9841 | +0.0054 | 0.9963 | – / – | – | 0.434 | – | – | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` | 01fb68a* |
+| CGM-fp(per_scanner,k=conv,kl=0.2) | clean | all | 93100 | – | 0.9840 | +0.0053 | 0.9964 | – / – | – | 0.269 | – | – | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` | 01fb68a* |
+| CGM-fp(per_scanner,k=1,kl=0.2) | clean | all | 93100 | – | 0.9814 | +0.0027 | 0.9954 | – / – | – | 0.224 | – | – | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` | 01fb68a* |
+| CGM-fp(per_scanner,k=2,kl=0.2) | clean | all | 93100 | – | 0.9828 | +0.0041 | 0.9960 | – / – | – | 0.247 | – | – | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` | 01fb68a* |
+| CGM-fp(per_scanner,k=3,kl=0.2) | clean | all | 93100 | – | 0.9833 | +0.0046 | 0.9961 | – / – | – | 0.255 | – | – | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` | 01fb68a* |
+| CGM-fp(fixed,k=conv) | clean | all | 93100 | – | 0.9851 | +0.0064 | 0.9966 | – / – | – | 0.329 | – | – | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` | 01fb68a* |
+| CGM-fp(fixed,k=1) | clean | all | 93100 | – | 0.9843 | +0.0056 | 0.9965 | – / – | – | 0.300 | – | – | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` | 01fb68a* |
+| CGM-fp(fixed,k=2) | clean | all | 93100 | – | 0.9848 | +0.0061 | 0.9966 | – / – | – | 0.314 | – | – | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` | 01fb68a* |
+| CGM-fp(fixed,k=3) | clean | all | 93100 | – | 0.9850 | +0.0063 | 0.9966 | – / – | – | 0.320 | – | – | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` | 01fb68a* |
+| CGM-fp(fixed,k=conv,kl=0.2) | clean | all | 93100 | – | 0.9824 | +0.0037 | 0.9958 | – / – | – | 0.234 | – | – | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` | 01fb68a* |
+| CGM-fp(fixed,k=1,kl=0.2) | clean | all | 93100 | – | 0.9814 | +0.0027 | 0.9954 | – / – | – | 0.224 | – | – | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` | 01fb68a* |
+| CGM-fp(fixed,k=2,kl=0.2) | clean | all | 93100 | – | 0.9819 | +0.0032 | 0.9956 | – / – | – | 0.228 | – | – | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` | 01fb68a* |
+| CGM-fp(fixed,k=3,kl=0.2) | clean | all | 93100 | – | 0.9821 | +0.0034 | 0.9957 | – / – | – | 0.230 | – | – | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` | 01fb68a* |
 
 SCORPION val, clean features, probes trained on train (– = `--retrieval-only`; `summary_val.csv`, arms in `arms.json`). G0 = consensus shrinkage (K = 1, α by the 95% rule on val); CGM-init = the V0-S init map (closed form, no training). Data: clean = the GAP cache's train split, other labels = augmented train caches (`sipe.features.extract`; a unit = one tile copy, views share the transform). Units: n = n tiles with one random copy each (same tiles in every arm), tiles = every tile once, all = every copy. Δ vs G0|clean|all (= the G0 of the mixture sweep when α = 1). Explanatory ablation: nothing is selected across arms; the PLISM readout uses the saved `map_<estimator>_<data>_<units>.pt`. Other rows (raw, reference, V0-S, ...) are map files evaluated in the same run. Test (`--test`, read once, `summary_test.csv`, probes trained on val as in `cgm_select`): – = not read. CGM-fp(<noise>) = the stationary point of the CGM training objective with a linear encoder (closed-form V0-S, `sipe.estimators.cgm_fixed_point`).
 
@@ -1192,6 +1253,23 @@ SCORPION val, clean features, probes trained on train (– = `--retrieval-only`;
 | CGM-fp(per_scanner,k=1,b=8) | clean | all | 1 | False | 0.12805 | -0.12877 | 0.491 | 560.3 | V0-S_a602 0.704 | `runs/bench/2026-10-28_08-21-40_claude-box_bc46_scorpion_aug_attribution_fp_beta` | c2cb13d* |
 | CGM-fp(per_scanner,k=2,b=8) | clean | all | 2 | False | 0.12805 | -0.15174 | 0.521 | 661.7 | V0-S_a602 0.769 | `runs/bench/2026-10-28_08-21-40_claude-box_bc46_scorpion_aug_attribution_fp_beta` | c2cb13d* |
 | CGM-fp(per_scanner,k=3,b=8) | clean | all | 3 | False | 0.12805 | -0.15702 | 0.563 | 705.0 | V0-S_a602 0.807 | `runs/bench/2026-10-28_08-21-40_claude-box_bc46_scorpion_aug_attribution_fp_beta` | c2cb13d* |
+| CGM-init | clean | all | – | – | – | – | – | – | V0-S_a602 0.547 | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` | 01fb68a* |
+| CGM-fp(per_scanner,k=conv) | clean | all | 1813 | True | 0.39955 | -0.17349 | 11.095 | 768.0 | V0-S_a602 1.000 | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` | 01fb68a* |
+| CGM-fp(per_scanner,k=1) | clean | all | 1 | False | 0.39955 | 0.10155 | 1.961 | 255.7 | V0-S_a602 0.417 | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` | 01fb68a* |
+| CGM-fp(per_scanner,k=2) | clean | all | 2 | False | 0.39955 | -0.07068 | 2.610 | 451.5 | V0-S_a602 0.496 | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` | 01fb68a* |
+| CGM-fp(per_scanner,k=3) | clean | all | 3 | False | 0.39955 | -0.11936 | 3.135 | 562.0 | V0-S_a602 0.605 | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` | 01fb68a* |
+| CGM-fp(per_scanner,k=conv,kl=0.2) | clean | all | 510 | True | -0.53644 | -0.78262 | 1.707 | 207.3 | V0-S_a602 0.571 | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` | 01fb68a* |
+| CGM-fp(per_scanner,k=1,kl=0.2) | clean | all | 1 | False | -0.53644 | -0.76315 | 1.506 | 88.4 | V0-S_a602 0.595 | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` | 01fb68a* |
+| CGM-fp(per_scanner,k=2,kl=0.2) | clean | all | 2 | False | -0.53644 | -0.77811 | 1.592 | 131.9 | V0-S_a602 0.600 | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` | 01fb68a* |
+| CGM-fp(per_scanner,k=3,kl=0.2) | clean | all | 3 | False | -0.53644 | -0.78118 | 1.637 | 162.4 | V0-S_a602 0.580 | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` | 01fb68a* |
+| CGM-fp(fixed,k=conv) | clean | all | 559 | True | 0.39955 | 0.26162 | 1.000 | 447.0 | V0-S_a602 0.583 | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` | 01fb68a* |
+| CGM-fp(fixed,k=1) | clean | all | 1 | False | 0.39955 | 0.30329 | 1.000 | 255.7 | V0-S_a602 0.417 | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` | 01fb68a* |
+| CGM-fp(fixed,k=2) | clean | all | 2 | False | 0.39955 | 0.27050 | 1.000 | 354.6 | V0-S_a602 0.487 | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` | 01fb68a* |
+| CGM-fp(fixed,k=3) | clean | all | 3 | False | 0.39955 | 0.26444 | 1.000 | 400.0 | V0-S_a602 0.522 | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` | 01fb68a* |
+| CGM-fp(fixed,k=conv,kl=0.2) | clean | all | 195 | True | -0.53644 | -0.68549 | 1.000 | 141.6 | V0-S_a602 0.576 | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` | 01fb68a* |
+| CGM-fp(fixed,k=1,kl=0.2) | clean | all | 1 | False | -0.53644 | -0.68146 | 1.000 | 88.4 | V0-S_a602 0.595 | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` | 01fb68a* |
+| CGM-fp(fixed,k=2,kl=0.2) | clean | all | 2 | False | -0.53644 | -0.68365 | 1.000 | 107.1 | V0-S_a602 0.593 | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` | 01fb68a* |
+| CGM-fp(fixed,k=3,kl=0.2) | clean | all | 3 | False | -0.53644 | -0.68451 | 1.000 | 118.8 | V0-S_a602 0.589 | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo` | 01fb68a* |
 
 V0-S objective by block coordinate descent from the CGM-init (`arms.json`, `fp_history_*.csv`, `linear_dist.csv`): k = iterations (conv = to convergence, the optimum: posterior collapse, tr(S_q) = D); J = the training objective per source view and dimension, without constants, at the init and at k; tr(W) / tr(W init) = noise trace over the init's within-tile noise (mean over scanners). Distance = ||L M − L' M'||_F / ||L' M'||_F to each linear map of `--maps`.
 
@@ -1587,6 +1665,12 @@ least-squares predictor of the tile consensus).
 | raw | – | – | – | 0.887 | 0.978 | – | – | – | 0.802 | 0.919 | 0.956 / 0.939 | 0.975 | – | `runs/bench/2026-10-29_15-14-49_lxbelshark_eeea_scorpion_mixture_G0_a4` | 7255f20* |
 | reference (eraser) | – | – | – | 0.973 | 0.985 | – | – | – | 0.959 | 0.991 | 0.685 / 0.463 | 0.986 | – | `runs/bench/2026-10-29_15-14-49_lxbelshark_eeea_scorpion_mixture_G0_a4` | 7255f20* |
 | G0 K=1 | 4.00 | – | – | 0.983 (0.979) | 0.985 | 1.087 | 0.131 | – | 0.971 | 0.994 | 0.434 / 0.342 | 0.987 | α at grid edge | `runs/bench/2026-10-29_15-14-49_lxbelshark_eeea_scorpion_mixture_G0_a4` | 7255f20* |
+| raw | – | – | – | 0.887 | 0.978 | – | – | – | 0.802 | 0.919 | 0.956 / 0.939 | 0.975 | – | `runs/bench/2026-11-01_19-27-14_lxbelshark_b725_scorpion_mixture_G0_a16` | 72f3e75* |
+| reference (eraser) | – | – | – | 0.973 | 0.985 | – | – | – | 0.959 | 0.991 | 0.685 / 0.463 | 0.986 | – | `runs/bench/2026-11-01_19-27-14_lxbelshark_b725_scorpion_mixture_G0_a16` | 72f3e75* |
+| G0 K=1 | 16.00 | – | – | 0.982 (0.979) | 0.980 | 1.087 | 0.131 | – | 0.969 | 0.994 | 0.337 / 0.301 | 0.983 | α at grid edge | `runs/bench/2026-11-01_19-27-14_lxbelshark_b725_scorpion_mixture_G0_a16` | 72f3e75* |
+| raw | – | – | – | 0.887 | 0.978 | – | – | – | 0.802 | 0.919 | 0.956 / 0.939 | 0.975 | – | `runs/bench/2026-11-01_19-31-36_lxbelshark_9d89_scorpion_mixture_G0_a32` | 72f3e75* |
+| reference (eraser) | – | – | – | 0.973 | 0.985 | – | – | – | 0.959 | 0.991 | 0.685 / 0.463 | 0.986 | – | `runs/bench/2026-11-01_19-31-36_lxbelshark_9d89_scorpion_mixture_G0_a32` | 72f3e75* |
+| G0 K=1 | 32.00 | – | – | 0.979 (0.979) | 0.977 | 1.087 | 0.131 | – | 0.964 | 0.992 | 0.305 / 0.285 | 0.980 | α at grid edge | `runs/bench/2026-11-01_19-31-36_lxbelshark_9d89_scorpion_mixture_G0_a32` | 72f3e75* |
 
 Val: selection split, scanner/region probes trained on train (`summary_val.csv`); α chosen by the 95%-of-best-val-top-1-gain rule, β by the val consensus likelihood, γ by the val residual likelihood (`selected.json`, `likelihood.csv`). ll = mean held-out log-likelihood, nats/dim: resid = residuals under N_k of their consensus cluster, x = single views under the mixture marginal. Gate = single-view argmax p(k|x) vs the consensus cluster, and share of tiles whose 5 views gate to one cluster (α=1 map, `gating.csv`). Test: proxy protocol, probes trained on val (`summary_test.csv`). Reference = soft-shrinkage eraser map evaluated in the same run.
 

@@ -49,6 +49,16 @@ as an arm, so report the path. On PLISM the iterates do not beat trained V0-S: k
 (`runs/bench/2026-10-28_06-49-01_lxbelshark_8acb_cgm_fp_k1_6e3e`,
 `runs/bench/2026-10-28_07-54-03_lxbelshark_4200_cgm_fp_k2_6e3e`), k=2 about equal to the
 tuned G0 α=8 (both 0.314): another case of finding 1.
+Cause and fix (2026-11-16): the loss averages the NLL over the target views and pays the KL
+once, so it bounds a *single-view* marginal, which carries no pairing information. The
+joint ELBO (KL weight 1/V = 0.2) or a noise frozen at the init both converge to an
+informative map (val top-1 0.9840 / 0.9851, no collapse;
+`runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo`). On PLISM the
+converged joint-ELBO map matches trained V0-S (all pairs 0.317, −0.001 [−0.002, +0.000] vs
+a602; `runs/bench/2026-11-16_16-29-17_lxbelshark_bfd1_cgm_fp_per_scanner-kconv-kl0.2_f0f2`);
+the frozen-noise map, best on val, is below the tuned G0 (−0.005 [−0.006, −0.004],
+`runs/bench/2026-11-16_16-54-44_lxbelshark_9c12_cgm_fp_fixed-kconv_f0f2`). An objective of
+this form should bound the joint likelihood of the paired views.
 
 **21. SCORPION val tracks PLISM inter-scanner, not PLISM all pairs; early steps miss the
 staining gain.** Over the 12k-step fits, steps 2000 vs 6000 on PLISM all pairs: V0-S −0.007

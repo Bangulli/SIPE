@@ -159,3 +159,8 @@ need before running or changing one of these tools.
   label=<map>] [--retrieval-only]`. Closed-form {G0, CGM-init (= the V0-S init)} ×
   {clean, augmented caches} × sizes (5120 tiles = the CGM init, `tiles`, `all`); val only,
   nothing selected across arms; PLISM on the saved maps is the readout. Table block `augattr`.
+  Closed-form V0-S objective (`sipe.estimators.cgm_fixed_point`): `--fixed-point
+  shared|per_scanner|fixed --fp-iters 1 2 3 0` (0 = converged) `[--fp-init-noise-weights
+  b ...] [--fp-kl-weights w ...]`. `w` = the objective's KL weight: 1 = the training loss
+  (converges to posterior collapse, finding 19), 1/V = 0.2 = the joint ELBO of the tile's
+  5 views; `fixed` keeps the noise at the init's within-tile covariance (2026-11-16).

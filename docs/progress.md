@@ -1,4 +1,14 @@
-# ISBI paper progress (as of 2026-11-03)
+# ISBI paper progress (as of 2026-11-16)
+
+**DESK REJECTED (reported by the user 2026-11-16).** Justification, verbatim: "Early stage
+Results- validation limitations need further work to resolve effects of pairing scale,
+content dependent scanner shifts and stopping criteria." The three items are the paper's own
+last Limitations sentence ("Future work will examine pairing scale, content-dependent scanner
+shifts and stopping criteria.", `paper-overleaf/paper.tex`). Next: resubmission to MIDL
+(user, 2026-11-16). Stopping criteria: closed-form fix for the collapse (joint ELBO /
+frozen noise) in `docs/experiment-log.md`, section 3; PLISM read 2026-11-16: the converged
+joint-ELBO linear map = trained V0-S (0.317 vs 0.318 all pairs); next = training with
+`kl_weight=0.2`.
 
 **SUBMITTED 2026-11-02 (user).** Overleaf repo HEAD at submission: `a9c41fa` ("change ref");
 the four "top-1 retrieval accuracy" wording edits (abstract, Metrics, Table 1 caption,
@@ -390,6 +400,11 @@ Open, not blocking the paper (details in the paper run log, `docs/experiment-log
 | v1s_s12k_0dbe_s06000 | posthoc_gap | 0.896 | 0.319 | 0.273 | 0.321 | `runs/bench/2026-10-29_16-19-58_lxbelshark_cc86_v1s_s12k_0dbe_s06000` | – | 2a42be2* |
 | v1s_s12k_0dbe_s04000 | posthoc_gap | 0.898 | 0.321 | 0.272 | 0.321 | `runs/bench/2026-10-29_17-30-16_lxbelshark_3a9e_v1s_s12k_0dbe_s04000` | – | b984892 |
 | v1s_s12k_0dbe_s02000 | posthoc_gap | 0.898 | 0.319 | 0.269 | 0.317 | `runs/bench/2026-10-29_17-30-51_lxbelshark_f222_v1s_s12k_0dbe_s02000` | – | b984892 |
+| mixture_G0_K1_a16 | posthoc_gap | 0.883 | 0.305 | 0.261 | 0.309 | `runs/bench/2026-11-01_21-25-56_lxbelshark_ca19_mixture_G0_K1_a16` | – | 9ccad84 |
+| mixture_G0_K1_a32 | posthoc_gap | 0.869 | 0.290 | 0.250 | 0.297 | `runs/bench/2026-11-01_21-36-18_lxbelshark_802b_mixture_G0_K1_a32` | – | 9ccad84 |
+| cgm_fp_per_scanner-kconv-kl0.2_f0f2 | posthoc_gap | 0.899 | 0.322 | 0.268 | 0.317 | `runs/bench/2026-11-16_16-29-17_lxbelshark_bfd1_cgm_fp_per_scanner-kconv-kl0.2_f0f2` | – | 01fb68a* |
+| cgm_fp_fixed-kconv_f0f2 | posthoc_gap | 0.894 | 0.309 | 0.260 | 0.309 | `runs/bench/2026-11-16_16-54-44_lxbelshark_9c12_cgm_fp_fixed-kconv_f0f2` | – | 01fb68a* |
+| cgm_fp_fixed-kconv-kl0.2_f0f2 | posthoc_gap | 0.894 | 0.307 | 0.252 | 0.302 | `runs/bench/2026-11-16_17-19-19_lxbelshark_84eb_cgm_fp_fixed-kconv-kl0.2_f0f2` | – | 01fb68a* |
 | h0_mini | – | 0.600 | 0.120 | 0.055 | 0.100 | `../plism-benchmark/output/metrics/8139_tiles/h0_mini` | – | – |
 | sipe_h0_mini | – | 0.666 | 0.237 | 0.158 | 0.203 | `../plism-benchmark/output/metrics/8139_tiles/sipe_h0_mini` | – | – |
 
@@ -459,6 +474,11 @@ similarity over all pairs, median top-10 accuracy per shift group, and their mea
 | v1s_s12k_0dbe_s06000 | posthoc_gap | 0.920 | 0.982 | 0.664 | 0.601 | 0.792 | `runs/bench/2026-10-29_16-19-58_lxbelshark_cc86_v1s_s12k_0dbe_s06000` | – | 2a42be2* |
 | v1s_s12k_0dbe_s04000 | posthoc_gap | 0.915 | 0.982 | 0.665 | 0.600 | 0.790 | `runs/bench/2026-10-29_17-30-16_lxbelshark_3a9e_v1s_s12k_0dbe_s04000` | – | b984892 |
 | v1s_s12k_0dbe_s02000 | posthoc_gap | 0.907 | 0.982 | 0.664 | 0.598 | 0.788 | `runs/bench/2026-10-29_17-30-51_lxbelshark_f222_v1s_s12k_0dbe_s02000` | – | b984892 |
+| mixture_G0_K1_a16 | posthoc_gap | 0.938 | 0.979 | 0.644 | 0.584 | 0.786 | `runs/bench/2026-11-01_21-25-56_lxbelshark_ca19_mixture_G0_K1_a16` | – | 9ccad84 |
+| mixture_G0_K1_a32 | posthoc_gap | 0.953 | 0.976 | 0.624 | 0.562 | 0.779 | `runs/bench/2026-11-01_21-36-18_lxbelshark_802b_mixture_G0_K1_a32` | – | 9ccad84 |
+| cgm_fp_per_scanner-kconv-kl0.2_f0f2 | posthoc_gap | 0.896 | 0.982 | 0.666 | 0.597 | 0.785 | `runs/bench/2026-11-16_16-29-17_lxbelshark_bfd1_cgm_fp_per_scanner-kconv-kl0.2_f0f2` | – | 01fb68a* |
+| cgm_fp_fixed-kconv_f0f2 | posthoc_gap | 0.907 | 0.981 | 0.653 | 0.585 | 0.781 | `runs/bench/2026-11-16_16-54-44_lxbelshark_9c12_cgm_fp_fixed-kconv_f0f2` | – | 01fb68a* |
+| cgm_fp_fixed-kconv-kl0.2_f0f2 | posthoc_gap | 0.890 | 0.981 | 0.652 | 0.578 | 0.775 | `runs/bench/2026-11-16_17-19-19_lxbelshark_84eb_cgm_fp_fixed-kconv-kl0.2_f0f2` | – | 01fb68a* |
 | h0_mini | – | 0.800 | 0.864 | 0.318 | 0.183 | 0.541 | `../plism-benchmark/output/metrics/8139_tiles/h0_mini` | – | – |
 | sipe_h0_mini | – | 0.961 | 0.888 | 0.501 | 0.345 | 0.674 | `../plism-benchmark/output/metrics/8139_tiles/sipe_h0_mini` | – | – |
 
@@ -548,6 +568,11 @@ this reason, never instead of them.
 | v1s_s12k_0dbe_s06000 | posthoc_gap | 0.910 | 0.374 | 0.320 | 0.370 | `runs/bench/2026-10-29_16-19-58_lxbelshark_cc86_v1s_s12k_0dbe_s06000` | – | 2a42be2* |
 | v1s_s12k_0dbe_s04000 | posthoc_gap | 0.912 | 0.376 | 0.320 | 0.370 | `runs/bench/2026-10-29_17-30-16_lxbelshark_3a9e_v1s_s12k_0dbe_s04000` | – | b984892 |
 | v1s_s12k_0dbe_s02000 | posthoc_gap | 0.912 | 0.375 | 0.315 | 0.366 | `runs/bench/2026-10-29_17-30-51_lxbelshark_f222_v1s_s12k_0dbe_s02000` | – | b984892 |
+| mixture_G0_K1_a16 | posthoc_gap | 0.898 | 0.357 | 0.306 | 0.356 | `runs/bench/2026-11-01_21-25-56_lxbelshark_ca19_mixture_G0_K1_a16` | – | 9ccad84 |
+| mixture_G0_K1_a32 | posthoc_gap | 0.886 | 0.340 | 0.293 | 0.342 | `runs/bench/2026-11-01_21-36-18_lxbelshark_802b_mixture_G0_K1_a32` | – | 9ccad84 |
+| cgm_fp_per_scanner-kconv-kl0.2_f0f2 | posthoc_gap | 0.912 | 0.378 | 0.315 | 0.366 | `runs/bench/2026-11-16_16-29-17_lxbelshark_bfd1_cgm_fp_per_scanner-kconv-kl0.2_f0f2` | – | 01fb68a* |
+| cgm_fp_fixed-kconv_f0f2 | posthoc_gap | 0.908 | 0.364 | 0.306 | 0.357 | `runs/bench/2026-11-16_16-54-44_lxbelshark_9c12_cgm_fp_fixed-kconv_f0f2` | – | 01fb68a* |
+| cgm_fp_fixed-kconv-kl0.2_f0f2 | posthoc_gap | 0.907 | 0.362 | 0.296 | 0.349 | `runs/bench/2026-11-16_17-19-19_lxbelshark_84eb_cgm_fp_fixed-kconv-kl0.2_f0f2` | – | 01fb68a* |
 | h0_mini | – | 0.609 | 0.142 | 0.065 | 0.114 | `../plism-benchmark/output/metrics/8139_tiles/h0_mini` | – | – |
 | sipe_h0_mini | – | 0.678 | 0.280 | 0.187 | 0.235 | `../plism-benchmark/output/metrics/8139_tiles/sipe_h0_mini` | – | – |
 
@@ -614,6 +639,11 @@ Top-1 accuracy, mean over slide pairs without the stain(s) HR on either side (re
 | v1s_s12k_0dbe_s06000 | posthoc_gap | 0.926 | 0.983 | 0.687 | 0.641 | 0.809 | `runs/bench/2026-10-29_16-19-58_lxbelshark_cc86_v1s_s12k_0dbe_s06000` | – | 2a42be2* |
 | v1s_s12k_0dbe_s04000 | posthoc_gap | 0.920 | 0.983 | 0.689 | 0.642 | 0.809 | `runs/bench/2026-10-29_17-30-16_lxbelshark_3a9e_v1s_s12k_0dbe_s04000` | – | b984892 |
 | v1s_s12k_0dbe_s02000 | posthoc_gap | 0.913 | 0.983 | 0.689 | 0.640 | 0.806 | `runs/bench/2026-10-29_17-30-51_lxbelshark_f222_v1s_s12k_0dbe_s02000` | – | b984892 |
+| mixture_G0_K1_a16 | posthoc_gap | 0.943 | 0.980 | 0.669 | 0.624 | 0.804 | `runs/bench/2026-11-01_21-25-56_lxbelshark_ca19_mixture_G0_K1_a16` | – | 9ccad84 |
+| mixture_G0_K1_a32 | posthoc_gap | 0.957 | 0.978 | 0.648 | 0.606 | 0.797 | `runs/bench/2026-11-01_21-36-18_lxbelshark_802b_mixture_G0_K1_a32` | – | 9ccad84 |
+| cgm_fp_per_scanner-kconv-kl0.2_f0f2 | posthoc_gap | 0.903 | 0.983 | 0.694 | 0.639 | 0.805 | `runs/bench/2026-11-16_16-29-17_lxbelshark_bfd1_cgm_fp_per_scanner-kconv-kl0.2_f0f2` | – | 01fb68a* |
+| cgm_fp_fixed-kconv_f0f2 | posthoc_gap | 0.913 | 0.982 | 0.681 | 0.628 | 0.801 | `runs/bench/2026-11-16_16-54-44_lxbelshark_9c12_cgm_fp_fixed-kconv_f0f2` | – | 01fb68a* |
+| cgm_fp_fixed-kconv-kl0.2_f0f2 | posthoc_gap | 0.896 | 0.981 | 0.684 | 0.621 | 0.796 | `runs/bench/2026-11-16_17-19-19_lxbelshark_84eb_cgm_fp_fixed-kconv-kl0.2_f0f2` | – | 01fb68a* |
 | h0_mini | – | 0.812 | 0.866 | 0.371 | 0.219 | 0.567 | `../plism-benchmark/output/metrics/8139_tiles/h0_mini` | – | – |
 | sipe_h0_mini | – | 0.964 | 0.891 | 0.549 | 0.394 | 0.699 | `../plism-benchmark/output/metrics/8139_tiles/sipe_h0_mini` | – | – |
 
