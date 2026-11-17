@@ -805,9 +805,38 @@ selection unchanged (no-aug 7e3c). It replaces e198 in the `cgm` block.
     not checked: linear lr 1e-4, or augmented vs clean data). V1-S rises and flattens: 6k run
     0.9852 at the end; 12k run 0.9861 / 0.9863 / 0.9867 / 0.9868 at steps 6000–12000 (with
     KL 1 the 12k V1-S fell from 0.9848 to 0.9830 after step 6000); 7b71 0.9852 in the same run.
-    PLISM pending (user): 6k maps and 12k steps 2000 / 6000 / 12000, tags
-    `cgm_v0s_kl0.2_2143`, `cgm_v1s_kl0.2_5e8a`, `v0s_kl0.2_s12k_6917_s<step>`,
-    `v1s_kl0.2_s12k_89fc_s<step>`.
+    Seed 43 of the V1-S 12k fit (`runs/2026-11-16_23-58-52_lxbelshark_fc72`, commit 31cf812;
+    `runs/bench/2026-11-17_10-11-04_claude-box_34ae_scorpion_kl0.2_v1s_seed43_val`): 0.9834 at
+    step 2000, 0.9862 at 6000, 0.9868 at 10000 and 12000, the same curve as seed 42 (0.9868 at
+    12000 in that run).
+  - PLISM V0-S kl 0.2 (read 2026-11-17, `docs/pair-tables.md`): all pairs 0.313 (6k,
+    `runs/bench/2026-11-16_23-50-39_lxbelshark_e57e_cgm_v0s_kl0.2_2143`) and 0.311 / 0.315 /
+    0.315 at steps 2000 / 6000 / 12000 of the 12k run (`…_df9e_…_s02000`, `…_0b14_…_s06000`,
+    `runs/bench/2026-11-17_01-00-06_lxbelshark_e027_v0s_kl0.2_s12k_6917_s12000`); step 12000
+    vs 6000 +0.001 [+0.000, +0.001]. Vs the tuned G0 α=8: 6k −0.001 [−0.002, +0.001], 12k
+    +0.002 [+0.000, +0.003], inter-scanner +0.006 / +0.007; vs V0-S a602 (KL 1): −0.005
+    [−0.006, −0.004] / −0.003 [−0.004, −0.002]. Reading: the trained linear model no longer
+    depends on the budget, but it sits below both the closed-form joint optimum (0.317) and
+    the KL-1 V0-S; it is not a better linear map than tuned G0.
+  - HEST V1-S kl 0.2 12k (`runs/bench/2026-11-17_01-34-38_lxbelshark_a114_cgm_v1s_kl0.2_89fc`):
+    average 0.364, vs GAP −0.000 [−0.009, +0.009], vs G0 +0.001 [−0.004, +0.006], vs 7b71
+    +0.000 [−0.004, +0.005]; READ +0.015 [+0.008, +0.023] vs 7b71 (still −0.020
+    [−0.030, −0.010] vs GAP), PRAD −0.006 [−0.007, −0.004]: utility preserved, the READ loss
+    halved.
+  - PLISM V1-S kl 0.2 (first launch failed at start on a device setting; relaunched by the
+    user, read 2026-11-17, `docs/pair-tables.md`): all pairs 0.317 for the 6k map
+    (`runs/bench/2026-11-17_14-43-23_lxbelshark_04be_cgm_v1s_kl0.2_5e8a`) and 0.315 / 0.317 /
+    0.317 at steps 2000 / 6000 / 12000 of the 12k run (`…_d4e0_…_s02000`, `…_b68a_…_s06000`,
+    `runs/bench/2026-11-17_15-52-57_lxbelshark_e290_v1s_kl0.2_s12k_89fc_s12000`); step 12000
+    vs 6000 +0.000 [+0.000, +0.001]. Vs the tuned G0 α=8 (12k): all pairs +0.003
+    [+0.002, +0.005], inter-scanner +0.010 [+0.007, +0.014] (95% of pairs), no-HR all pairs
+    +0.004 [+0.002, +0.006]; HR all pairs −0.002 [−0.003, −0.001]. Vs 7b71 (KL 1, 6k):
+    −0.004 [−0.005, −0.003] all pairs, inter-scanner +0.002 [+0.001, +0.004].
+  - Reading: with KL 0.2 both trained models are budget-independent on PLISM. V1-S keeps a
+    significant gain over tuned G0, smaller than the KL-1 7b71 gain (+0.003 vs +0.008
+    [+0.006, +0.009] all pairs, same block); the extra 7b71 gain came from a budget-stopped point of a collapsing
+    objective, so the KL-0.2 V1-S is the defensible model. Nonlinear vs linear (both KL
+    0.2, 12k): 0.317 vs 0.315 all pairs.
 
 - Content-dependent scanner offsets (2026-10-16, `sipe.eval.content_offsets`; motivation:
   the CGM's shift δ_k is constant per scanner). Design: per scanner pair (k, j), target
@@ -1767,6 +1796,37 @@ monotonically (0.9764 → 0.9835 val). Same shape as V0-S. PLISM step 12000
 | s10000 | test | 0.9707 | 0.9944 | 0.9823 | `runs/2026-10-29_13-18-57_lxbelshark_0dbe/map_cgm_step10000.pt` | `runs/bench/2026-10-29_14-24-09_claude-box_50a1_scorpion_map_retrieval_v1s_s12k` | 4b126fe* |
 | s12000 | test | 0.9707 | 0.9943 | 0.9823 | `runs/2026-10-29_13-18-57_lxbelshark_0dbe/map_cgm_step12000.pt` | `runs/bench/2026-10-29_14-24-09_claude-box_50a1_scorpion_map_retrieval_v1s_s12k` | 4b126fe* |
 | 7b71 | test | 0.9756 | 0.9953 | 0.9781 | `runs/2026-10-14_22-30-38_lxbelshark_7b71/map_cgm.pt` | `runs/bench/2026-10-29_14-24-09_claude-box_50a1_scorpion_map_retrieval_v1s_s12k` | 4b126fe* |
+| raw | val | 0.8870 | 0.9586 | 0.9193 | – | `runs/bench/2026-11-16_22-48-24_claude-box_4900_scorpion_kl0.2_budget_val` | 38ded26 |
+| v0s_6k_s02000 | val | 0.9801 | 0.9946 | 0.9694 | `runs/2026-11-16_20-11-56_lxbelshark_2143/map_cgm_step02000.pt` | `runs/bench/2026-11-16_22-48-24_claude-box_4900_scorpion_kl0.2_budget_val` | 38ded26 |
+| v0s_6k_s04000 | val | 0.9800 | 0.9945 | 0.9696 | `runs/2026-11-16_20-11-56_lxbelshark_2143/map_cgm_step04000.pt` | `runs/bench/2026-11-16_22-48-24_claude-box_4900_scorpion_kl0.2_budget_val` | 38ded26 |
+| v0s_6k_s06000 | val | 0.9802 | 0.9946 | 0.9696 | `runs/2026-11-16_20-11-56_lxbelshark_2143/map_cgm_step06000.pt` | `runs/bench/2026-11-16_22-48-24_claude-box_4900_scorpion_kl0.2_budget_val` | 38ded26 |
+| v0s_12k_s02000 | val | 0.9801 | 0.9946 | 0.9694 | `runs/2026-11-16_21-03-41_lxbelshark_6917/map_cgm_step02000.pt` | `runs/bench/2026-11-16_22-48-24_claude-box_4900_scorpion_kl0.2_budget_val` | 38ded26 |
+| v0s_12k_s04000 | val | 0.9800 | 0.9946 | 0.9696 | `runs/2026-11-16_21-03-41_lxbelshark_6917/map_cgm_step04000.pt` | `runs/bench/2026-11-16_22-48-24_claude-box_4900_scorpion_kl0.2_budget_val` | 38ded26 |
+| v0s_12k_s06000 | val | 0.9804 | 0.9947 | 0.9696 | `runs/2026-11-16_21-03-41_lxbelshark_6917/map_cgm_step06000.pt` | `runs/bench/2026-11-16_22-48-24_claude-box_4900_scorpion_kl0.2_budget_val` | 38ded26 |
+| v0s_12k_s08000 | val | 0.9803 | 0.9947 | 0.9697 | `runs/2026-11-16_21-03-41_lxbelshark_6917/map_cgm_step08000.pt` | `runs/bench/2026-11-16_22-48-24_claude-box_4900_scorpion_kl0.2_budget_val` | 38ded26 |
+| v0s_12k_s10000 | val | 0.9803 | 0.9946 | 0.9698 | `runs/2026-11-16_21-03-41_lxbelshark_6917/map_cgm_step10000.pt` | `runs/bench/2026-11-16_22-48-24_claude-box_4900_scorpion_kl0.2_budget_val` | 38ded26 |
+| v0s_12k_s12000 | val | 0.9803 | 0.9946 | 0.9698 | `runs/2026-11-16_21-03-41_lxbelshark_6917/map_cgm_step12000.pt` | `runs/bench/2026-11-16_22-48-24_claude-box_4900_scorpion_kl0.2_budget_val` | 38ded26 |
+| v1s_6k_s02000 | val | 0.9838 | 0.9964 | 0.9708 | `runs/2026-11-16_20-11-56_lxbelshark_5e8a/map_cgm_step02000.pt` | `runs/bench/2026-11-16_22-48-24_claude-box_4900_scorpion_kl0.2_budget_val` | 38ded26 |
+| v1s_6k_s04000 | val | 0.9851 | 0.9970 | 0.9718 | `runs/2026-11-16_20-11-56_lxbelshark_5e8a/map_cgm_step04000.pt` | `runs/bench/2026-11-16_22-48-24_claude-box_4900_scorpion_kl0.2_budget_val` | 38ded26 |
+| v1s_6k_s06000 | val | 0.9852 | 0.9969 | 0.9720 | `runs/2026-11-16_20-11-56_lxbelshark_5e8a/map_cgm_step06000.pt` | `runs/bench/2026-11-16_22-48-24_claude-box_4900_scorpion_kl0.2_budget_val` | 38ded26 |
+| v1s_12k_s02000 | val | 0.9838 | 0.9964 | 0.9709 | `runs/2026-11-16_21-00-57_lxbelshark_89fc/map_cgm_step02000.pt` | `runs/bench/2026-11-16_22-48-24_claude-box_4900_scorpion_kl0.2_budget_val` | 38ded26 |
+| v1s_12k_s04000 | val | 0.9852 | 0.9970 | 0.9716 | `runs/2026-11-16_21-00-57_lxbelshark_89fc/map_cgm_step04000.pt` | `runs/bench/2026-11-16_22-48-24_claude-box_4900_scorpion_kl0.2_budget_val` | 38ded26 |
+| v1s_12k_s06000 | val | 0.9861 | 0.9972 | 0.9718 | `runs/2026-11-16_21-00-57_lxbelshark_89fc/map_cgm_step06000.pt` | `runs/bench/2026-11-16_22-48-24_claude-box_4900_scorpion_kl0.2_budget_val` | 38ded26 |
+| v1s_12k_s08000 | val | 0.9863 | 0.9974 | 0.9723 | `runs/2026-11-16_21-00-57_lxbelshark_89fc/map_cgm_step08000.pt` | `runs/bench/2026-11-16_22-48-24_claude-box_4900_scorpion_kl0.2_budget_val` | 38ded26 |
+| v1s_12k_s10000 | val | 0.9867 | 0.9974 | 0.9725 | `runs/2026-11-16_21-00-57_lxbelshark_89fc/map_cgm_step10000.pt` | `runs/bench/2026-11-16_22-48-24_claude-box_4900_scorpion_kl0.2_budget_val` | 38ded26 |
+| v1s_12k_s12000 | val | 0.9868 | 0.9974 | 0.9725 | `runs/2026-11-16_21-00-57_lxbelshark_89fc/map_cgm_step12000.pt` | `runs/bench/2026-11-16_22-48-24_claude-box_4900_scorpion_kl0.2_budget_val` | 38ded26 |
+| fp_joint_conv | val | 0.9840 | 0.9964 | 0.9709 | `runs/bench/2026-11-16_14-46-47_claude-box_f0f2_scorpion_cgm_fp_joint_elbo/map_CGM-fp-per_scanner-kconv-kl0.2_clean_all.pt` | `runs/bench/2026-11-16_22-48-24_claude-box_4900_scorpion_kl0.2_budget_val` | 38ded26 |
+| v0s_a602 | val | 0.9807 | 0.9950 | 0.9774 | `runs/2026-10-15_08-50-48_lxbelshark_a602/map_cgm.pt` | `runs/bench/2026-11-16_22-48-24_claude-box_4900_scorpion_kl0.2_budget_val` | 38ded26 |
+| v1s_7b71 | val | 0.9852 | 0.9969 | 0.9794 | `runs/2026-10-14_22-30-38_lxbelshark_7b71/map_cgm.pt` | `runs/bench/2026-11-16_22-48-24_claude-box_4900_scorpion_kl0.2_budget_val` | 38ded26 |
+| raw | val | 0.8870 | 0.9586 | 0.9193 | – | `runs/bench/2026-11-17_10-11-04_claude-box_34ae_scorpion_kl0.2_v1s_seed43_val` | 31cf812* |
+| v1s_s43_12k_s02000 | val | 0.9834 | 0.9963 | 0.9709 | `runs/2026-11-16_23-58-52_lxbelshark_fc72/map_cgm_step02000.pt` | `runs/bench/2026-11-17_10-11-04_claude-box_34ae_scorpion_kl0.2_v1s_seed43_val` | 31cf812* |
+| v1s_s43_12k_s04000 | val | 0.9852 | 0.9969 | 0.9716 | `runs/2026-11-16_23-58-52_lxbelshark_fc72/map_cgm_step04000.pt` | `runs/bench/2026-11-17_10-11-04_claude-box_34ae_scorpion_kl0.2_v1s_seed43_val` | 31cf812* |
+| v1s_s43_12k_s06000 | val | 0.9862 | 0.9971 | 0.9721 | `runs/2026-11-16_23-58-52_lxbelshark_fc72/map_cgm_step06000.pt` | `runs/bench/2026-11-17_10-11-04_claude-box_34ae_scorpion_kl0.2_v1s_seed43_val` | 31cf812* |
+| v1s_s43_12k_s08000 | val | 0.9865 | 0.9975 | 0.9723 | `runs/2026-11-16_23-58-52_lxbelshark_fc72/map_cgm_step08000.pt` | `runs/bench/2026-11-17_10-11-04_claude-box_34ae_scorpion_kl0.2_v1s_seed43_val` | 31cf812* |
+| v1s_s43_12k_s10000 | val | 0.9868 | 0.9975 | 0.9725 | `runs/2026-11-16_23-58-52_lxbelshark_fc72/map_cgm_step10000.pt` | `runs/bench/2026-11-17_10-11-04_claude-box_34ae_scorpion_kl0.2_v1s_seed43_val` | 31cf812* |
+| v1s_s43_12k_s12000 | val | 0.9868 | 0.9975 | 0.9725 | `runs/2026-11-16_23-58-52_lxbelshark_fc72/map_cgm_step12000.pt` | `runs/bench/2026-11-17_10-11-04_claude-box_34ae_scorpion_kl0.2_v1s_seed43_val` | 31cf812* |
+| v1s_s42_12k_s12000 | val | 0.9868 | 0.9974 | 0.9725 | `runs/2026-11-16_21-00-57_lxbelshark_89fc/map_cgm_step12000.pt` | `runs/bench/2026-11-17_10-11-04_claude-box_34ae_scorpion_kl0.2_v1s_seed43_val` | 31cf812* |
+| v1s_7b71 | val | 0.9852 | 0.9969 | 0.9794 | `runs/2026-10-14_22-30-38_lxbelshark_7b71/map_cgm.pt` | `runs/bench/2026-11-17_10-11-04_claude-box_34ae_scorpion_kl0.2_v1s_seed43_val` | 31cf812* |
 
 Saved map files applied to the cached features of one split (`sipe.eval.map_retrieval`): retrieval columns of `sipe.eval.proxy`, the same top-1 as the `cgm_select` summaries, without probes. Analysis rows, nothing selected.
 

@@ -58,7 +58,13 @@ converged joint-ELBO map matches trained V0-S (all pairs 0.317, −0.001 [−0.0
 a602; `runs/bench/2026-11-16_16-29-17_lxbelshark_bfd1_cgm_fp_per_scanner-kconv-kl0.2_f0f2`);
 the frozen-noise map, best on val, is below the tuned G0 (−0.005 [−0.006, −0.004],
 `runs/bench/2026-11-16_16-54-44_lxbelshark_9c12_cgm_fp_fixed-kconv_f0f2`). An objective of
-this form should bound the joint likelihood of the paired views.
+this form should bound the joint likelihood of the paired views. Trained with KL weight 0.2,
+V0-S no longer depends on the step budget on PLISM (step 12000 vs 6000 +0.001 [+0.000,
++0.001], `runs/bench/2026-11-17_01-00-06_lxbelshark_e027_v0s_kl0.2_s12k_6917_s12000`; V1-S +0.000
+[+0.000, +0.001], `runs/bench/2026-11-17_15-52-57_lxbelshark_e290_v1s_kl0.2_s12k_89fc_s12000`),
+and V1-S
+val top-1 rises to a plateau instead of declining (2 seeds,
+`runs/bench/2026-11-17_10-11-04_claude-box_34ae_scorpion_kl0.2_v1s_seed43_val`).
 
 **21. SCORPION val tracks PLISM inter-scanner, not PLISM all pairs; early steps miss the
 staining gain.** Over the 12k-step fits, steps 2000 vs 6000 on PLISM all pairs: V0-S −0.007
