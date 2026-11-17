@@ -14,8 +14,10 @@ is budget-independent but not above tuned G0 (12k +0.002 [+0.000, +0.003] all pa
 V1-S kl 0.2 12k average 0.364, READ +0.015 vs 7b71. PLISM of V1-S kl 0.2 (read 2026-11-17):
 budget-independent (12k vs 6k +0.000 [+0.000, +0.001]); vs tuned G0 all pairs +0.003
 [+0.002, +0.005], inter-scanner +0.010 [+0.007, +0.014]; vs 7b71 −0.004 [−0.005, −0.003]
-(`runs/bench/2026-11-17_15-52-57_lxbelshark_e290_v1s_kl0.2_s12k_89fc_s12000`). Nothing in
-flight.
+(`runs/bench/2026-11-17_15-52-57_lxbelshark_e290_v1s_kl0.2_s12k_89fc_s12000`). MIDL
+selection protocol (2026-11-17): WSI-grouped 4-fold CV on all of SCORPION, refit on every
+WSI, then PLISM / HEST (tag `midl-pre-cv` = last single-split commit; `docs/estimators.md`).
+Baselines done; in flight: V1-S / V0-S kl 0.2 fold fits (user; experiment-log section 3).
 
 **SUBMITTED 2026-11-02 (user).** Overleaf repo HEAD at submission: `a9c41fa` ("change ref");
 the four "top-1 retrieval accuracy" wording edits (abstract, Metrics, Table 1 caption,
