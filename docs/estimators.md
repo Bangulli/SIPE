@@ -35,6 +35,31 @@ need before running or changing one of these tools.
   `runs/bench/2026-10-15_18-25-53_lxbelshark_490a_augcache_dihedral` (dihedral x8),
   `runs/bench/2026-10-15_18-37-41_lxbelshark_54ba_augcache_zoom` (zoom x4).
 
+## MIDL selection protocol: WSI-grouped 4-fold CV (from 2026-11-17)
+
+Replaces the single train/val/test split for selection (git tag `midl-pre-cv` = the last
+single-split state). The 48 SCORPION WSIs are dealt into 4 folds of 12
+(`sipe.data.folds.group_folds`: sorted slide ids, torch `randperm` seed 42, round robin).
+A setting is scored by the mean over folds of the held-out fold's top-1 (fit on the
+other 3); the 95% rule runs on that mean; the chosen setting is refit on all 48 WSIs, and
+that map goes to PLISM / HEST. No SCORPION test number: the CV mean is the selection
+value (optimistic for the selected row).
+
+- Closed-form maps: `uv run python -m sipe.eval.cv_sweep --tag <tag> --features-from
+  <cache> [--methods eraser_slide eraser_region eraser_tile g0] [--n-folds 4]`.
+  Pools the cache's train/val/test (`sipe.eval.proxy.load_cv_cache`), fits per fold
+  (eraser: `soft_shrinkage_sweep.fit_family`; G0: `sipe.estimators.mixture`), retrieval
+  only (no probes). Outputs `cv_folds.csv`, `cv_mean.csv`, `selected.json`,
+  `map_<method>.pt` (refit on every WSI). Block `scorpion_cv`.
+- Trained fits: `uv run sipe fit --config <cfg> --data.init_args.n_folds=4
+  --data.init_args.fold=<k>` (k = 0..3; `-1` = refit on every WSI, whose val is fold 0
+  in sample, monitoring only). The fold's test split is empty. Score the 4 fold maps
+  with `uv run python -m sipe.eval.map_retrieval --tag <tag> --features-from <cache>
+  --n-folds 4 --maps <name>=<map f0>,<map f1>,<map f2>,<map f3>` (same `cv_*.csv`, same
+  block).
+- The datamodule folds and the cache folds are the same assignment (`tests/test_cv.py`;
+  checked on the real data 2026-11-17: equal train/val slide sets for every fold).
+
 ## Soft-shrinkage eraser sweep
 
 - Sweep: `uv run python -m sipe.eval.soft_shrinkage_sweep --tag <tag> [--poolings gap cls]

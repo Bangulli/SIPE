@@ -13,6 +13,7 @@ from torch.utils.data import DataLoader, Dataset
 
 from sipe.model.encoders import encoder_meta
 
+from .folds import REFIT, check_fold, group_folds
 from .utils import (
     filename_from_row,
     infer_domain,
@@ -165,6 +166,13 @@ class SCORPIONDataModule(L.LightningDataModule):
     ``scanners`` (scanner-count study, `sipe.eval.scanner_count`) is the keep-list
     version: train keeps only these scanners' rows, same rules otherwise. Both may be
     set; a scanner must then pass both.
+
+    ``n_folds`` / ``fold`` (MIDL protocol, `sipe.data.folds`) replace the
+    train/val/test split with grouped k-fold CV over every group: ``fold`` = k gives
+    val = the groups of fold k, train = the other folds, test = empty;
+    ``fold = -1`` (refit) trains on every group. The refit has no held-out data: its
+    val is fold 0 *in sample*, for monitoring only, never for selection.
+    ``val_fraction`` / ``test_fraction`` are ignored with ``n_folds``.
     """
 
     def __init__(
@@ -192,6 +200,8 @@ class SCORPIONDataModule(L.LightningDataModule):
         drop_last: bool = True,
         hold_out_scanner: str | None = None,
         scanners: list[str] | None = None,
+        n_folds: int | None = None,
+        fold: int | None = None,
     ) -> None:
         super().__init__()
         self.save_hyperparameters()
@@ -208,6 +218,10 @@ class SCORPIONDataModule(L.LightningDataModule):
             raise ValueError("test_fraction must be in [0, 1).")
         if val_fraction + test_fraction >= 1.0:
             raise ValueError("val_fraction + test_fraction must be < 1.")
+        if (n_folds is None) != (fold is None):
+            raise ValueError("n_folds and fold go together.")
+        if n_folds is not None:
+            check_fold(int(fold), int(n_folds))
 
         self.data_root = Path(data_root)
         self.metadata_path = self.data_root / metadata_filename
@@ -245,6 +259,8 @@ class SCORPIONDataModule(L.LightningDataModule):
         self.drop_last = bool(drop_last)
         self.hold_out_scanner = hold_out_scanner
         self.scanners = None if scanners is None else [str(s) for s in scanners]
+        self.n_folds = None if n_folds is None else int(n_folds)
+        self.fold = None if fold is None else int(fold)
 
         self.domain_names: tuple[str, ...] = ()
         self.domain_to_index: dict[str, int] = {}
@@ -346,6 +362,8 @@ class SCORPIONDataModule(L.LightningDataModule):
         self,
         metadata: pd.DataFrame,
     ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+        if self.n_folds is not None:
+            return self._fold_metadata(metadata)
         if self.split_column is not None and self.split_column in metadata.columns:
             split = (
                 metadata[self.split_column]
@@ -406,6 +424,23 @@ class SCORPIONDataModule(L.LightningDataModule):
             raise RuntimeError("Training split is empty.")
 
         return train, val, test
+
+    def _fold_metadata(
+        self, metadata: pd.DataFrame
+    ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+        if self.group_column is None:
+            raise ValueError("n_folds needs a group_column (WSI-grouped folds).")
+        if self.split_column is not None and self.split_column in metadata.columns:
+            raise ValueError(
+                f"n_folds with a {self.split_column!r} column in the metadata: "
+                "set split_column=None to use the folds."
+            )
+        groups = metadata[self.group_column].astype(str)
+        fold = groups.map(group_folds(groups, self.n_folds, self.seed))
+        val_fold = 0 if self.fold == REFIT else self.fold
+        train = metadata if self.fold == REFIT else metadata.loc[fold != self.fold]
+        val = metadata.loc[fold == val_fold]
+        return train.copy(), val.copy(), metadata.iloc[:0].copy()
 
     def setup(self, stage: str | None = None) -> None:
         del stage

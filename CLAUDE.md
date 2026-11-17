@@ -18,12 +18,18 @@ are small or unstable.
   parameters, and never needs the scanner ID or a paired view.**
 - Input: frozen H0-mini GAP over patch tokens (768-d, `backbone_gap`), same features for every
   method.
-- Fit everything (means, PCA bases, covariances, clusters, gates) on the train split only; pick
-  hyperparameters on SCORPION val only. Don't tune on PLISM; it is an external benchmark.
+- Fit everything (means, PCA bases, covariances, clusters, gates) on the training folds only;
+  pick hyperparameters on SCORPION only. Don't tune on PLISM; it is an external benchmark.
+- **Selection protocol (MIDL, from 2026-11-17):** WSI-grouped 4-fold CV over all 48 SCORPION
+  WSIs (`sipe.data.folds`); select on the fold mean of top-1 (95% rule), refit the chosen
+  setting on every WSI, then PLISM / HEST. No SCORPION test. Commands: `docs/estimators.md`,
+  "MIDL selection protocol". The single train/val/test split (tag `midl-pre-cv`) is the ISBI
+  protocol; its runs stay as they are.
 - State the pairing unit of every method: tile/ROI-level pairs or slide-level scanner means.
 - Scanner-probe accuracy is a diagnostic, not the target. Don't claim scanner invariance or
   unseen-scanner generalization from SCORPION WSI-disjoint tests alone.
-- Report order: SCORPION val (selection) → SCORPION test → PLISM → HEST.
+- Report order: SCORPION 4-fold CV (selection) → PLISM → HEST (ISBI runs: SCORPION val →
+  SCORPION test → PLISM → HEST).
 
 **Progress docs.** Whenever you check or interpret runs (fits, sweeps, SCORPION proxy,
 PLISM/HEST bench runs), update them in the same turn:

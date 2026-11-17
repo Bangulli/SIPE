@@ -26,6 +26,7 @@ import numpy as np
 import pandas as pd
 import torch
 
+from sipe.data.folds import REFIT, check_fold, group_folds
 from sipe.eval.scorpion_retrieval import TOPK, region_probe, retrieval, scanner_probes
 
 RETRIEVAL_COLS = ("cosine_similarity", *(f"top_{k}_accuracy" for k in TOPK))
@@ -42,6 +43,42 @@ def load_cache(
         )
         metas[split] = pd.read_csv(cache / f"meta_{split}.csv")
     return feats, metas
+
+
+CACHE_SPLITS = ("train", "val", "test")
+
+
+def load_cv_cache(
+    cache: Path, n_folds: int, fold: int, pooling: str = "gap", seed: int = 42
+) -> tuple[dict[str, np.ndarray], dict[str, pd.DataFrame]]:
+    """One CV fold of a cache: its train/val/test splits pooled, then re-split by WSI.
+
+    Same folds as `SCORPIONDataModule(n_folds=, fold=)` (`sipe.data.folds`). Returns
+    {"train", "val"}, each meta with `row` renumbered into its own feature array (the
+    eraser's delta builders index features by `row`). `fold = REFIT` (-1): train =
+    every WSI, no val.
+    """
+    check_fold(fold, n_folds)
+    feats, metas = load_cache(cache, CACHE_SPLITS, pooling)
+    x = np.concatenate([feats[s] for s in CACHE_SPLITS])
+    parts, offset = [], 0
+    for split in CACHE_SPLITS:
+        parts.append(metas[split].assign(row=metas[split]["row"] + offset))
+        offset += len(feats[split])
+    meta = pd.concat(parts, ignore_index=True)
+    if len(meta) != len(x) or not meta["row"].sort_values().eq(np.arange(len(x))).all():
+        raise ValueError(f"{cache}: meta rows do not index the pooled features.")
+    slides = meta["slide_id"].astype(str)
+    folds = slides.map(group_folds(slides, n_folds, seed))
+    keep = {"train": folds != fold}
+    if fold != REFIT:
+        keep["val"] = folds == fold
+    out_x, out_meta = {}, {}
+    for name, rows in keep.items():
+        sub = meta.loc[rows.to_numpy()].reset_index(drop=True)
+        out_x[name] = x[sub["row"].to_numpy()]
+        out_meta[name] = sub.assign(row=np.arange(len(sub)))
+    return out_x, out_meta
 
 
 def cache_encoder(cache: Path) -> str:

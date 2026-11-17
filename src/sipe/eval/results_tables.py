@@ -34,6 +34,10 @@ Sources, all under runs/ (gitignored, so every row names the dir it came from):
     (blocks scanner_count_plism, scanner_count_plism_seen)
   - saved map files on one split, no probes: runs/bench/*/summary_<split>.csv
     (sipe.eval.map_retrieval)
+  - WSI-grouped CV (MIDL protocol, block scorpion_cv): runs/bench/*/cv_mean.csv +
+    cv_folds.csv (+ selected.json) of sipe.eval.cv_sweep and of
+    sipe.eval.map_retrieval --n-folds; block scorpion_cv_pairs: per-fold paired
+    differences of cv_folds.csv rows vs a reference row
   - map spectrum in G0's eigenbasis: runs/bench/*/summary.csv + spectrum_bins.csv
     (sipe.eval.map_spectrum)
   - training: runs/<run>/wandb/*run-*/*.wandb (local W&B history; no API key needed)
@@ -66,6 +70,9 @@ Options on the opening marker (space-separated key=value):
   full=<model>:<tag>[,...]  scanner_count_plism(_seen): existing all-scanner PLISM runs
                             (e.g. full=G0:mixture_G0_K1,V1-S:cgm_v1s_7b71)
   ref=<tag> tags=<tag>,...  hest_pairs: HEST runs paired per (task, fold, gene) with ref
+  ref=<key> tags=<key>,...  scorpion_cv_pairs: CV rows paired per fold with ref; key =
+                            <method>@<value> (sipe.eval.cv_sweep, e.g. g0@8) or the map
+                            name (sipe.eval.map_retrieval --n-folds); latest run wins
 
   uv run python -m sipe.eval.results_tables          # print every table
   uv run python -m sipe.eval.results_tables --write  # refresh the blocks in every doc
@@ -1713,6 +1720,124 @@ def map_retrieval_table(root: Path, opts: dict[str, list[str]]) -> str:
     )
 
 
+def scorpion_cv_table(root: Path, opts: dict[str, list[str]]) -> str:
+    header = [
+        "method", "value", "folds", "top-1 mean", "top-1 std", "top-1 per fold",
+        "cosine mean", "selected", "bench run dir", "SIPE commit",
+    ]  # fmt: skip
+    rows = []
+    runs = [
+        *_bench_runs(root, "scorpion_cv_sweep", *_filters(opts)),
+        *_bench_runs(root, "scorpion_map_retrieval_cv", *_filters(opts)),
+    ]
+    for run in sorted(runs, key=lambda r: r.dir.name):
+        source = [f"`{_rel(run.dir)}`", run.source_cells()[2]]
+        mean_csv, folds_csv = run.dir / "cv_mean.csv", run.dir / "cv_folds.csv"
+        if not mean_csv.exists():
+            rows.append(["no results", *["–"] * (len(header) - 3), *source])
+            continue
+        mean = pd.read_csv(mean_csv)
+        folds = pd.read_csv(folds_csv)
+        selected = _read_json(run.dir / "selected.json")
+        sweep = "method" in mean.columns
+        keys = ["method", "value"] if sweep else ["name"]
+        for _, r in mean.iterrows():
+            match = (folds[keys] == r[keys]).all(axis=1)
+            per_fold = folds.loc[match].sort_values("fold")["top_1_accuracy"]
+            name = str(r[keys[0]])
+            value = float(r["value"]) if sweep else None
+            chosen = sweep and selected.get(name, {}).get("value") == value
+            rows.append([
+                name,
+                "–" if value is None else f"{value:g}",
+                str(int(r["n_folds"])),
+                f"{r['top_1_accuracy_mean']:.4f}",
+                f"{r['top_1_accuracy_std']:.4f}",
+                " / ".join(f"{v:.4f}" for v in per_fold),
+                f"{r['cosine_similarity_mean']:.4f}",
+                f"yes (`{selected[name]['map_file']}`)" if chosen else "",
+                *source,
+            ])  # fmt: skip
+    return (
+        _table(header, rows)
+        + "\n\nWSI-grouped k-fold CV over every SCORPION WSI (`sipe.data.folds`,"
+        " MIDL protocol): fit on the other folds, retrieval on the held-out fold"
+        " (`sipe.eval.proxy.retrieval_metrics`, no probes); std over folds (ddof 1)."
+        " Value: lambda (eraser) or alpha (G0), 0 = raw. Selected: the 95% rule on"
+        " the fold mean, then refit on every WSI (`sipe.eval.cv_sweep`); the mean is"
+        " the selection value, so it is optimistic for the selected row. Rows"
+        " without a value are fold maps of trained fits (`sipe.eval.map_retrieval"
+        " --n-folds`)."
+    )
+
+
+def _cv_fold_scores(root: Path, opts: dict[str, list[str]]) -> dict[str, Any]:
+    """key -> (run, per-fold top-1 Series, (n_folds, fold_seed)); latest run wins."""
+    runs = [
+        *_bench_runs(root, "scorpion_cv_sweep", *_filters(opts)),
+        *_bench_runs(root, "scorpion_map_retrieval_cv", *_filters(opts)),
+    ]
+    out: dict[str, Any] = {}
+    for run in sorted(runs, key=lambda r: r.dir.name):
+        path = run.dir / "cv_folds.csv"
+        if not path.exists():
+            continue
+        folds = pd.read_csv(path)
+        if "method" in folds.columns:
+            keys = folds["method"] + "@" + folds["value"].map(lambda v: f"{v:g}")
+        else:
+            keys = folds["name"].astype(str)
+        scheme = (int(run.config.get("n_folds")), int(run.config.get("fold_seed", 42)))
+        for key, rows in folds.groupby(keys, sort=False):
+            out[key] = (run, rows.set_index("fold")["top_1_accuracy"], scheme)
+    return out
+
+
+def scorpion_cv_pairs_table(root: Path, opts: dict[str, list[str]]) -> str:
+    from scipy.stats import t as student_t
+
+    scores = _cv_fold_scores(root, opts)
+    ref_key = opts["ref"][0]
+    if ref_key not in scores:
+        return f"no CV run with reference `{ref_key}`"
+    ref_run, ref, ref_scheme = scores[ref_key]
+    header = [
+        "method", "folds", "top-1 mean", "ref top-1 mean", "Δ per fold", "Δ mean",
+        "95% CI (t, folds)", "folds better", "bench run dir",
+    ]  # fmt: skip
+    rows = []
+    for key in opts.get("tags", []):
+        if key not in scores:
+            rows.append([key, *["–"] * (len(header) - 2), "no CV run"])
+            continue
+        run, top1, scheme = scores[key]
+        if scheme != ref_scheme or set(top1.index) != set(ref.index):
+            rows.append([key, *["–"] * (len(header) - 2), "other folds"])
+            continue
+        delta = (top1 - ref.loc[top1.index]).sort_index()
+        n = len(delta)
+        half = student_t.ppf(0.975, n - 1) * delta.std(ddof=1) / math.sqrt(n)
+        rows.append([
+            key,
+            str(n),
+            f"{top1.mean():.4f}",
+            f"{ref.mean():.4f}",
+            " / ".join(f"{d:+.4f}" for d in delta),
+            f"{delta.mean():+.4f}",
+            f"[{delta.mean() - half:+.4f}, {delta.mean() + half:+.4f}]",
+            f"{int((delta > 0).sum())}/{n}",
+            f"`{_rel(run.dir)}`",
+        ])  # fmt: skip
+    return (
+        _table(header, rows)
+        + f"\n\nReference: `{ref_key}` (`{_rel(ref_run.dir)}`). Per-fold top-1 on the"
+        " held-out fold (`cv_folds.csv`; same WSI folds for every row, checked by"
+        " n_folds and fold seed); Δ = method minus reference per fold; 95% CI ="
+        " Student t over the folds (df = folds − 1), which treats the folds as"
+        " independent although their training sets overlap, so it is a rough guide."
+    )
+
+
 def map_spectrum_table(root: Path, opts: dict[str, list[str]]) -> str:
     header = [
         "map", "α fit", "fit RMSE", "off-diagonal", "kept content", "kept scanner",
@@ -1777,6 +1902,8 @@ TABLES = {
     "training": training_table,
     "map_spectrum": map_spectrum_table,
     "map_retrieval": map_retrieval_table,
+    "scorpion_cv": scorpion_cv_table,
+    "scorpion_cv_pairs": scorpion_cv_pairs_table,
 }
 
 
