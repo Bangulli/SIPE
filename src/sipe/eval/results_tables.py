@@ -1723,7 +1723,7 @@ def map_retrieval_table(root: Path, opts: dict[str, list[str]]) -> str:
 def scorpion_cv_table(root: Path, opts: dict[str, list[str]]) -> str:
     header = [
         "method", "value", "folds", "top-1 mean", "top-1 std", "top-1 per fold",
-        "cosine mean", "selected", "bench run dir", "SIPE commit",
+        "cosine mean", "rel. change", "selected", "bench run dir", "SIPE commit",
     ]  # fmt: skip
     rows = []
     runs = [
@@ -1746,7 +1746,12 @@ def scorpion_cv_table(root: Path, opts: dict[str, list[str]]) -> str:
             per_fold = folds.loc[match].sort_values("fold")["top_1_accuracy"]
             name = str(r[keys[0]])
             value = float(r["value"]) if sweep else None
-            chosen = sweep and selected.get(name, {}).get("value") == value
+            if sweep:
+                chosen = selected.get(name, {}).get("value") == value
+                mark = f"yes (`{selected[name]['map_file']}`)" if chosen else ""
+            else:
+                mark = "yes" if selected.get("selected") == name else ""
+            change = r.get("relative_change_mean", float("nan"))
             rows.append([
                 name,
                 "–" if value is None else f"{value:g}",
@@ -1755,7 +1760,8 @@ def scorpion_cv_table(root: Path, opts: dict[str, list[str]]) -> str:
                 f"{r['top_1_accuracy_std']:.4f}",
                 " / ".join(f"{v:.4f}" for v in per_fold),
                 f"{r['cosine_similarity_mean']:.4f}",
-                f"yes (`{selected[name]['map_file']}`)" if chosen else "",
+                "–" if pd.isna(change) else f"{change:.4f}",
+                mark,
                 *source,
             ])  # fmt: skip
     return (
@@ -1763,11 +1769,15 @@ def scorpion_cv_table(root: Path, opts: dict[str, list[str]]) -> str:
         + "\n\nWSI-grouped k-fold CV over every SCORPION WSI (`sipe.data.folds`,"
         " MIDL protocol): fit on the other folds, retrieval on the held-out fold"
         " (`sipe.eval.proxy.retrieval_metrics`, no probes); std over folds (ddof 1)."
-        " Value: lambda (eraser) or alpha (G0), 0 = raw. Selected: the 95% rule on"
-        " the fold mean, then refit on every WSI (`sipe.eval.cv_sweep`); the mean is"
-        " the selection value, so it is optimistic for the selected row. Rows"
-        " without a value are fold maps of trained fits (`sipe.eval.map_retrieval"
-        " --n-folds`)."
+        " Value: lambda (eraser) or alpha (G0), 0 = raw. Rel. change: fold mean of"
+        " ||x' - x|| / ||x||. Selected (`sipe.eval.proxy.select_cv`): best fold-mean"
+        " top-1; values whose per-fold paired difference to the best has a 95% t"
+        " interval containing 0 tie with it, and the tied one with the smallest"
+        " relative change wins; per method within its grid (`sipe.eval.cv_sweep`,"
+        " then refit on every WSI) or among the maps of one run"
+        " (`sipe.eval.map_retrieval --n-folds`, rows without a value: fold maps of"
+        " trained fits). The mean is the selection value, so it is optimistic for the"
+        " selected row."
     )
 
 

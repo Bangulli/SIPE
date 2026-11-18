@@ -5,12 +5,13 @@ SCORPION features of every WSI (train + val + test of the cache, 48 WSIs) are de
 into `--n-folds` WSI-grouped folds (`sipe.data.folds`, the same folds as
 `SCORPIONDataModule(n_folds=, fold=)`). For each fold, every method is fit on the
 other folds and each grid value is scored on the held-out fold by cross-scanner
-retrieval (`sipe.eval.proxy.retrieval_metrics`, no probes). The grid value is chosen
-on the mean over folds with the usual rule (`sipe.eval.proxy.select_lambda`: the
-smallest value whose mean top-1 gain over the identity reaches `--select-gain-frac`
-of the best gain), then refit on every WSI and saved as a `--posthoc` map file for
-PLISM / HEST. There is no SCORPION test: the CV mean is the selection value, so it
-is optimistic for the selected row.
+retrieval (`sipe.eval.proxy.retrieval_metrics`, no probes) and by how much the map
+moves the embedding (`relative_change`). The grid value is chosen by
+`sipe.eval.proxy.select_cv`: the best fold-mean top-1; values whose per-fold paired
+difference to the best is not resolved (t interval contains 0) tie with it, and the
+tied value with the smallest relative change wins. It is then refit on every WSI and
+saved as a `--posthoc` map file for PLISM / HEST. There is no SCORPION test: the CV
+mean is the selection value, so it is optimistic for the selected row.
 
 Methods (fits unchanged from the single-split sweeps):
 - `eraser_<slide|region|tile>`: soft-shrinkage eraser of
@@ -21,6 +22,8 @@ Methods (fits unchanged from the single-split sweeps):
 
 Outputs (run dir): `cv_folds.csv` (method, value, fold, retrieval columns),
 `cv_mean.csv` (mean and std over folds), `selected.json`, `map_<method>.pt`.
+`selected.json` is per method, within its own grid; methods are compared by the
+`scorpion_cv_pairs` blocks of `sipe.eval.results_tables`.
 
     uv run python -m sipe.eval.cv_sweep --tag cv4_baselines \\
         --features-from runs/bench/<feature cache run>   # CLAUDE.md, "Cached features"
@@ -48,8 +51,9 @@ from sipe.eval.proxy import (
     apply_map,
     cache_encoder,
     load_cv_cache,
+    relative_change,
     retrieval_metrics,
-    select_lambda,
+    select_cv,
 )
 from sipe.eval.soft_shrinkage_sweep import DEFAULT_LAMBDAS, ERASER_CONFIG, fit_family
 
@@ -109,9 +113,18 @@ def grid(method: str, args) -> list[float]:
     return sorted({0.0, *values})  # 0 = identity (raw), the base of the gain rule
 
 
+CV_COLS = (*RETRIEVAL_COLS, "relative_change")
+SELECT_RULE = (
+    "best fold-mean top-1; candidates whose per-fold paired difference to the best has"
+    " a 95% t interval containing 0 tie with it; among the tied, the smallest fold-mean"
+    " relative change (sipe.eval.proxy.select_cv)"
+)
+
+
 def cv_mean(folds: pd.DataFrame, keys: list[str]) -> pd.DataFrame:
-    """Mean and std (ddof 1) over folds of every retrieval column, per keys."""
-    stats = folds.groupby(keys, sort=False)[list(RETRIEVAL_COLS)].agg(["mean", "std"])
+    """Mean and std (ddof 1) over folds of every CV column, per keys."""
+    cols = [c for c in CV_COLS if c in folds.columns]
+    stats = folds.groupby(keys, sort=False)[cols].agg(["mean", "std"])
     stats.columns = [f"{c}_{s}" for c, s in stats.columns]
     n = folds.groupby(keys, sort=False)["fold"].nunique().rename("n_folds")
     return stats.join(n).reset_index()
@@ -131,7 +144,6 @@ def main(argv: list[str] | None = None) -> Path:
     parser.add_argument("--alphas", nargs="+", type=float, default=list(DEFAULT_ALPHAS))
     parser.add_argument("--ridge", type=float, default=1e-4, help="G0 (mixture_sweep).")
     parser.add_argument("--gate-dim", type=int, default=32, help="G0 map file only.")
-    parser.add_argument("--select-gain-frac", type=float, default=0.95)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--device", type=int, default=0, help="CUDA index, -1 = CPU.")
     args = parser.parse_args(argv)
@@ -145,7 +157,8 @@ def main(argv: list[str] | None = None) -> Path:
             "benchmark": "scorpion_cv_sweep",
             **{k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items()},
             "protocol": "WSI-grouped k-fold CV on every cached WSI (sipe.data.folds);"
-            " select on the fold mean of val top-1; refit on every WSI",
+            " select per method on the folds; refit on every WSI",
+            "selection": SELECT_RULE,
             "eraser": ERASER_CONFIG,
         },
         checkpoint={"features_from": str(args.features_from.resolve())},
@@ -159,13 +172,19 @@ def main(argv: list[str] | None = None) -> Path:
         )
         base = {"fold": fold, "n_train_wsi": meta["train"]["slide_id"].nunique(),
                 "n_val_wsi": meta["val"]["slide_id"].nunique()}  # fmt: skip
-        raw = retrieval_metrics(x["val"], meta["val"], device)
+        raw = {**retrieval_metrics(x["val"], meta["val"], device),
+               "relative_change": 0.0}  # fmt: skip
         for method in args.methods:
             fitted = Fitted(method, x["train"], meta["train"], args, device)
             for value in grid(method, args):
-                metrics = raw if value == 0.0 else retrieval_metrics(
-                    apply_map(fitted.map(value), x["val"], device), meta["val"], device
-                )  # fmt: skip
+                if value == 0.0:
+                    metrics = raw
+                else:
+                    out = apply_map(fitted.map(value), x["val"], device)
+                    metrics = {
+                        **retrieval_metrics(out, meta["val"], device),
+                        "relative_change": relative_change(out, x["val"]),
+                    }
                 rows.append({"method": method, "value": value, **base, **metrics})
                 log.info("fold %d %s %g: top-1 %.4f", fold, method, value,
                          metrics["top_1_accuracy"])  # fmt: skip
@@ -180,23 +199,22 @@ def main(argv: list[str] | None = None) -> Path:
     )
     selected = {}
     for method, m in mean.groupby("method", sort=False):
-        rule_rows = m.rename(
-            columns={"value": "lambda", "top_1_accuracy_mean": "top_1_accuracy"}
-        )
-        best = select_lambda(rule_rows, args.select_gain_frac)
-        value = float(best["lambda"])
+        value, tied, best = select_cv(folds.loc[folds["method"] == method], "value")
+        value, row = float(value), m.set_index("value").loc[value]
         per_fold = folds.loc[(folds["method"] == method) & (folds["value"] == value)]
         path = run_dir / f"map_{method}.pt"
         Fitted(method, x["train"], meta["train"], args, device).save(value, path, args)
         selected[method] = {
             "value": value,
             "param": "alpha" if method == "g0" else "lambda",
-            "rule": f"smallest value with mean CV top-1 gain >= "
-            f"{args.select_gain_frac:g} x best gain",
-            "cv_top_1_mean": float(best["top_1_accuracy"]),
-            "cv_top_1_std": float(best["top_1_accuracy_std"]),
+            "rule": SELECT_RULE,
+            "best_value": float(best),
+            "tied_values": sorted(float(v) for v in tied),
+            "cv_top_1_mean": float(row["top_1_accuracy_mean"]),
+            "cv_top_1_std": float(row["top_1_accuracy_std"]),
             "cv_top_1_folds": per_fold.sort_values("fold")["top_1_accuracy"].tolist(),
             "cv_top_1_best": float(m["top_1_accuracy_mean"].max()),
+            "cv_relative_change_mean": float(row["relative_change_mean"]),
             "cv_top_1_raw": float(
                 m.loc[m["value"] == 0.0, "top_1_accuracy_mean"].iloc[0]
             ),

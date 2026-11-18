@@ -8,9 +8,12 @@ comparable (the metrics themselves are in `sipe.eval.scorpion_retrieval`):
   region probe (content guard) and the mean relative change of the embedding;
 - `summarize`: `evaluate` for several maps on val (probes trained on a train
   subsample) or test (probes trained on val), the split conventions of the sweeps;
-- `select_by_gain`: the 95% rule. First row, in a given simplicity order, whose val
-  top-1 gain over a base reaches `gain_frac` x the best gain; `select_lambda` is the
-  eraser's form (order = lambda, base = lambda 0).
+- `select_cv`: the MIDL rule on CV folds (best fold-mean top-1; ties, i.e. a per-fold
+  paired difference to the best that is not resolved, go to the map that changes the
+  embedding least);
+- `select_by_gain`: the 95% rule (ISBI protocol). First row, in a given simplicity
+  order, whose val top-1 gain over a base reaches `gain_frac` x the best gain;
+  `select_lambda` is the eraser's form (order = lambda, base = lambda 0).
 
 Moved out of `sipe.eval.soft_shrinkage_sweep` / `sipe.eval.mixture_sweep` without
 behavior changes (2026-10-15); those modules re-export the old names.
@@ -127,6 +130,12 @@ def apply_map(
     return np.concatenate(out)
 
 
+def relative_change(x: np.ndarray, raw: np.ndarray) -> float:
+    """Mean over rows of ||x - raw|| / ||raw|| (how much a map moves the embedding)."""
+    diff = x.astype(np.float64) - raw
+    return float(np.mean(np.linalg.norm(diff, axis=1) / np.linalg.norm(raw, axis=1)))
+
+
 def retrieval_metrics(x: np.ndarray, meta: pd.DataFrame, device) -> dict[str, float]:
     pairs = retrieval(x, meta, device)
     return {c: float(pairs[c].mean()) for c in RETRIEVAL_COLS}
@@ -141,14 +150,11 @@ def evaluate(
     device: torch.device,
 ) -> dict[str, float]:
     pairs = retrieval(eval_x, eval_meta, device)
-    diff = eval_x.astype(np.float64) - raw_eval_x
     return {
         **{c: float(pairs[c].mean()) for c in RETRIEVAL_COLS},
         **scanner_probes(probe_x, probe_y, eval_x, eval_meta["domain"].to_numpy()),
         "region_probe_acc": region_probe(eval_x, eval_meta)["region_probe_acc"],
-        "relative_change": float(
-            np.mean(np.linalg.norm(diff, axis=1) / np.linalg.norm(raw_eval_x, axis=1))
-        ),
+        "relative_change": relative_change(eval_x, raw_eval_x),
     }
 
 
@@ -203,3 +209,35 @@ def select_lambda(rows: pd.DataFrame, gain_frac: float) -> pd.Series:
     rows = rows.sort_values("lambda")
     raw = float(rows.loc[rows["lambda"] == 0.0, "top_1_accuracy"].iloc[0])
     return select_by_gain(rows, gain_frac, raw)
+
+
+def select_cv(
+    folds: pd.DataFrame, key: str, ci: float = 0.95
+) -> tuple[object, list, object]:
+    """MIDL selection on CV folds: (selected key, tied keys, best key).
+
+    `folds` has one row per (key, fold) with `top_1_accuracy` and `relative_change`.
+    Best = highest fold-mean top-1. A candidate ties with the best when its per-fold
+    paired difference to the best is not resolved: the Student t interval (`ci`, df =
+    folds - 1) of the mean difference contains 0 (zero spread: tie iff the difference is
+    0). Among the tied (the best included), the smallest fold-mean `relative_change`
+    wins, i.e. the map that changes the embedding least.
+    """
+    from scipy.stats import t as student_t
+
+    top1 = folds.pivot(index="fold", columns=key, values="top_1_accuracy")
+    if top1.isna().any().any():
+        raise ValueError("select_cv: every candidate needs a score on every fold.")
+    change = folds.groupby(key, sort=False)["relative_change"].mean()
+    best = top1.mean().idxmax()
+    n = len(top1)
+    half = student_t.ppf(0.5 + ci / 2, n - 1) if n > 1 else np.inf
+    tied = []
+    for cand in top1.columns:
+        delta = top1[cand] - top1[best]
+        sd = float(delta.std(ddof=1)) if n > 1 else np.nan
+        mean = float(delta.mean())
+        if mean == 0.0 or (sd > 0 and mean + half * sd / np.sqrt(n) >= 0):
+            tied.append(cand)
+    selected = min(tied, key=lambda c: (change[c], str(c)))
+    return selected, tied, best

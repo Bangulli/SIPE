@@ -16,7 +16,7 @@ from test_mixture import _write_cache
 from sipe.bench.posthoc import load_posthoc_map
 from sipe.data.folds import REFIT, group_folds
 from sipe.data.scorpion import PairedSCORPIONDataModule
-from sipe.eval.proxy import load_cache, load_cv_cache
+from sipe.eval.proxy import load_cache, load_cv_cache, select_cv
 
 
 def test_group_folds_balanced_and_deterministic():
@@ -30,6 +30,28 @@ def test_group_folds_balanced_and_deterministic():
         group_folds(groups, 1)
     with pytest.raises(ValueError):
         group_folds(["a", "b"], 3)
+
+
+def _folds(scores, changes):
+    return pd.DataFrame(
+        [{"name": k, "fold": f, "top_1_accuracy": v, "relative_change": changes[k]}
+         for k, per_fold in scores.items() for f, v in enumerate(per_fold)]
+    )  # fmt: skip
+
+
+def test_select_cv_best_then_least_change_among_ties():
+    changes = {"small": 0.1, "big": 0.3, "worse": 0.05}
+    # big is best; small is below it on every fold by a steady 0.002: resolved.
+    resolved = {"big": [0.90, 0.92, 0.94, 0.96], "small": [0.898, 0.918, 0.938, 0.958],
+                "worse": [0.80, 0.82, 0.84, 0.86]}  # fmt: skip
+    assert select_cv(_folds(resolved, changes), "name") == ("big", ["big"], "big")
+    # small is behind on average but not on every fold: a tie, the smaller change wins.
+    noisy = {**resolved, "small": [0.91, 0.91, 0.95, 0.95]}
+    selected, tied, best = select_cv(_folds(noisy, changes), "name")
+    assert (selected, best) == ("small", "big") and set(tied) == {"big", "small"}
+    # equal scores on every fold (zero spread) also tie.
+    equal = {**resolved, "small": resolved["big"]}
+    assert select_cv(_folds(equal, changes), "name")[0] == "small"
 
 
 def _paired_dm(root, fold):
@@ -123,8 +145,15 @@ def test_cv_sweep_selects_on_the_fold_mean_and_refits(tmp_path, monkeypatch):
         assert sel["cv_top_1_mean"] == pytest.approx(
             np.mean(sel["cv_top_1_folds"]), abs=1e-3
         )
-        gain = rows["top_1_accuracy_mean"] - sel["cv_top_1_raw"]
-        assert sel["cv_top_1_mean"] - sel["cv_top_1_raw"] >= 0.95 * gain.max() - 1e-3
+        assert (
+            sel["best_value"] == rows.loc[rows["top_1_accuracy_mean"].idxmax(), "value"]
+        )
+        assert (
+            sel["value"] in sel["tied_values"]
+            and sel["best_value"] in sel["tied_values"]
+        )
+        tied = rows.loc[rows["value"].isin(sel["tied_values"])]
+        assert row["relative_change_mean"] == tied["relative_change_mean"].min()
         fmap = load_posthoc_map(run_dir / sel["map_file"]).map
         # The saved map is the refit on every WSI at the selected value.
         refit = cv.Fitted(
@@ -156,6 +185,10 @@ def test_map_retrieval_cv_mode(tmp_path, monkeypatch):
     folds = pd.read_csv(run_dir / "cv_folds.csv")
     mean = pd.read_csv(run_dir / "cv_mean.csv")
     assert set(mean["name"]) == {"raw", "same"} and set(folds["fold"]) == {0, 1, 2, 3}
+    assert (folds.query("name == 'raw'")["relative_change"] == 0).all()
+    assert (folds.query("name == 'same'")["relative_change"] > 0).all()
+    selected = json.loads((run_dir / "selected.json").read_text())
+    assert selected["selected"] in selected["tied"] and selected["best"] == "same"
     # Raw rows equal the CV sweep's identity rows (same folds, same metric).
     raw = pd.read_csv(sweep / "cv_folds.csv").query("value == 0")
     np.testing.assert_allclose(

@@ -12,8 +12,10 @@ CV mode (`--n-folds`, MIDL protocol): each `--maps` entry is `NAME=PATH_0,...,PA
 the map of each fold's fit (`sipe fit ... --data.init_args.n_folds=K
 --data.init_args.fold=k`); map k is scored on the held-out WSIs of fold k
 (`sipe.eval.proxy.load_cv_cache`, the datamodule's folds). Outputs `cv_folds.csv`
-(name, fold, retrieval columns) and `cv_mean.csv` (mean and std over folds), the
-columns of `sipe.eval.cv_sweep`; raw is a row of both.
+(name, fold, retrieval columns, relative change) and `cv_mean.csv` (mean and std over
+folds), the columns of `sipe.eval.cv_sweep`; raw is a row of both. `selected.json`:
+the pick among the maps of the run and raw, by the rule of `sipe.eval.proxy.select_cv`
+(e.g. a step budget or an architecture arm, given as separate `--maps` entries).
 
     uv run python -m sipe.eval.map_retrieval --tag <tag> --split test \\
         --features-from runs/bench/<feature cache run> --maps <name>=<map file> ...
@@ -24,6 +26,7 @@ columns of `sipe.eval.cv_sweep`; raw is a row of both.
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 from pathlib import Path
 
@@ -32,14 +35,16 @@ import torch
 
 from sipe.bench.posthoc import load_posthoc_map
 from sipe.bench.provenance import new_bench_run_dir, write_run_info
-from sipe.eval.cv_sweep import cv_mean
+from sipe.eval.cv_sweep import SELECT_RULE, cv_mean
 from sipe.eval.proxy import (
     apply_map,
     cache_encoder,
     check_map_matches_cache,
     load_cache,
     load_cv_cache,
+    relative_change,
     retrieval_metrics,
+    select_cv,
 )
 
 
@@ -52,13 +57,12 @@ def run_cv(args, maps: dict[str, list[str]], run_dir: Path, device) -> None:
         x, meta = x["val"], meta["val"]
         base = {"fold": fold, "n_val_wsi": meta["slide_id"].nunique()}
         rows.append({"name": "raw", **base, **retrieval_metrics(x, meta, device),
-                     "path": ""})  # fmt: skip
+                     "relative_change": 0.0, "path": ""})  # fmt: skip
         for name, paths in maps.items():
-            fmap = load_posthoc_map(paths[fold]).map
+            out = apply_map(load_posthoc_map(paths[fold]).map, x, device)
             rows.append({
-                "name": name, **base,
-                **retrieval_metrics(apply_map(fmap, x, device), meta, device),
-                "path": paths[fold],
+                "name": name, **base, **retrieval_metrics(out, meta, device),
+                "relative_change": relative_change(out, x), "path": paths[fold],
             })  # fmt: skip
             logging.info(
                 "fold %d %s: top-1 %.4f", fold, name, rows[-1]["top_1_accuracy"]
@@ -67,7 +71,12 @@ def run_cv(args, maps: dict[str, list[str]], run_dir: Path, device) -> None:
     folds.to_csv(run_dir / "cv_folds.csv", index=False, float_format="%.4f")
     mean = cv_mean(folds, ["name"])
     mean.to_csv(run_dir / "cv_mean.csv", index=False, float_format="%.4f")
+    name, tied, best = select_cv(folds, "name")
+    selected = {"selected": name, "tied": sorted(tied), "best": best,
+                "rule": SELECT_RULE}  # fmt: skip
+    (run_dir / "selected.json").write_text(json.dumps(selected, indent=2) + "\n")
     print(mean.to_string(index=False, float_format="%.4f"))
+    print(json.dumps(selected, indent=2))
 
 
 def main(argv: list[str] | None = None) -> None:
