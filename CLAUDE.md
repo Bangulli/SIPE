@@ -21,9 +21,10 @@ are small or unstable.
 - Fit everything (means, PCA bases, covariances, clusters, gates) on the training folds only;
   pick hyperparameters on SCORPION only. Don't tune on PLISM; it is an external benchmark.
 - **Selection protocol (MIDL, from 2026-11-17):** WSI-grouped 4-fold CV over all 48 SCORPION
-  WSIs (`sipe.data.folds`); select on the fold mean of top-1 (95% rule), refit the chosen
-  setting on every WSI, then PLISM / HEST. No SCORPION test. Commands: `docs/estimators.md`,
-  "MIDL selection protocol". The single train/val/test split (tag `midl-pre-cv`) is the ISBI
+  WSIs (`sipe.data.folds`); select the best fold-mean top-1, ties (per-fold paired difference
+  not resolved) to the map that changes the embedding least (`sipe.eval.proxy.select_cv`; no
+  95% rule), refit the chosen setting on every WSI, then PLISM / HEST. No SCORPION test.
+  Commands: `docs/estimators.md`, "MIDL selection protocol". The single train/val/test split (tag `midl-pre-cv`) is the ISBI
   protocol; its runs stay as they are.
 - State the pairing unit of every method: tile/ROI-level pairs or slide-level scanner means.
 - Scanner-probe accuracy is a diagnostic, not the target. Don't claim scanner invariance or
@@ -104,8 +105,8 @@ Read the relevant section there before running or changing one.
 - The eraser code is vendored verbatim in `src/sipe/baselines/soft_delta_legacy.py` and
   `shrinkage_legacy.py`, with the source commit in the header. Don't edit them; re-vendor
   instead. vfm-geom-xai itself is not a dependency.
-- λ / hyperparameter rule: smallest λ (simplest setting) reaching 95% of the best val top-1
-  gain. The goal is to mitigate scanner distances, not to erase the scanner: never select by
+- λ / hyperparameter rule (ISBI single split; MIDL uses `select_cv`, above): smallest λ
+  (simplest setting) reaching 95% of the best val top-1 gain. The goal is to mitigate scanner distances, not to erase the scanner: never select by
   probe removal. Val probes train on train, test probes on val: not comparable.
 - Poolings: `gap` = mean of the patch tokens without prefix tokens (= `backbone_gap`);
   `cls` = token 0. Report which pooling a number uses.

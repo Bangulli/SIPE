@@ -41,8 +41,12 @@ Replaces the single train/val/test split for selection (git tag `midl-pre-cv` = 
 single-split state). The 48 SCORPION WSIs are dealt into 4 folds of 12
 (`sipe.data.folds.group_folds`: sorted slide ids, torch `randperm` seed 42, round robin).
 A setting is scored by the mean over folds of the held-out fold's top-1 (fit on the
-other 3); the 95% rule runs on that mean; the chosen setting is refit on all 48 WSIs, and
-that map goes to PLISM / HEST. No SCORPION test number: the CV mean is the selection
+other 3). Selection (`sipe.eval.proxy.select_cv`, from 2026-11-18; no 95% rule): the best
+fold-mean top-1; a candidate whose per-fold paired difference to the best has a 95% t
+interval containing 0 ties with it, and among the tied the smallest fold-mean relative change
+||x' − x|| / ||x|| wins. Per method within its grid, or among the maps of one
+`map_retrieval --n-folds` run (budgets, arms); methods are compared by `scorpion_cv_pairs`.
+The chosen setting is refit on all 48 WSIs, and that map goes to PLISM / HEST. No SCORPION test number: the CV mean is the selection
 value (optimistic for the selected row).
 
 - Closed-form maps: `uv run python -m sipe.eval.cv_sweep --tag <tag> --features-from

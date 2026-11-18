@@ -1,4 +1,4 @@
-# Findings: what the acquisition-shrinkage phase taught us (as of 2026-10-29)
+# Findings: what the acquisition-shrinkage phase taught us (as of 2026-11-18)
 
 Lessons that outlive single runs: about the benchmarks, the protocols, the data and what
 did or did not work. Each one names its evidence (run dir, or the table in
@@ -179,6 +179,21 @@ to 14x14 at load, interpolated back at each 448 px forward) changed nearest neig
 against the checkpoint's own grid. We follow TRIDENT exactly (`src/sipe/model/conch.py`)
 and test the match (`tests/test_bench_adapters.py::test_conch_v15_matches_trident`, bench
 env). A plismbench leaderboard row of CONCH v1.5 is therefore not directly comparable to ours.
+
+**22. The 95% rule cannot rank methods on SCORPION CV; dropped for MIDL (2026-11-18).**
+The rule's tolerance is 5% of the gain over raw. Raw mean top-1 is 0.8269 on the 4-fold CV
+(`runs/bench/2026-11-17_18-14-03_claude-box_4590_scorpion_cv4_baselines`), so the tolerance
+is ~0.008, more than every gap between the competitive maps. Applied across arms, V0-S 6k
+(0.9739) would pass against V1-S 12k (0.9809,
+`runs/bench/2026-11-18_07-25-12_claude-box_e046_scorpion_cv4_cgm_kl0.2`), although V1-S 6k
+beats it on 4/4 folds by +0.0057 [+0.0037, +0.0077]. Keep the rule for one method's own grid
+(α, λ, step budget, ρ) at most. Decision (user, 2026-11-18): the MIDL rule is the best
+fold-mean top-1, with ties (per-fold paired difference whose t interval contains 0) going to
+the map that changes the embedding least (`sipe.eval.proxy.select_cv`). Compare methods by
+`scorpion_cv_pairs` (Δ per fold, t interval, folds better), which resolves gaps of ~0.001
+when they are consistent. Under the 95% rule V1-S would have been 6k; under the new rule it
+is 12k (12k vs 6k +0.0013 [+0.0011, +0.0015], 4/4 folds,
+`runs/bench/2026-11-18_08-03-48_claude-box_8a1a_scorpion_cv4_cgm_kl0.2_argmax`).
 
 ## Data and the acquisition nuisance
 
